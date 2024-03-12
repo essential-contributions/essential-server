@@ -1,6 +1,6 @@
 use essential_types::{intent::Intent, PersistentAddress};
-
-use crate::{signed::Signed, storage::Storage};
+use placeholder::Signed;
+use storage::Storage;
 
 #[cfg(test)]
 mod tests;
