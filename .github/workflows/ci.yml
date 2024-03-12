@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cargo:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - command: check --locked --all
+          - command: clippy --locked --all -- -D warnings
+          - command: fmt --all -- --check
+          - command: test --locked --all
+          - command: test --no-default-features --locked --all
+          - command: test --all-features --locked --all
+    env:
+        CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
+    steps:
+    - name: Provide Access to Private Repos
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_SELF }}
+    - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v2
+    - run: cargo ${{ matrix.command }}
+
+  # TODO: Update/fork this tool to provide a simpler, cargo-plugin-style CLI
+  # so that it can be merged in the command table above
+  cargo-toml-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v2
+    - run: cargo install --version "0.1.1" cargo-toml-lint
+    - run: git ls-files | grep Cargo.toml$ | xargs --verbose -n 1 cargo-toml-lint
