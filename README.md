@@ -6,5 +6,6 @@
 - Query State
 - List Intents
 - List Intent Storage Layout
+- Update EOA State
 - Sign EOA Authority To Solve Intent
 - List Previous Winning Solutions
