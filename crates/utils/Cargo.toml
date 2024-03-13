@@ -2,3 +2,6 @@
 edition = "2021"
 name = "utils"
 version = "0.1.0"
+
+[dependencies]
+essential-types = { workspace = true }

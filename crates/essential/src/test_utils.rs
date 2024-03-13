@@ -29,6 +29,5 @@ pub fn sign<T>(data: T) -> Signed<T> {
     Signed {
         data,
         signature: todo!(),
-        public_key: todo!(),
     }
 }

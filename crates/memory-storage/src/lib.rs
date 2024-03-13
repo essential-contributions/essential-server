@@ -1,7 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
-use essential_types::{intent::Intent, IntentAddress, PersistentAddress};
-use placeholder::{Batch, EoaPermit, Signed, StorageLayout};
+use essential_types::{
+    intent::Intent, solution::Solution, Eoa, Hash, IntentAddress, Key, PersistentAddress, Word,
+};
+use placeholder::{Batch, EoaPermit, Signature, Signed, StorageLayout};
 use storage::Storage;
 use utils::Lock;
 
@@ -18,8 +24,19 @@ impl Default for MemoryStorage {
 
 #[derive(Default)]
 struct Inner {
-    intents: HashMap<PersistentAddress, Signed<Vec<Intent>>>,
+    intents: HashMap<IntentAddress, IntentSet>,
+    permit_pool: Vec<Signed<EoaPermit>>,
+    solution_pool: HashMap<Hash, Signed<Solution>>,
+    solved: BTreeMap<Duration, Batch>,
+    state: HashMap<IntentAddress, BTreeMap<Key, Word>>,
+    eoa_state: HashMap<Eoa, BTreeMap<Key, Word>>,
     // TODO: Add other storage data.
+}
+
+struct IntentSet {
+    order: Vec<IntentAddress>,
+    data: HashMap<IntentAddress, Intent>,
+    signature: Signature,
 }
 
 impl MemoryStorage {
@@ -32,25 +49,45 @@ impl MemoryStorage {
 
 impl Storage for MemoryStorage {
     async fn insert_intent_set(&self, intent: Signed<Vec<Intent>>) -> anyhow::Result<()> {
-        todo!()
+        let Signed { data, signature } = intent;
+        let hash = IntentAddress(utils::hash(&data));
+        let order: Vec<_> = data.iter().map(|i| IntentAddress(utils::hash(i))).collect();
+        let map = order.iter().cloned().zip(data.into_iter()).collect();
+        let set = IntentSet {
+            order,
+            data: map,
+            signature,
+        };
+        self.inner.apply(|i| i.intents.insert(hash, set));
+        Ok(())
     }
 
     async fn insert_permit_into_pool(&self, permit: Signed<EoaPermit>) -> anyhow::Result<()> {
-        todo!()
+        self.inner.apply(|i| i.permit_pool.push(permit));
+        Ok(())
     }
 
-    async fn insert_solution_into_pool(
-        &self,
-        solution: Signed<essential_types::solution::Solution>,
-    ) -> anyhow::Result<()> {
-        todo!()
+    async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
+        let hash = utils::hash(&solution.data);
+        self.inner.apply(|i| i.solution_pool.insert(hash, solution));
+        Ok(())
     }
 
-    async fn move_solutions_to_solved(
-        &self,
-        solutions: &[essential_types::Hash],
-    ) -> anyhow::Result<()> {
-        todo!()
+    async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
+        self.inner.apply(|i| {
+            let solutions = solutions
+                .iter()
+                .filter_map(|h| i.solution_pool.remove(h))
+                .collect();
+            let batch = Batch { solutions };
+            i.solved.insert(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap(),
+                batch,
+            );
+        });
+        Ok(())
     }
 
     async fn update_state(
@@ -64,7 +101,7 @@ impl Storage for MemoryStorage {
 
     async fn update_eoa_state(
         &self,
-        address: &essential_types::Eoa,
+        address: &Eoa,
         key: &[u8],
         value: Option<Vec<u8>>,
     ) -> anyhow::Result<Option<Vec<u8>>> {
