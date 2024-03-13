@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use essential_types::{
@@ -25,12 +25,12 @@ impl Default for MemoryStorage {
 #[derive(Default)]
 struct Inner {
     intents: HashMap<IntentAddress, IntentSet>,
+    intent_time_index: BTreeMap<Duration, IntentAddress>,
     permit_pool: Vec<Signed<EoaPermit>>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
     solved: BTreeMap<Duration, Batch>,
     state: HashMap<IntentAddress, BTreeMap<Key, Word>>,
     eoa_state: HashMap<Eoa, BTreeMap<Key, Word>>,
-    // TODO: Add other storage data.
 }
 
 struct IntentSet {
@@ -64,7 +64,11 @@ impl Storage for MemoryStorage {
             data: map,
             signature,
         };
-        self.inner.apply(|i| i.intents.insert(hash, set));
+        let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        self.inner.apply(|i| {
+            i.intents.insert(hash.clone(), set);
+            i.intent_time_index.insert(time, hash);
+        });
         Ok(())
     }
 
@@ -159,7 +163,19 @@ impl Storage for MemoryStorage {
         &self,
         address: &IntentAddress,
     ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
-        todo!()
+        let v = self.inner.apply(|i| {
+            let set = i.intents.get(address)?;
+            let data = set
+                .order
+                .iter()
+                .map(|i| set.data.get(i).cloned())
+                .collect::<Option<Vec<_>>>()?;
+            Some(Signed {
+                data,
+                signature: set.signature,
+            })
+        });
+        Ok(v)
     }
 
     async fn list_intents(
