@@ -1,11 +1,21 @@
 [workspace]
-members = ["crates/essential"]
+members = [
+    "crates/essential",
+    "crates/memory-storage",
+    "crates/placeholder",
+    "crates/storage",
+    "crates/utils",
+]
 resolver = "2"
 
 [workspace.dependencies]
 anyhow = "1.0.80"
-ed25519-dalek = { version = "2.1.0", features = ["rand_core"] }
-essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-constraint-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-state-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 tokio = { version = "1.36.0", features = ["full"] }
+
+placeholder = { path = "crates/placeholder" }
+memory-storage = { path = "crates/memory-storage" }
+storage = { path = "crates/storage" }
+utils = { path = "crates/utils" }

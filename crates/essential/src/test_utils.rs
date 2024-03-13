@@ -1,12 +1,9 @@
 use essential_types::{
     intent::{Directive, Intent},
     slots::Slots,
+    solution::Solution,
 };
-
-use crate::signed::Signed;
-pub use storage::TestStorage;
-
-mod storage;
+use placeholder::Signed;
 
 pub fn empty_intent() -> Intent {
     Intent {
@@ -18,6 +15,13 @@ pub fn empty_intent() -> Intent {
         state_read: Default::default(),
         constraints: Default::default(),
         directive: Directive::Satisfy,
+    }
+}
+
+pub fn empty_solution() -> Solution {
+    Solution {
+        data: Default::default(),
+        state_mutations: Default::default(),
     }
 }
 
