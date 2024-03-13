@@ -1,7 +1,8 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Eoa, Hash, IntentAddress, PersistentAddress,
+    intent::Intent, solution::Solution, Eoa, Hash, IntentAddress, Key, KeyRange, PersistentAddress,
+    Word,
 };
 use placeholder::{Batch, EoaPermit, Signed, StorageLayout};
 use storage::Storage;
@@ -91,19 +92,35 @@ where
     pub async fn query_state(
         &self,
         address: &IntentAddress,
-        key: &[u8],
-    ) -> anyhow::Result<Vec<u8>> {
+        key: &Key,
+    ) -> anyhow::Result<Option<Word>> {
         self.storage.query_state(address, key).await
     }
 
-    pub async fn query_eoa_state(&self, address: &Eoa, key: &[u8]) -> anyhow::Result<Vec<u8>> {
+    pub async fn query_state_range(
+        &self,
+        address: &IntentAddress,
+        key: &KeyRange,
+    ) -> anyhow::Result<Vec<Option<Word>>> {
+        self.storage.query_state_range(address, key).await
+    }
+
+    pub async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
         self.storage.query_eoa_state(address, key).await
+    }
+
+    pub async fn query_eoa_state_range(
+        &self,
+        address: &Eoa,
+        key: &KeyRange,
+    ) -> anyhow::Result<Vec<Option<Word>>> {
+        self.storage.query_eoa_state_range(address, key).await
     }
 
     pub async fn get_storage_layout(
         &self,
         address: &IntentAddress,
-    ) -> anyhow::Result<StorageLayout> {
+    ) -> anyhow::Result<Option<StorageLayout>> {
         self.storage.get_storage_layout(address).await
     }
 }

@@ -2,6 +2,7 @@
 members = [
     "crates/essential",
     "crates/memory-storage",
+    "crates/rlite-storage",
     "crates/placeholder",
     "crates/storage",
     "crates/utils",
