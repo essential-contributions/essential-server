@@ -1,7 +1,7 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Eoa, Hash, IntentAddress, Key, KeyRange, PersistentAddress,
+    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, KeyRange,
     Word,
 };
 
@@ -19,13 +19,13 @@ pub trait Storage {
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()>;
     async fn update_state(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &Key,
         value: Option<Word>,
     ) -> anyhow::Result<Option<Word>>;
     async fn update_state_range(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &KeyRange,
         value: Option<Word>,
     ) -> anyhow::Result<Vec<Option<Word>>>;
@@ -42,10 +42,10 @@ pub trait Storage {
         value: Option<Word>,
     ) -> anyhow::Result<Vec<Option<Word>>>;
     // Reads
-    async fn get_intent(&self, address: &PersistentAddress) -> anyhow::Result<Option<Intent>>;
+    async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>>;
     async fn get_intent_set(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
     ) -> anyhow::Result<Option<Signed<Vec<Intent>>>>;
     /// List all intents. This will paginate the results. The page is 0-indexed.
     /// A time range can optionally be provided to filter the results.
@@ -62,11 +62,14 @@ pub trait Storage {
         time_range: impl Into<Option<Range<Duration>>>,
         page: impl Into<Option<usize>>,
     ) -> anyhow::Result<Vec<Batch>>;
-    async fn query_state(&self, address: &IntentAddress, key: &Key)
-        -> anyhow::Result<Option<Word>>;
+    async fn query_state(
+        &self,
+        address: &ContentAddress,
+        key: &Key,
+    ) -> anyhow::Result<Option<Word>>;
     async fn query_state_range(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>>;
     async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>>;
@@ -77,6 +80,6 @@ pub trait Storage {
     ) -> anyhow::Result<Vec<Option<Word>>>;
     async fn get_storage_layout(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
     ) -> anyhow::Result<Option<StorageLayout>>;
 }

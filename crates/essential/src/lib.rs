@@ -1,7 +1,7 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Eoa, Hash, IntentAddress, Key, KeyRange, PersistentAddress,
+    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, KeyRange,
     Word,
 };
 use placeholder::{Batch, EoaPermit, Signed, StorageLayout};
@@ -38,7 +38,7 @@ where
     pub async fn deploy_intent_set(
         &self,
         intents: Signed<Vec<Intent>>,
-    ) -> anyhow::Result<PersistentAddress> {
+    ) -> anyhow::Result<ContentAddress> {
         deploy::deploy(&self.storage, intents).await
     }
 
@@ -54,13 +54,13 @@ where
         permit::submit_permit(&self.storage, permit).await
     }
 
-    pub async fn get_intent(&self, address: &PersistentAddress) -> anyhow::Result<Option<Intent>> {
+    pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
         self.storage.get_intent(address).await
     }
 
     pub async fn get_intent_set(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
     ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
         self.storage.get_intent_set(address).await
     }
@@ -91,7 +91,7 @@ where
 
     pub async fn query_state(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &Key,
     ) -> anyhow::Result<Option<Word>> {
         self.storage.query_state(address, key).await
@@ -99,7 +99,7 @@ where
 
     pub async fn query_state_range(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>> {
         self.storage.query_state_range(address, key).await
@@ -119,7 +119,7 @@ where
 
     pub async fn get_storage_layout(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
     ) -> anyhow::Result<Option<StorageLayout>> {
         self.storage.get_storage_layout(address).await
     }

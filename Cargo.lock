@@ -84,7 +84,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3c06ddbdb3cb103eb1374fd77e58861eeb2c747d"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#5e5c9058c749f52d8f784a5acaa95584d838515b"
 dependencies = [
  "serde",
  "serde_json",

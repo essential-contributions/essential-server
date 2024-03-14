@@ -5,7 +5,7 @@ use std::{
 };
 
 use essential_types::{
-    intent::Intent, solution::Solution, Eoa, Hash, IntentAddress, Key, PersistentAddress, Word,
+    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, Word,
 };
 use placeholder::{Batch, EoaPermit, Signature, Signed, StorageLayout};
 use storage::Storage;
@@ -24,19 +24,19 @@ impl Default for MemoryStorage {
 
 #[derive(Default)]
 struct Inner {
-    intents: HashMap<IntentAddress, IntentSet>,
-    intent_time_index: BTreeMap<Duration, IntentAddress>,
+    intents: HashMap<ContentAddress, IntentSet>,
+    intent_time_index: BTreeMap<Duration, ContentAddress>,
     permit_pool: Vec<Signed<EoaPermit>>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
     solved: BTreeMap<Duration, Batch>,
-    state: HashMap<IntentAddress, BTreeMap<Key, Word>>,
+    state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
     eoa_state: HashMap<Eoa, BTreeMap<Key, Word>>,
 }
 
 struct IntentSet {
     storage_layout: StorageLayout,
-    order: Vec<IntentAddress>,
-    data: HashMap<IntentAddress, Intent>,
+    order: Vec<ContentAddress>,
+    data: HashMap<ContentAddress, Intent>,
     signature: Signature,
 }
 
@@ -55,8 +55,11 @@ impl Storage for MemoryStorage {
         intent: Signed<Vec<Intent>>,
     ) -> anyhow::Result<()> {
         let Signed { data, signature } = intent;
-        let hash = IntentAddress(utils::hash(&data));
-        let order: Vec<_> = data.iter().map(|i| IntentAddress(utils::hash(i))).collect();
+        let hash = ContentAddress(utils::hash(&data));
+        let order: Vec<_> = data
+            .iter()
+            .map(|i| ContentAddress(utils::hash(i)))
+            .collect();
         let map = order.iter().cloned().zip(data.into_iter()).collect();
         let set = IntentSet {
             storage_layout,
@@ -102,7 +105,7 @@ impl Storage for MemoryStorage {
 
     async fn update_state(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &Key,
         value: Option<Word>,
     ) -> anyhow::Result<Option<Word>> {
@@ -118,7 +121,7 @@ impl Storage for MemoryStorage {
 
     async fn update_state_range(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &essential_types::KeyRange,
         value: Option<Word>,
     ) -> anyhow::Result<Vec<Option<Word>>> {
@@ -150,7 +153,7 @@ impl Storage for MemoryStorage {
         todo!()
     }
 
-    async fn get_intent(&self, address: &PersistentAddress) -> anyhow::Result<Option<Intent>> {
+    async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
         let v = self.inner.apply(|i| {
             let set = i.intents.get(&address.set)?;
             let intent = set.data.get(&address.intent)?;
@@ -161,7 +164,7 @@ impl Storage for MemoryStorage {
 
     async fn get_intent_set(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
     ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
         let v = self.inner.apply(|i| {
             let set = i.intents.get(address)?;
@@ -206,7 +209,7 @@ impl Storage for MemoryStorage {
 
     async fn get_storage_layout(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
     ) -> anyhow::Result<Option<StorageLayout>> {
         let v = self.inner.apply(|i| {
             let set = i.intents.get(address)?;
@@ -217,7 +220,7 @@ impl Storage for MemoryStorage {
 
     async fn query_state(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &Key,
     ) -> anyhow::Result<Option<Word>> {
         let v = self.inner.apply(|i| {
@@ -230,7 +233,7 @@ impl Storage for MemoryStorage {
 
     async fn query_state_range(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
         key: &essential_types::KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>> {
         todo!()
