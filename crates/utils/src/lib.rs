@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 
-use essential_types::Hash;
+use essential_types::{Hash, KeyRange};
 
 pub struct Lock<T> {
     data: Mutex<T>,

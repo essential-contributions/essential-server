@@ -1,5 +1,7 @@
+use core::time;
 use std::{
     collections::{BTreeMap, HashMap},
+    os::unix::raw::time_t,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -7,9 +9,14 @@ use std::{
 use essential_types::{
     intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, Word,
 };
-use placeholder::{Batch, EoaPermit, Signature, Signed, StorageLayout};
+use placeholder::{
+    key_range_iter, key_range_length, Batch, EoaPermit, Signature, Signed, StorageLayout,
+};
 use storage::Storage;
 use utils::Lock;
+
+/// Amount of values returned in a single page.
+const PAGE_SIZE: usize = 100;
 
 #[derive(Clone)]
 pub struct MemoryStorage {
@@ -25,9 +32,12 @@ impl Default for MemoryStorage {
 #[derive(Default)]
 struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
+    // TODO: Is it possible that multiple intent sets are created at the
+    // exact same time? This is nanosecond precision.
     intent_time_index: BTreeMap<Duration, ContentAddress>,
     permit_pool: Vec<Signed<EoaPermit>>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
+    /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Batch>,
     state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
     eoa_state: HashMap<Eoa, BTreeMap<Key, Word>>,
@@ -122,10 +132,24 @@ impl Storage for MemoryStorage {
     async fn update_state_range(
         &self,
         address: &ContentAddress,
-        key: &essential_types::KeyRange,
-        value: Option<Word>,
+        keys: &essential_types::KeyRange,
+        values: Vec<Option<Word>>,
     ) -> anyhow::Result<Vec<Option<Word>>> {
-        todo!()
+        anyhow::ensure!(
+            key_range_length(keys) == values.len(),
+            "key range and values length mismatch"
+        );
+        let v = self.inner.apply(|i| {
+            let map = i.state.entry(address.clone()).or_default();
+            key_range_iter(keys)
+                .zip(values.into_iter())
+                .map(|(k, v)| match v {
+                    None => map.remove(k),
+                    Some(v) => map.insert(*k, v),
+                })
+                .collect()
+        });
+        Ok(v)
     }
 
     async fn update_eoa_state(
@@ -147,10 +171,24 @@ impl Storage for MemoryStorage {
     async fn update_eoa_state_range(
         &self,
         address: &Eoa,
-        key: &essential_types::KeyRange,
-        value: Option<Word>,
+        keys: &essential_types::KeyRange,
+        values: Vec<Option<Word>>,
     ) -> anyhow::Result<Vec<Option<Word>>> {
-        todo!()
+        anyhow::ensure!(
+            key_range_length(keys) == values.len(),
+            "key range and values length mismatch"
+        );
+        let v = self.inner.apply(|i| {
+            let map = i.eoa_state.entry(*address).or_default();
+            key_range_iter(keys)
+                .zip(values.into_iter())
+                .map(|(k, v)| match v {
+                    None => map.remove(k),
+                    Some(v) => map.insert(*k, v),
+                })
+                .collect()
+        });
+        Ok(v)
     }
 
     async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
@@ -186,7 +224,42 @@ impl Storage for MemoryStorage {
         time_range: impl Into<Option<std::ops::Range<std::time::Duration>>>,
         page: impl Into<Option<usize>>,
     ) -> anyhow::Result<Vec<Intent>> {
-        todo!()
+        let time_range = time_range.into();
+        let page = page.into().unwrap_or(0);
+        match time_range {
+            Some(range) => {
+                let v = self.inner.apply(|i| {
+                    let start = page * PAGE_SIZE;
+                    i.intent_time_index
+                        .range(range)
+                        .skip(start)
+                        // TODO: Should this be silent when the intent set is missing?
+                        // By construction it shouldn't ever be but still maybe it's better
+                        // to check?
+                        .filter_map(|(_, v)| Some(i.intents.get(v)?.data.values().cloned()))
+                        .take(PAGE_SIZE)
+                        .flatten()
+                        .collect()
+                });
+                Ok(v)
+            }
+            None => {
+                let v = self.inner.apply(|i| {
+                    let start = page * PAGE_SIZE;
+                    i.intent_time_index
+                        .iter()
+                        .skip(start)
+                        // TODO: Should this be silent when the intent set is missing?
+                        // By construction it shouldn't ever be but still maybe it's better
+                        // to check?
+                        .filter_map(|(_, v)| Some(i.intents.get(v)?.data.values().cloned()))
+                        .take(PAGE_SIZE)
+                        .flatten()
+                        .collect()
+                });
+                Ok(v)
+            }
+        }
     }
 
     async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
@@ -204,7 +277,34 @@ impl Storage for MemoryStorage {
         time_range: impl Into<Option<std::ops::Range<std::time::Duration>>>,
         page: impl Into<Option<usize>>,
     ) -> anyhow::Result<Vec<Batch>> {
-        todo!()
+        let time_range = time_range.into();
+        let page = page.into().unwrap_or(0);
+        match time_range {
+            Some(range) => {
+                let v = self.inner.apply(|i| {
+                    let start = page * PAGE_SIZE;
+                    i.solved
+                        .range(range)
+                        .skip(start)
+                        .map(|(_, v)| v.clone())
+                        .take(PAGE_SIZE)
+                        .collect()
+                });
+                Ok(v)
+            }
+            None => {
+                let v = self.inner.apply(|i| {
+                    let start = page * PAGE_SIZE;
+                    i.solved
+                        .iter()
+                        .skip(start)
+                        .map(|(_, v)| v.clone())
+                        .take(PAGE_SIZE)
+                        .collect()
+                });
+                Ok(v)
+            }
+        }
     }
 
     async fn get_storage_layout(

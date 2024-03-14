@@ -26,8 +26,8 @@ pub trait Storage {
     async fn update_state_range(
         &self,
         address: &ContentAddress,
-        key: &KeyRange,
-        value: Option<Word>,
+        keys: &KeyRange,
+        values: Vec<Option<Word>>,
     ) -> anyhow::Result<Vec<Option<Word>>>;
     async fn update_eoa_state(
         &self,
@@ -38,8 +38,8 @@ pub trait Storage {
     async fn update_eoa_state_range(
         &self,
         address: &Eoa,
-        key: &KeyRange,
-        value: Option<Word>,
+        keys: &KeyRange,
+        values: Vec<Option<Word>>,
     ) -> anyhow::Result<Vec<Option<Word>>>;
     // Reads
     async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>>;
@@ -70,13 +70,13 @@ pub trait Storage {
     async fn query_state_range(
         &self,
         address: &ContentAddress,
-        key: &KeyRange,
+        keys: &KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>>;
     async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>>;
     async fn query_eoa_state_range(
         &self,
         address: &Eoa,
-        key: &KeyRange,
+        keys: &KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>>;
     async fn get_storage_layout(
         &self,
