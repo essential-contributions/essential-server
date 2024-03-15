@@ -1,7 +1,5 @@
-use core::time;
 use std::{
     collections::{BTreeMap, HashMap},
-    os::unix::raw::time_t,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -334,9 +332,15 @@ impl Storage for MemoryStorage {
     async fn query_state_range(
         &self,
         address: &ContentAddress,
-        key: &essential_types::KeyRange,
+        keys: &essential_types::KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>> {
-        todo!()
+        let v = self.inner.apply(|i| {
+            let Some(map) = i.state.get(address) else {
+                return vec![None; key_range_length(keys)];
+            };
+            key_range_iter(keys).map(|k| map.get(k).cloned()).collect()
+        });
+        Ok(v)
     }
 
     async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
@@ -351,8 +355,14 @@ impl Storage for MemoryStorage {
     async fn query_eoa_state_range(
         &self,
         address: &Eoa,
-        key: &essential_types::KeyRange,
+        keys: &essential_types::KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>> {
-        todo!()
+        let v = self.inner.apply(|i| {
+            let Some(map) = i.eoa_state.get(address) else {
+                return vec![None; key_range_length(keys)];
+            };
+            key_range_iter(keys).map(|k| map.get(k).cloned()).collect()
+        });
+        Ok(v)
     }
 }
