@@ -1,0 +1,8 @@
+[package]
+edition = "2021"
+name = "test-utils"
+version = "0.1.0"
+
+[dependencies]
+essential-types = { workspace = true }
+placeholder = { workspace = true }

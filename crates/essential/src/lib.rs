@@ -1,7 +1,8 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Eoa, Hash, IntentAddress, PersistentAddress,
+    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, KeyRange,
+    Word,
 };
 use placeholder::{Batch, EoaPermit, Signed, StorageLayout};
 use storage::Storage;
@@ -10,9 +11,6 @@ mod deploy;
 mod permit;
 mod run;
 mod solution;
-
-#[cfg(test)]
-mod test_utils;
 
 #[derive(Clone)]
 pub struct Essential<S>
@@ -37,7 +35,7 @@ where
     pub async fn deploy_intent_set(
         &self,
         intents: Signed<Vec<Intent>>,
-    ) -> anyhow::Result<PersistentAddress> {
+    ) -> anyhow::Result<ContentAddress> {
         deploy::deploy(&self.storage, intents).await
     }
 
@@ -53,23 +51,23 @@ where
         permit::submit_permit(&self.storage, permit).await
     }
 
-    pub async fn get_intent(&self, address: &PersistentAddress) -> anyhow::Result<Option<Intent>> {
+    pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
         self.storage.get_intent(address).await
     }
 
     pub async fn get_intent_set(
         &self,
-        address: &IntentAddress,
+        address: &ContentAddress,
     ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
         self.storage.get_intent_set(address).await
     }
 
-    pub async fn list_intents(
+    pub async fn list_intent_sets(
         &self,
         time_range: impl Into<Option<Range<Duration>>>,
         page: impl Into<Option<usize>>,
-    ) -> anyhow::Result<Vec<Intent>> {
-        self.storage.list_intents(time_range, page).await
+    ) -> anyhow::Result<Vec<Vec<Intent>>> {
+        self.storage.list_intent_sets(time_range, page).await
     }
 
     pub async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
@@ -90,20 +88,36 @@ where
 
     pub async fn query_state(
         &self,
-        address: &IntentAddress,
-        key: &[u8],
-    ) -> anyhow::Result<Vec<u8>> {
+        address: &ContentAddress,
+        key: &Key,
+    ) -> anyhow::Result<Option<Word>> {
         self.storage.query_state(address, key).await
     }
 
-    pub async fn query_eoa_state(&self, address: &Eoa, key: &[u8]) -> anyhow::Result<Vec<u8>> {
+    pub async fn query_state_range(
+        &self,
+        address: &ContentAddress,
+        key: &KeyRange,
+    ) -> anyhow::Result<Vec<Option<Word>>> {
+        self.storage.query_state_range(address, key).await
+    }
+
+    pub async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
         self.storage.query_eoa_state(address, key).await
+    }
+
+    pub async fn query_eoa_state_range(
+        &self,
+        address: &Eoa,
+        key: &KeyRange,
+    ) -> anyhow::Result<Vec<Option<Word>>> {
+        self.storage.query_eoa_state_range(address, key).await
     }
 
     pub async fn get_storage_layout(
         &self,
-        address: &IntentAddress,
-    ) -> anyhow::Result<StorageLayout> {
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<StorageLayout>> {
         self.storage.get_storage_layout(address).await
     }
 }

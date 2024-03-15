@@ -1,10 +1,8 @@
 use essential_types::solution::SolutionData;
 use memory_storage::MemoryStorage;
 
-use crate::{
-    deploy::deploy,
-    test_utils::{empty_intent, empty_solution, sign},
-};
+use crate::deploy::deploy;
+use test_utils::{empty_intent, empty_solution, sign};
 
 use super::*;
 

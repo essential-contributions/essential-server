@@ -28,7 +28,6 @@ pub fn empty_solution() -> Solution {
 pub fn sign<T>(data: T) -> Signed<T> {
     Signed {
         data,
-        signature: todo!(),
-        public_key: todo!(),
+        signature: (),
     }
 }
