@@ -1,5 +1,7 @@
 //! This module contains place holder types that will exist in `essential-types` crate.
 
+use std::time::Duration;
+
 use essential_types::{solution::Solution, Key, KeyRange};
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +19,8 @@ pub struct Signed<T> {
 /// Placeholder for real type that will be in `essential-types` crate.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Batch {
+    pub block_number: u64,
+    pub timestamp: Duration,
     pub solutions: Vec<Signed<Solution>>,
 }
 
