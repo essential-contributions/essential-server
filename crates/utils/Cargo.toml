@@ -5,3 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 essential-types = { workspace = true }
+serde = { workspace = true }
+# TODO: Replace with hashing serialization
+serde_json = { workspace = true }
+sha2 = { workspace = true }

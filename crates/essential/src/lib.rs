@@ -59,8 +59,8 @@ where
 
     pub async fn list_intent_sets(
         &self,
-        time_range: impl Into<Option<Range<Duration>>>,
-        page: impl Into<Option<usize>>,
+        time_range: Option<Range<Duration>>,
+        page: Option<usize>,
     ) -> anyhow::Result<Vec<Vec<Intent>>> {
         self.storage.list_intent_sets(time_range, page).await
     }
@@ -71,8 +71,8 @@ where
 
     pub async fn list_winning_batches(
         &self,
-        time_range: impl Into<Option<Range<Duration>>>,
-        page: impl Into<Option<usize>>,
+        time_range: Option<Range<Duration>>,
+        page: Option<usize>,
     ) -> anyhow::Result<Vec<Batch>> {
         self.storage.list_winning_batches(time_range, page).await
     }
