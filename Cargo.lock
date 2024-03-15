@@ -77,6 +77,7 @@ dependencies = [
  "memory-storage",
  "placeholder",
  "storage",
+ "test-utils",
  "tokio",
  "utils",
 ]
@@ -138,6 +139,8 @@ dependencies = [
  "essential-types",
  "placeholder",
  "storage",
+ "test-utils",
+ "tokio",
  "utils",
 ]
 
@@ -347,6 +350,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "test-utils"
+version = "0.1.0"
+dependencies = [
+ "essential-types",
+ "placeholder",
 ]
 
 [[package]]

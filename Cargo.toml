@@ -20,3 +20,4 @@ placeholder = { path = "crates/placeholder" }
 memory-storage = { path = "crates/memory-storage" }
 storage = { path = "crates/storage" }
 utils = { path = "crates/utils" }
+test-utils = { path = "crates/test_utils" }

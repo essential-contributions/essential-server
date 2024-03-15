@@ -13,6 +13,9 @@ use placeholder::{
 use storage::Storage;
 use utils::Lock;
 
+#[cfg(test)]
+mod tests;
+
 /// Amount of values returned in a single page.
 const PAGE_SIZE: usize = 100;
 
@@ -217,11 +220,11 @@ impl Storage for MemoryStorage {
         Ok(v)
     }
 
-    async fn list_intents(
+    async fn list_intent_sets(
         &self,
         time_range: impl Into<Option<std::ops::Range<std::time::Duration>>>,
         page: impl Into<Option<usize>>,
-    ) -> anyhow::Result<Vec<Intent>> {
+    ) -> anyhow::Result<Vec<Vec<Intent>>> {
         let time_range = time_range.into();
         let page = page.into().unwrap_or(0);
         match time_range {
@@ -234,9 +237,10 @@ impl Storage for MemoryStorage {
                         // TODO: Should this be silent when the intent set is missing?
                         // By construction it shouldn't ever be but still maybe it's better
                         // to check?
-                        .filter_map(|(_, v)| Some(i.intents.get(v)?.data.values().cloned()))
+                        .filter_map(|(_, v)| {
+                            Some(i.intents.get(v)?.data.values().cloned().collect())
+                        })
                         .take(PAGE_SIZE)
-                        .flatten()
                         .collect()
                 });
                 Ok(v)
@@ -250,9 +254,10 @@ impl Storage for MemoryStorage {
                         // TODO: Should this be silent when the intent set is missing?
                         // By construction it shouldn't ever be but still maybe it's better
                         // to check?
-                        .filter_map(|(_, v)| Some(i.intents.get(v)?.data.values().cloned()))
+                        .filter_map(|(_, v)| {
+                            Some(i.intents.get(v)?.data.values().cloned().collect())
+                        })
                         .take(PAGE_SIZE)
-                        .flatten()
                         .collect()
                 });
                 Ok(v)

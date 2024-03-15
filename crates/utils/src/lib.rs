@@ -18,6 +18,6 @@ impl<T> Lock<T> {
     }
 }
 
-pub fn hash<T>(t: &T) -> Hash {
+pub fn hash<T>(_t: &T) -> Hash {
     todo!()
 }

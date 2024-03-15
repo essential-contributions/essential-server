@@ -1,7 +1,7 @@
 use essential_types::IntentAddress;
 use memory_storage::MemoryStorage;
 
-use crate::test_utils::{empty_intent, sign};
+use test_utils::{empty_intent, sign};
 
 use super::*;
 

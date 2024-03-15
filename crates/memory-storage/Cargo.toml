@@ -9,3 +9,7 @@ essential-types = { workspace = true }
 placeholder = { workspace = true }
 storage = { workspace = true }
 utils = { workspace = true }
+
+[dev-dependencies]
+test-utils = { workspace = true }
+tokio = { workspace = true }

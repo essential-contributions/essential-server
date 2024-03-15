@@ -12,9 +12,6 @@ mod permit;
 mod run;
 mod solution;
 
-#[cfg(test)]
-mod test_utils;
-
 #[derive(Clone)]
 pub struct Essential<S>
 where
@@ -65,12 +62,12 @@ where
         self.storage.get_intent_set(address).await
     }
 
-    pub async fn list_intents(
+    pub async fn list_intent_sets(
         &self,
         time_range: impl Into<Option<Range<Duration>>>,
         page: impl Into<Option<usize>>,
-    ) -> anyhow::Result<Vec<Intent>> {
-        self.storage.list_intents(time_range, page).await
+    ) -> anyhow::Result<Vec<Vec<Intent>>> {
+        self.storage.list_intent_sets(time_range, page).await
     }
 
     pub async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {

@@ -50,11 +50,11 @@ pub trait Storage {
     /// List all intents. This will paginate the results. The page is 0-indexed.
     /// A time range can optionally be provided to filter the results.
     /// The time is duration since the Unix epoch.
-    async fn list_intents(
+    async fn list_intent_sets(
         &self,
         time_range: impl Into<Option<Range<Duration>>>,
         page: impl Into<Option<usize>>,
-    ) -> anyhow::Result<Vec<Intent>>;
+    ) -> anyhow::Result<Vec<Vec<Intent>>>;
     async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>>;
     async fn list_permits_pool(&self) -> anyhow::Result<Vec<Signed<EoaPermit>>>;
     async fn list_winning_batches(
