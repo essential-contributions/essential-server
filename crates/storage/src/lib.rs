@@ -1,8 +1,7 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, KeyRange,
-    Word,
+    intent::Intent, solution::Solution, ContentAddress, Hash, IntentAddress, Key, KeyRange, Word,
 };
 
 use placeholder::{Batch, EoaPermit, Signed, StorageLayout};
@@ -26,18 +25,6 @@ pub trait Storage {
     async fn update_state_range(
         &self,
         address: &ContentAddress,
-        keys: &KeyRange,
-        values: Vec<Option<Word>>,
-    ) -> anyhow::Result<Vec<Option<Word>>>;
-    async fn update_eoa_state(
-        &self,
-        address: &Eoa,
-        key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>>;
-    async fn update_eoa_state_range(
-        &self,
-        address: &Eoa,
         keys: &KeyRange,
         values: Vec<Option<Word>>,
     ) -> anyhow::Result<Vec<Option<Word>>>;
@@ -70,12 +57,6 @@ pub trait Storage {
     async fn query_state_range(
         &self,
         address: &ContentAddress,
-        keys: &KeyRange,
-    ) -> anyhow::Result<Vec<Option<Word>>>;
-    async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>>;
-    async fn query_eoa_state_range(
-        &self,
-        address: &Eoa,
         keys: &KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>>;
     async fn get_storage_layout(

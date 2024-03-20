@@ -1,8 +1,7 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, KeyRange,
-    Word,
+    intent::Intent, solution::Solution, ContentAddress, Hash, IntentAddress, Key, KeyRange, Word,
 };
 use placeholder::{Batch, EoaPermit, Signed, StorageLayout};
 use storage::Storage;
@@ -100,18 +99,6 @@ where
         key: &KeyRange,
     ) -> anyhow::Result<Vec<Option<Word>>> {
         self.storage.query_state_range(address, key).await
-    }
-
-    pub async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
-        self.storage.query_eoa_state(address, key).await
-    }
-
-    pub async fn query_eoa_state_range(
-        &self,
-        address: &Eoa,
-        key: &KeyRange,
-    ) -> anyhow::Result<Vec<Option<Word>>> {
-        self.storage.query_eoa_state_range(address, key).await
     }
 
     pub async fn get_storage_layout(
