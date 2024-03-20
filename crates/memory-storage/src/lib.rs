@@ -7,9 +7,7 @@ use std::{
 use essential_types::{
     intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, Word,
 };
-use placeholder::{
-    key_range_iter, key_range_length, Batch, EoaPermit, Signature, Signed, StorageLayout,
-};
+use placeholder::{key_range_iter, key_range_length, Batch, Signature, Signed, StorageLayout};
 use storage::Storage;
 use utils::Lock;
 
@@ -36,7 +34,6 @@ struct Inner {
     // TODO: Is it possible that multiple intent sets are created at the
     // exact same time? This is nanosecond precision.
     intent_time_index: BTreeMap<Duration, ContentAddress>,
-    permit_pool: Vec<Signed<EoaPermit>>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Batch>,
@@ -83,11 +80,6 @@ impl Storage for MemoryStorage {
             i.intents.insert(hash.clone(), set);
             i.intent_time_index.insert(time, hash);
         });
-        Ok(())
-    }
-
-    async fn insert_permit_into_pool(&self, permit: Signed<EoaPermit>) -> anyhow::Result<()> {
-        self.inner.apply(|i| i.permit_pool.push(permit));
         Ok(())
     }
 
@@ -269,10 +261,6 @@ impl Storage for MemoryStorage {
         Ok(self
             .inner
             .apply(|i| i.solution_pool.values().cloned().collect()))
-    }
-
-    async fn list_permits_pool(&self) -> anyhow::Result<Vec<Signed<EoaPermit>>> {
-        Ok(self.inner.apply(|i| i.permit_pool.clone()))
     }
 
     async fn list_winning_batches(
