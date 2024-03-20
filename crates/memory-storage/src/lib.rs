@@ -5,7 +5,7 @@ use std::{
 };
 
 use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, Word,
+    intent::Intent, solution::Solution, ContentAddress, Hash, IntentAddress, Key, Word,
 };
 use placeholder::{key_range_iter, key_range_length, Batch, Signature, Signed, StorageLayout};
 use storage::Storage;
@@ -38,7 +38,6 @@ struct Inner {
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Batch>,
     state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
-    eoa_state: HashMap<Eoa, BTreeMap<Key, Word>>,
 }
 
 struct IntentSet {
@@ -134,45 +133,6 @@ impl Storage for MemoryStorage {
         );
         let v = self.inner.apply(|i| {
             let map = i.state.entry(address.clone()).or_default();
-            key_range_iter(keys)
-                .zip(values.into_iter())
-                .map(|(k, v)| match v {
-                    None => map.remove(k),
-                    Some(v) => map.insert(*k, v),
-                })
-                .collect()
-        });
-        Ok(v)
-    }
-
-    async fn update_eoa_state(
-        &self,
-        address: &Eoa,
-        key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>> {
-        let v = self.inner.apply(|i| {
-            let map = i.eoa_state.entry(*address).or_default();
-            match value {
-                None => map.remove(key),
-                Some(value) => map.insert(*key, value),
-            }
-        });
-        Ok(v)
-    }
-
-    async fn update_eoa_state_range(
-        &self,
-        address: &Eoa,
-        keys: &essential_types::KeyRange,
-        values: Vec<Option<Word>>,
-    ) -> anyhow::Result<Vec<Option<Word>>> {
-        anyhow::ensure!(
-            key_range_length(keys) == values.len(),
-            "key range and values length mismatch"
-        );
-        let v = self.inner.apply(|i| {
-            let map = i.eoa_state.entry(*address).or_default();
             key_range_iter(keys)
                 .zip(values.into_iter())
                 .map(|(k, v)| match v {
@@ -329,29 +289,6 @@ impl Storage for MemoryStorage {
     ) -> anyhow::Result<Vec<Option<Word>>> {
         let v = self.inner.apply(|i| {
             let Some(map) = i.state.get(address) else {
-                return vec![None; key_range_length(keys)];
-            };
-            key_range_iter(keys).map(|k| map.get(k).cloned()).collect()
-        });
-        Ok(v)
-    }
-
-    async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
-        let v = self.inner.apply(|i| {
-            let map = i.eoa_state.get(address)?;
-            let v = map.get(key)?;
-            Some(*v)
-        });
-        Ok(v)
-    }
-
-    async fn query_eoa_state_range(
-        &self,
-        address: &Eoa,
-        keys: &essential_types::KeyRange,
-    ) -> anyhow::Result<Vec<Option<Word>>> {
-        let v = self.inner.apply(|i| {
-            let Some(map) = i.eoa_state.get(address) else {
                 return vec![None; key_range_length(keys)];
             };
             key_range_iter(keys).map(|k| map.get(k).cloned()).collect()

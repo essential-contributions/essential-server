@@ -26,7 +26,6 @@ async fn test_solve() {
     solution.data.push(SolutionData {
         intent_to_solve: todo!(),
         decision_variables: todo!(),
-        sender: todo!(),
     });
     let solution = sign(solution);
     submit_solution(&storage, solution.clone()).await.unwrap();
