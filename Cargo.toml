@@ -14,6 +14,9 @@ anyhow = "1.0.80"
 essential-constraint-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-state-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+postcard = { version = "1.0.8", features = ["alloc"]}
+secp256k1 = { version = "0.28.2", features = ["rand-std", "hashes-std"] }
+serde = { version = "1.0.197", default-features = false }
 tokio = { version = "1.36.0", features = ["full"] }
 
 placeholder = { path = "crates/placeholder" }
