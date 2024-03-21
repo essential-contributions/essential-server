@@ -2,8 +2,8 @@
 members = [
     "crates/essential",
     "crates/memory-storage",
-    "crates/rlite-storage",
     "crates/placeholder",
+    "crates/rlite-storage",
     "crates/storage",
     "crates/utils",
 ]
@@ -14,10 +14,11 @@ anyhow = "1.0.80"
 essential-constraint-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-state-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+serde = { version = "1.0.195", features = ["derive"] }
 tokio = { version = "1.36.0", features = ["full"] }
 
-placeholder = { path = "crates/placeholder" }
 memory-storage = { path = "crates/memory-storage" }
+placeholder = { path = "crates/placeholder" }
 storage = { path = "crates/storage" }
-utils = { path = "crates/utils" }
 test-utils = { path = "crates/test_utils" }
+utils = { path = "crates/utils" }
