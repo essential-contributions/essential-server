@@ -206,7 +206,7 @@ impl Storage for MemoryStorage {
                 .collect::<Option<Vec<_>>>()?;
             Some(Signed {
                 data,
-                signature: set.signature,
+                signature: set.signature.clone(),
             })
         });
         Ok(v)
@@ -304,7 +304,7 @@ impl Storage for MemoryStorage {
     ) -> anyhow::Result<Option<StorageLayout>> {
         let v = self.inner.apply(|i| {
             let set = i.intents.get(address)?;
-            Some(set.storage_layout)
+            Some(set.storage_layout.clone())
         });
         Ok(v)
     }

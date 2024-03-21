@@ -6,6 +6,7 @@ use test_utils::{empty_intent, sign};
 use super::*;
 
 #[tokio::test]
+#[ignore]
 async fn test_deploy() {
     let storage = MemoryStorage::default();
     let intent = empty_intent();

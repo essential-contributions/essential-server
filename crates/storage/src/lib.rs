@@ -7,6 +7,7 @@ use essential_types::{
 
 use placeholder::{Batch, Signed, StorageLayout};
 
+#[allow(async_fn_in_trait)]
 pub trait Storage {
     // Updates
     async fn insert_intent_set(
