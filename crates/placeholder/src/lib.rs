@@ -22,9 +22,6 @@ pub struct Batch {
 pub type StorageLayout = ();
 
 /// Placeholder for real type that will be in `essential-types` crate.
-pub type EoaPermit = ();
-
-/// Placeholder for real type that will be in `essential-types` crate.
 pub struct KeyRangeIter<'a>(&'a KeyRange);
 
 /// Placeholder for real functionality that will be in `essential-types` crate.

@@ -5,7 +5,7 @@ use essential_types::{
     Word,
 };
 
-use placeholder::{Batch, EoaPermit, Signed, StorageLayout};
+use placeholder::{Batch, Signed, StorageLayout};
 
 pub trait Storage {
     // Updates
@@ -14,7 +14,6 @@ pub trait Storage {
         storage_layout: StorageLayout,
         intent: Signed<Vec<Intent>>,
     ) -> anyhow::Result<()>;
-    async fn insert_permit_into_pool(&self, permit: Signed<EoaPermit>) -> anyhow::Result<()>;
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()>;
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()>;
     async fn update_state(
@@ -56,7 +55,6 @@ pub trait Storage {
         page: impl Into<Option<usize>>,
     ) -> anyhow::Result<Vec<Vec<Intent>>>;
     async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>>;
-    async fn list_permits_pool(&self) -> anyhow::Result<Vec<Signed<EoaPermit>>>;
     async fn list_winning_batches(
         &self,
         time_range: impl Into<Option<Range<Duration>>>,

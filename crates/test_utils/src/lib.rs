@@ -10,7 +10,6 @@ pub fn empty_intent() -> Intent {
         slots: Slots {
             decision_variables: 0,
             state: Default::default(),
-            permits: Default::default(),
         },
         state_read: Default::default(),
         constraints: Default::default(),
