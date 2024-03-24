@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS eoa (
+    id INTEGER PRIMARY KEY,
+    public_key BLOB NOT NULL UNIQUE
+);

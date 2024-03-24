@@ -83,6 +83,13 @@ impl Storage for MemoryStorage {
         Ok(())
     }
 
+    async fn insert_eoa(&self, eoa: Eoa) -> anyhow::Result<()> {
+        self.inner.apply(|i| {
+            i.eoa_state.entry(eoa).or_default();
+        });
+        Ok(())
+    }
+
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
         let hash = utils::hash(&solution.data);
         self.inner.apply(|i| i.solution_pool.insert(hash, solution));
@@ -95,13 +102,16 @@ impl Storage for MemoryStorage {
                 .iter()
                 .filter_map(|h| i.solution_pool.remove(h))
                 .collect();
-            let batch = Batch { solutions };
-            i.solved.insert(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap(),
-                batch,
-            );
+            let block_number = i.solved.len() as u64;
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap();
+            let batch = Batch {
+                block_number,
+                timestamp,
+                solutions,
+            };
+            i.solved.insert(timestamp, batch);
         });
         Ok(())
     }
@@ -151,14 +161,15 @@ impl Storage for MemoryStorage {
         key: &Key,
         value: Option<Word>,
     ) -> anyhow::Result<Option<Word>> {
-        let v = self.inner.apply(|i| {
-            let map = i.eoa_state.entry(*address).or_default();
+        self.inner.apply(|i| {
+            let Some(map) = i.eoa_state.get_mut(address) else {
+                anyhow::bail!("eoa not found");
+            };
             match value {
-                None => map.remove(key),
-                Some(value) => map.insert(*key, value),
+                None => Ok(map.remove(key)),
+                Some(value) => Ok(map.insert(*key, value)),
             }
-        });
-        Ok(v)
+        })
     }
 
     async fn update_eoa_state_range(
@@ -214,11 +225,10 @@ impl Storage for MemoryStorage {
 
     async fn list_intent_sets(
         &self,
-        time_range: impl Into<Option<std::ops::Range<std::time::Duration>>>,
-        page: impl Into<Option<usize>>,
+        time_range: Option<std::ops::Range<std::time::Duration>>,
+        page: Option<usize>,
     ) -> anyhow::Result<Vec<Vec<Intent>>> {
-        let time_range = time_range.into();
-        let page = page.into().unwrap_or(0);
+        let page = page.unwrap_or(0);
         match time_range {
             Some(range) => {
                 let v = self.inner.apply(|i| {
@@ -265,11 +275,10 @@ impl Storage for MemoryStorage {
 
     async fn list_winning_batches(
         &self,
-        time_range: impl Into<Option<std::ops::Range<std::time::Duration>>>,
-        page: impl Into<Option<usize>>,
+        time_range: Option<std::ops::Range<std::time::Duration>>,
+        page: Option<usize>,
     ) -> anyhow::Result<Vec<Batch>> {
-        let time_range = time_range.into();
-        let page = page.into().unwrap_or(0);
+        let page = page.unwrap_or(0);
         match time_range {
             Some(range) => {
                 let v = self.inner.apply(|i| {
