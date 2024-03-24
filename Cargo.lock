@@ -1343,8 +1343,8 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "essential-types",
+ "postcard",
  "serde",
- "serde_json",
  "sha2",
 ]
 
