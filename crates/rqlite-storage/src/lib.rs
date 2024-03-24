@@ -31,16 +31,14 @@ pub struct RqliteStorage {
 
 /// Encodes a type into blob data which is then base64 encoded.
 fn encode<T: serde::Serialize>(value: &T) -> String {
-    // TODO: Update to postcard
-    let value = serde_json::to_vec(value).unwrap();
+    let value = postcard::to_allocvec(value).expect("How can this fail?");
     base64::engine::general_purpose::STANDARD.encode(value)
 }
 
 /// Decodes a base64 encoded blob into a type.
 fn decode<T: serde::de::DeserializeOwned>(value: &str) -> anyhow::Result<T> {
-    // TODO: Update to postcard
     let value = base64::engine::general_purpose::STANDARD.decode(value)?;
-    Ok(serde_json::from_slice(&value)?)
+    Ok(postcard::from_bytes(&value)?)
 }
 
 /// Constructs an SQL statement ready for execution in the form of a list of JSON values,
