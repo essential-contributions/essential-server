@@ -1,11 +1,40 @@
 //! This module contains place holder types that will exist in `essential-types` crate.
 
 use essential_types::{solution::Solution, Key, KeyRange};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Placeholder for real type that will be in `essential-types` crate.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct Signature;
+pub struct Signature {
+    #[serde(
+        serialize_with = "serialize_signature",
+        deserialize_with = "deserialize_signature"
+    )]
+    pub bytes: [u8; 64],
+}
+
+fn serialize_signature<S>(bytes: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_bytes(bytes)
+}
+
+fn deserialize_signature<'de, D>(deserializer: D) -> Result<[u8; 64], D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    let bytes: Vec<u8> = Deserialize::deserialize(deserializer)?;
+    if bytes.len() == 64 {
+        let mut arr = [0u8; 64];
+        arr.copy_from_slice(&bytes);
+        Ok(arr)
+    } else {
+        Err(D::Error::custom("Expected a byte array of length 64"))
+    }
+}
 
 /// Placeholder for real type that will be in `essential-types` crate.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

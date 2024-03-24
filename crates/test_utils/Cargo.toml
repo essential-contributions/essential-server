@@ -6,3 +6,6 @@ version = "0.1.0"
 [dependencies]
 essential-types = { workspace = true }
 placeholder = { workspace = true }
+utils = { workspace = true }
+secp256k1 = { workspace = true }
+serde = { workspace = true }

@@ -1,4 +1,5 @@
-use test_utils::{empty_intent, sign};
+use test_utils::{empty_intent, random_keypair};
+use utils::sign;
 
 use super::*;
 
@@ -7,7 +8,7 @@ use super::*;
 async fn test_insert_intent_set() {
     let storage = MemoryStorage::new();
     let storage_layout = StorageLayout {};
-    let intent = sign(vec![empty_intent()]);
+    let intent = sign(vec![empty_intent()], random_keypair().0);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
