@@ -31,8 +31,7 @@ pub struct RqliteStorage {
 
 /// Encodes a type into blob data which is then base64 encoded.
 fn encode<T: serde::Serialize>(value: &T) -> String {
-    // TODO: Update to postcard
-    let value = serde_json::to_vec(value).unwrap();
+    let value = postcard::to_allocvec(value).unwrap();
     base64::engine::general_purpose::STANDARD.encode(value)
 }
 
