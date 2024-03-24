@@ -2,8 +2,8 @@
 members = [
     "crates/essential",
     "crates/memory-storage",
-    "crates/rlite-storage",
     "crates/placeholder",
+    "crates/rlite-storage",
     "crates/storage",
     "crates/utils",
 ]
@@ -16,11 +16,11 @@ essential-state-asm = { git = "ssh://git@github.com/essential-contributions/esse
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 postcard = { version = "1.0.8", features = ["alloc"]}
 secp256k1 = { version = "0.28.2", features = ["rand-std", "hashes-std"] }
-serde = { version = "1.0.197", default-features = false }
+serde = { version = "1.0.197", features = ["derive"] }
 tokio = { version = "1.36.0", features = ["full"] }
 
-placeholder = { path = "crates/placeholder" }
 memory-storage = { path = "crates/memory-storage" }
+placeholder = { path = "crates/placeholder" }
 storage = { path = "crates/storage" }
-utils = { path = "crates/utils" }
 test-utils = { path = "crates/test_utils" }
+utils = { path = "crates/utils" }

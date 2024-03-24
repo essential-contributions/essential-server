@@ -5,7 +5,7 @@ use std::{
 };
 
 use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, Hash, IntentAddress, Key, Word,
+    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, Word,
 };
 use placeholder::{key_range_iter, key_range_length, Batch, Signature, Signed, StorageLayout};
 use storage::Storage;
@@ -166,7 +166,7 @@ impl Storage for MemoryStorage {
                 .collect::<Option<Vec<_>>>()?;
             Some(Signed {
                 data,
-                signature: set.signature,
+                signature: set.signature.clone(),
             })
         });
         Ok(v)
@@ -264,7 +264,7 @@ impl Storage for MemoryStorage {
     ) -> anyhow::Result<Option<StorageLayout>> {
         let v = self.inner.apply(|i| {
             let set = i.intents.get(address)?;
-            Some(set.storage_layout)
+            Some(set.storage_layout.clone())
         });
         Ok(v)
     }
