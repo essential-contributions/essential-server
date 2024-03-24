@@ -21,7 +21,7 @@ impl<T> Lock<T> {
 }
 
 pub fn hash<T: Serialize>(t: &T) -> Hash {
-    let data = serde_json::to_vec(t).expect("Can this ever fail?");
+    let data = postcard::to_allocvec(t).expect("Can this ever fail?");
     let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
     hasher.update(&data);
     hasher.finalize().into()
