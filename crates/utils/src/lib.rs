@@ -21,7 +21,8 @@ impl<T> Lock<T> {
 }
 
 pub fn hash<T: Serialize>(t: &T) -> Hash {
-    let data = postcard::to_allocvec(t).unwrap();
+    let data = postcard::to_allocvec(t)
+        .expect("serde::Serialize trait should prevent serialization failure");
     let mut hasher = <sha2::Sha256 as sha2::Digest>::new();
     hasher.update(&data);
     hasher.finalize().into()
