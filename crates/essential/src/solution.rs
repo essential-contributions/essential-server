@@ -2,8 +2,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use essential_types::{intent::Intent, solution::Solution, Hash};
-use placeholder::Signed;
+use essential_types::{intent::Intent, solution::Solution, Hash, Signed};
 use storage::Storage;
 
 #[cfg(test)]

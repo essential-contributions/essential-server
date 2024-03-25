@@ -7,7 +7,6 @@ version = "0.1.0"
 anyhow = { workspace = true }
 base64 = { workspace = true }
 essential-types = { workspace = true }
-placeholder = { workspace = true }
 postcard = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true }

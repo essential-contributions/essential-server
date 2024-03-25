@@ -33,6 +33,6 @@ async fn test_solve() {
     solve(&storage).await.unwrap();
     let result = storage.list_solutions_pool().await.unwrap();
     assert!(result.is_empty());
-    let _result = storage.list_winning_batches(None, None).await.unwrap();
+    let _result = storage.list_winning_blocks(None, None).await.unwrap();
     // Assert that the solution is in the only winning batch
 }

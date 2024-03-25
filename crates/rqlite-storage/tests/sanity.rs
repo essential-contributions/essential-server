@@ -1,7 +1,6 @@
 use std::vec;
 
-use essential_types::{ContentAddress, IntentAddress};
-use placeholder::StorageLayout;
+use essential_types::{ContentAddress, IntentAddress, StorageLayout};
 use rqlite_storage::RqliteStorage;
 use storage::Storage;
 use test_utils::{empty_intent, empty_solution, intent_with_vars, sign};
@@ -98,10 +97,10 @@ async fn test_insert_solution_into_pool() {
         .unwrap();
     let solutions = storage.list_solutions_pool().await.unwrap();
     assert_eq!(solutions.len(), 0);
-    let batches = storage.list_winning_batches(None, None).await.unwrap();
+    let batches = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(batches.len(), 1);
     assert_eq!(
-        hash(&batches[0].solutions),
+        hash(&batches[0].batch.solutions),
         hash(&vec![sign(empty_solution())])
     );
 }

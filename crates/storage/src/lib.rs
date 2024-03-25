@@ -6,11 +6,9 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, KeyRange,
-    Word,
+    intent::Intent, solution::Solution, Block, ContentAddress, Eoa, Hash, IntentAddress, Key,
+    Signed, StorageLayout, Word,
 };
-
-use placeholder::{Batch, Signed, StorageLayout};
 
 // TODO: Maybe this warning is right,
 // we will find out when we try to use this trait
@@ -44,15 +42,6 @@ pub trait Storage {
         value: Option<Word>,
     ) -> anyhow::Result<Option<Word>>;
 
-    /// Update the state of a content address with a range of keys.
-    /// TODO: This might not be possible.
-    async fn update_state_range(
-        &self,
-        address: &ContentAddress,
-        keys: &KeyRange,
-        values: Vec<Option<Word>>,
-    ) -> anyhow::Result<Vec<Option<Word>>>;
-
     /// Update the state of an EOA.
     async fn update_eoa_state(
         &self,
@@ -60,15 +49,6 @@ pub trait Storage {
         key: &Key,
         value: Option<Word>,
     ) -> anyhow::Result<Option<Word>>;
-
-    /// Update the state of an EOA with a range of keys.
-    /// TODO: This might not be possible.
-    async fn update_eoa_state_range(
-        &self,
-        address: &Eoa,
-        keys: &KeyRange,
-        values: Vec<Option<Word>>,
-    ) -> anyhow::Result<Vec<Option<Word>>>;
 
     // Reads
     /// Get an individual intent.
@@ -93,12 +73,12 @@ pub trait Storage {
     /// List all solutions in the pool.
     async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>>;
 
-    /// List all batches of solutions that have been solved.
-    async fn list_winning_batches(
+    /// List all blocks of solutions that have been solved.
+    async fn list_winning_blocks(
         &self,
         time_range: Option<Range<Duration>>,
         page: Option<usize>,
-    ) -> anyhow::Result<Vec<Batch>>;
+    ) -> anyhow::Result<Vec<Block>>;
 
     /// Query the state of a content address.
     async fn query_state(
@@ -107,24 +87,8 @@ pub trait Storage {
         key: &Key,
     ) -> anyhow::Result<Option<Word>>;
 
-    /// Query the state of a content address with a range of keys.
-    /// TODO: This might not be possible.
-    async fn query_state_range(
-        &self,
-        address: &ContentAddress,
-        keys: &KeyRange,
-    ) -> anyhow::Result<Vec<Option<Word>>>;
-
     /// Query the state of an EOA.
     async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>>;
-
-    /// Query the state of an EOA with a range of keys.
-    /// TODO: This might not be possible.
-    async fn query_eoa_state_range(
-        &self,
-        address: &Eoa,
-        keys: &KeyRange,
-    ) -> anyhow::Result<Vec<Option<Word>>>;
 
     /// Get the storage layout of a content address.
     async fn get_storage_layout(

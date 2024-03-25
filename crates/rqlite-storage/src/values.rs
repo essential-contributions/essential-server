@@ -1,11 +1,10 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::bail;
-use essential_types::{intent::Intent, solution::Solution, Word};
-use placeholder::{Batch, Signature, Signed};
+use essential_types::{intent::Intent, solution::Solution, Batch, Block, Signature, Signed, Word};
 use serde_json::Value;
 
-use crate::{decode, RESULTS_KEY};
+use crate::{decode, decode_signature, RESULTS_KEY};
 
 #[derive(Debug)]
 pub struct QueryValues {
@@ -55,7 +54,7 @@ pub fn get_intent_set(
         return Ok(None);
     };
 
-    let signature: Signature = decode(&signature)?;
+    let signature: Signature = decode_signature(&signature)?;
 
     // Decode the intents
     let intents: Vec<Intent> = intents
@@ -124,7 +123,9 @@ pub fn list_solutions_pool(
                             _ => None,
                         };
                         let signature = match signature {
-                            serde_json::Value::String(signature) => decode(signature).ok(),
+                            serde_json::Value::String(signature) => {
+                                decode_signature(signature).ok()
+                            }
                             _ => None,
                         };
                         Some(Signed {
@@ -140,22 +141,22 @@ pub fn list_solutions_pool(
     Ok(r)
 }
 
-pub fn list_winning_batches(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Batch>> {
+pub fn list_winning_blocks(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Block>> {
     let Some(Rows { rows }) = queries.into_iter().next().flatten() else {
         return Ok(Vec::with_capacity(0));
     };
     let r = rows
         .into_iter()
         .try_fold(BTreeMap::new(), |map, Columns { columns }| {
-            map_solution_to_batch(map, &columns)
+            map_solution_to_block(map, &columns)
         });
     Ok(r?.into_values().collect())
 }
 
-fn map_solution_to_batch(
-    mut map: BTreeMap<u64, Batch>,
+fn map_solution_to_block(
+    mut map: BTreeMap<u64, Block>,
     columns: &[Value],
-) -> anyhow::Result<BTreeMap<u64, Batch>> {
+) -> anyhow::Result<BTreeMap<u64, Block>> {
     match columns {
         [Value::Number(batch_id), Value::String(solution), Value::String(signature), Value::Number(created_at_secs), Value::Number(created_at_nanos)] => {
             match (
@@ -165,13 +166,16 @@ fn map_solution_to_batch(
             ) {
                 (Some(batch_id), Some(created_at_secs), Some(created_at_nanos)) => {
                     let solution = decode(solution)?;
-                    let signature = decode(signature)?;
+                    let signature = decode_signature(signature)?;
                     map.entry(batch_id)
-                        .or_insert_with(|| Batch {
-                            block_number: batch_id - 1,
+                        .or_insert_with(|| Block {
+                            number: batch_id - 1,
                             timestamp: Duration::new(created_at_secs, created_at_nanos as u32),
-                            solutions: Vec::with_capacity(1),
+                            batch: Batch {
+                                solutions: Vec::with_capacity(1),
+                            },
                         })
+                        .batch
                         .solutions
                         .push(Signed {
                             data: solution,
