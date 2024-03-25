@@ -2,8 +2,8 @@ use essential_types::{
     intent::{Directive, Intent},
     slots::Slots,
     solution::Solution,
+    Signed,
 };
-use placeholder::{Signature, Signed};
 
 pub fn empty_intent() -> Intent {
     Intent {
@@ -33,12 +33,13 @@ pub fn empty_solution() -> Solution {
     Solution {
         data: Default::default(),
         state_mutations: Default::default(),
+        partial_solutions: Default::default(),
     }
 }
 
 pub fn sign<T>(data: T) -> Signed<T> {
     Signed {
         data,
-        signature: Signature,
+        signature: [0; 64],
     }
 }

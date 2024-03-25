@@ -2,9 +2,9 @@
 //! # Rqlite storage
 //! This uses a remote rqlite server to store data.
 
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use base64::Engine;
-use essential_types::{ContentAddress, Eoa, Word};
+use essential_types::{Block, ContentAddress, Eoa, Signature, Signed, StorageLayout, Word};
 use storage::Storage;
 use utils::hash;
 
@@ -39,6 +39,22 @@ fn encode<T: serde::Serialize>(value: &T) -> String {
 fn decode<T: serde::de::DeserializeOwned>(value: &str) -> anyhow::Result<T> {
     let value = base64::engine::general_purpose::STANDARD.decode(value)?;
     Ok(postcard::from_bytes(&value)?)
+}
+
+/// Encodes a type into blob data which is then base64 encoded.
+fn encode_signature(sig: &Signature) -> String {
+    let value = postcard::to_allocvec(&sig[..]).expect("How can this fail?");
+    base64::engine::general_purpose::STANDARD.encode(value)
+}
+
+/// Decodes a base64 encoded blob into a type.
+fn decode_signature(value: &str) -> anyhow::Result<Signature> {
+    let value = base64::engine::general_purpose::STANDARD.decode(value)?;
+    let sig: Vec<u8> = postcard::from_bytes(&value)?;
+    let Ok(sig): Result<Signature, _> = sig.try_into() else {
+        bail!("Failed to convert signature");
+    };
+    Ok(sig)
 }
 
 /// Constructs an SQL statement ready for execution in the form of a list of JSON values,
@@ -179,8 +195,8 @@ fn handle_errors(
 impl Storage for RqliteStorage {
     async fn insert_intent_set(
         &self,
-        storage_layout: placeholder::StorageLayout,
-        intents: placeholder::Signed<Vec<essential_types::intent::Intent>>,
+        storage_layout: StorageLayout,
+        intents: Signed<Vec<essential_types::intent::Intent>>,
     ) -> anyhow::Result<()> {
         // Get the time this intent set was created at.
         let created_at = std::time::SystemTime::now();
@@ -188,7 +204,7 @@ impl Storage for RqliteStorage {
 
         // Encode the data into base64 blobs.
         let address = encode(&ContentAddress(hash(&intents.data)));
-        let signature = encode(&intents.signature);
+        let signature = encode_signature(&intents.signature);
         let storage_layout = encode(&storage_layout);
 
         // For each intent, insert the intent and the intent set pairing.
@@ -238,10 +254,10 @@ impl Storage for RqliteStorage {
 
     async fn insert_solution_into_pool(
         &self,
-        solution: placeholder::Signed<essential_types::solution::Solution>,
+        solution: Signed<essential_types::solution::Solution>,
     ) -> anyhow::Result<()> {
         let hash = encode(&hash(&solution.data));
-        let signature = encode(&solution.signature);
+        let signature = encode_signature(&solution.signature);
         let solution = encode(&solution.data);
 
         let inserts = &[include_sql!(
@@ -316,16 +332,6 @@ impl Storage for RqliteStorage {
         }
     }
 
-    #[allow(unused_variables)]
-    async fn update_state_range(
-        &self,
-        address: &essential_types::ContentAddress,
-        keys: &essential_types::KeyRange,
-        values: Vec<Option<essential_types::Word>>,
-    ) -> anyhow::Result<Vec<Option<essential_types::Word>>> {
-        todo!("Maybe we can't handle ranges?")
-    }
-
     async fn update_eoa_state(
         &self,
         address: &essential_types::Eoa,
@@ -354,16 +360,6 @@ impl Storage for RqliteStorage {
         }
     }
 
-    #[allow(unused_variables)]
-    async fn update_eoa_state_range(
-        &self,
-        address: &essential_types::Eoa,
-        keys: &essential_types::KeyRange,
-        values: Vec<Option<essential_types::Word>>,
-    ) -> anyhow::Result<Vec<Option<essential_types::Word>>> {
-        todo!("Maybe we can't handle ranges?")
-    }
-
     async fn get_intent(
         &self,
         address: &essential_types::IntentAddress,
@@ -382,7 +378,7 @@ impl Storage for RqliteStorage {
     async fn get_intent_set(
         &self,
         address: &essential_types::ContentAddress,
-    ) -> anyhow::Result<Option<placeholder::Signed<Vec<essential_types::intent::Intent>>>> {
+    ) -> anyhow::Result<Option<Signed<Vec<essential_types::intent::Intent>>>> {
         let address = encode(address);
         let sql = &[
             include_sql!("query/get_intent_set_signature.sql", address.clone()),
@@ -423,18 +419,18 @@ impl Storage for RqliteStorage {
 
     async fn list_solutions_pool(
         &self,
-    ) -> anyhow::Result<Vec<placeholder::Signed<essential_types::solution::Solution>>> {
+    ) -> anyhow::Result<Vec<Signed<essential_types::solution::Solution>>> {
         // TODO: Maybe we want to page this?
         let sql = &[include_sql!("query/list_solutions_pool.sql")];
         let queries = self.query_values(sql).await?;
         values::list_solutions_pool(queries)
     }
 
-    async fn list_winning_batches(
+    async fn list_winning_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
         page: Option<usize>,
-    ) -> anyhow::Result<Vec<placeholder::Batch>> {
+    ) -> anyhow::Result<Vec<Block>> {
         let page = page.unwrap_or(0);
         let queries = match time_range {
             Some(range) => {
@@ -455,7 +451,7 @@ impl Storage for RqliteStorage {
                 self.query_values(sql).await?
             }
         };
-        values::list_winning_batches(queries)
+        values::list_winning_blocks(queries)
     }
 
     async fn query_state(
@@ -474,15 +470,6 @@ impl Storage for RqliteStorage {
         Ok(r)
     }
 
-    #[allow(unused_variables)]
-    async fn query_state_range(
-        &self,
-        address: &essential_types::ContentAddress,
-        keys: &essential_types::KeyRange,
-    ) -> anyhow::Result<Vec<Option<essential_types::Word>>> {
-        todo!()
-    }
-
     async fn query_eoa_state(
         &self,
         address: &essential_types::Eoa,
@@ -499,19 +486,10 @@ impl Storage for RqliteStorage {
         Ok(r)
     }
 
-    #[allow(unused_variables)]
-    async fn query_eoa_state_range(
-        &self,
-        address: &essential_types::Eoa,
-        keys: &essential_types::KeyRange,
-    ) -> anyhow::Result<Vec<Option<essential_types::Word>>> {
-        todo!()
-    }
-
     async fn get_storage_layout(
         &self,
         address: &essential_types::ContentAddress,
-    ) -> anyhow::Result<Option<placeholder::StorageLayout>> {
+    ) -> anyhow::Result<Option<StorageLayout>> {
         let address = encode(address);
         let sql = &[include_sql!("query/get_storage_layout.sql", address)];
         let queries = self.query_values(sql).await?;
