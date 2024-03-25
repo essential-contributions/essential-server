@@ -5,9 +5,9 @@ use std::{
 };
 
 use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, Eoa, Hash, IntentAddress, Key, Word,
+    intent::Intent, solution::Solution, Batch, Block, ContentAddress, Eoa, Hash, IntentAddress,
+    Key, Signature, Signed, StorageLayout, Word,
 };
-use placeholder::{key_range_iter, key_range_length, Batch, Signature, Signed, StorageLayout};
 use storage::Storage;
 use utils::Lock;
 
@@ -36,8 +36,9 @@ struct Inner {
     intent_time_index: BTreeMap<Duration, ContentAddress>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
     /// Solved batches ordered by the time they were solved.
-    solved: BTreeMap<Duration, Batch>,
+    solved: BTreeMap<Duration, Block>,
     state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
+    eoa_state: HashMap<Eoa, BTreeMap<Key, Word>>,
 }
 
 struct IntentSet {
@@ -82,6 +83,13 @@ impl Storage for MemoryStorage {
         Ok(())
     }
 
+    async fn insert_eoa(&self, eoa: Eoa) -> anyhow::Result<()> {
+        self.inner.apply(|i| {
+            i.eoa_state.entry(eoa).or_default();
+        });
+        Ok(())
+    }
+
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
         let hash = utils::hash(&solution.data);
         self.inner.apply(|i| i.solution_pool.insert(hash, solution));
@@ -94,13 +102,16 @@ impl Storage for MemoryStorage {
                 .iter()
                 .filter_map(|h| i.solution_pool.remove(h))
                 .collect();
-            let batch = Batch { solutions };
-            i.solved.insert(
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap(),
-                batch,
-            );
+            let number = i.solved.len() as u64;
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap();
+            let batch = Block {
+                number,
+                timestamp,
+                batch: Batch { solutions },
+            };
+            i.solved.insert(timestamp, batch);
         });
         Ok(())
     }
@@ -121,27 +132,21 @@ impl Storage for MemoryStorage {
         Ok(v)
     }
 
-    async fn update_state_range(
+    async fn update_eoa_state(
         &self,
-        address: &ContentAddress,
-        keys: &essential_types::KeyRange,
-        values: Vec<Option<Word>>,
-    ) -> anyhow::Result<Vec<Option<Word>>> {
-        anyhow::ensure!(
-            key_range_length(keys) == values.len(),
-            "key range and values length mismatch"
-        );
-        let v = self.inner.apply(|i| {
-            let map = i.state.entry(address.clone()).or_default();
-            key_range_iter(keys)
-                .zip(values.into_iter())
-                .map(|(k, v)| match v {
-                    None => map.remove(k),
-                    Some(v) => map.insert(*k, v),
-                })
-                .collect()
-        });
-        Ok(v)
+        address: &Eoa,
+        key: &Key,
+        value: Option<Word>,
+    ) -> anyhow::Result<Option<Word>> {
+        self.inner.apply(|i| {
+            let Some(map) = i.eoa_state.get_mut(address) else {
+                anyhow::bail!("eoa not found");
+            };
+            match value {
+                None => Ok(map.remove(key)),
+                Some(value) => Ok(map.insert(*key, value)),
+            }
+        })
     }
 
     async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
@@ -166,7 +171,7 @@ impl Storage for MemoryStorage {
                 .collect::<Option<Vec<_>>>()?;
             Some(Signed {
                 data,
-                signature: set.signature.clone(),
+                signature: set.signature,
             })
         });
         Ok(v)
@@ -174,11 +179,10 @@ impl Storage for MemoryStorage {
 
     async fn list_intent_sets(
         &self,
-        time_range: impl Into<Option<std::ops::Range<std::time::Duration>>>,
-        page: impl Into<Option<usize>>,
+        time_range: Option<std::ops::Range<std::time::Duration>>,
+        page: Option<usize>,
     ) -> anyhow::Result<Vec<Vec<Intent>>> {
-        let time_range = time_range.into();
-        let page = page.into().unwrap_or(0);
+        let page = page.unwrap_or(0);
         match time_range {
             Some(range) => {
                 let v = self.inner.apply(|i| {
@@ -223,13 +227,12 @@ impl Storage for MemoryStorage {
             .apply(|i| i.solution_pool.values().cloned().collect()))
     }
 
-    async fn list_winning_batches(
+    async fn list_winning_blocks(
         &self,
-        time_range: impl Into<Option<std::ops::Range<std::time::Duration>>>,
-        page: impl Into<Option<usize>>,
-    ) -> anyhow::Result<Vec<Batch>> {
-        let time_range = time_range.into();
-        let page = page.into().unwrap_or(0);
+        time_range: Option<std::ops::Range<std::time::Duration>>,
+        page: Option<usize>,
+    ) -> anyhow::Result<Vec<Block>> {
+        let page = page.unwrap_or(0);
         match time_range {
             Some(range) => {
                 let v = self.inner.apply(|i| {
@@ -282,16 +285,11 @@ impl Storage for MemoryStorage {
         Ok(v)
     }
 
-    async fn query_state_range(
-        &self,
-        address: &ContentAddress,
-        keys: &essential_types::KeyRange,
-    ) -> anyhow::Result<Vec<Option<Word>>> {
+    async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
         let v = self.inner.apply(|i| {
-            let Some(map) = i.state.get(address) else {
-                return vec![None; key_range_length(keys)];
-            };
-            key_range_iter(keys).map(|k| map.get(k).cloned()).collect()
+            let map = i.eoa_state.get(address)?;
+            let v = map.get(key)?;
+            Some(*v)
         });
         Ok(v)
     }

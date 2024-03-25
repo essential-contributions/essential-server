@@ -6,7 +6,7 @@ version = "0.1.0"
 [dependencies]
 essential-state-asm = { workspace = true }
 essential-types = { workspace = true }
-placeholder = { workspace = true }
 postcard = { workspace = true }
 secp256k1 = { workspace = true }
 serde = { workspace = true }
+sha2 = { workspace = true }

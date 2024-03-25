@@ -1,9 +1,9 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, Hash, IntentAddress, Key, KeyRange, Word,
+    intent::Intent, solution::Solution, Block, ContentAddress, Eoa, Hash, IntentAddress, Key,
+    Signed, StorageLayout, Word,
 };
-use placeholder::{Batch, Signed, StorageLayout};
 use storage::Storage;
 
 mod deploy;
@@ -58,8 +58,8 @@ where
 
     pub async fn list_intent_sets(
         &self,
-        time_range: impl Into<Option<Range<Duration>>>,
-        page: impl Into<Option<usize>>,
+        time_range: Option<Range<Duration>>,
+        page: Option<usize>,
     ) -> anyhow::Result<Vec<Vec<Intent>>> {
         self.storage.list_intent_sets(time_range, page).await
     }
@@ -68,12 +68,12 @@ where
         self.storage.list_solutions_pool().await
     }
 
-    pub async fn list_winning_batches(
+    pub async fn list_winning_blocks(
         &self,
-        time_range: impl Into<Option<Range<Duration>>>,
-        page: impl Into<Option<usize>>,
-    ) -> anyhow::Result<Vec<Batch>> {
-        self.storage.list_winning_batches(time_range, page).await
+        time_range: Option<Range<Duration>>,
+        page: Option<usize>,
+    ) -> anyhow::Result<Vec<Block>> {
+        self.storage.list_winning_blocks(time_range, page).await
     }
 
     pub async fn query_state(
@@ -84,12 +84,8 @@ where
         self.storage.query_state(address, key).await
     }
 
-    pub async fn query_state_range(
-        &self,
-        address: &ContentAddress,
-        key: &KeyRange,
-    ) -> anyhow::Result<Vec<Option<Word>>> {
-        self.storage.query_state_range(address, key).await
+    pub async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
+        self.storage.query_eoa_state(address, key).await
     }
 
     pub async fn get_storage_layout(

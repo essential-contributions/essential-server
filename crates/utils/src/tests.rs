@@ -7,7 +7,6 @@ use essential_types::{
     intent::{Directive, Intent},
     slots::{Slots, StateSlot},
 };
-use placeholder::Signature;
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 fn keypair(data: [u8; 32]) -> (SecretKey, PublicKey) {
@@ -118,7 +117,7 @@ fn test_sign_empty_intent() {
         249, 120, 91, 254, 163, 186, 232, 125, 6, 71, 74, 180, 107, 30, 135, 138, 85, 182, 185, 19,
         224, 51, 60, 197,
     ];
-    assert_eq!(expected_signature, signed.signature.bytes);
+    assert_eq!(expected_signature, signed.signature);
 }
 
 #[test]
@@ -160,7 +159,7 @@ fn test_sign() {
         242, 102, 43, 83, 199, 202, 196, 250, 83, 97, 98, 90, 193, 199, 218, 74, 161, 59, 169, 71,
         167, 205, 16, 199,
     ];
-    assert_eq!(expected_signature, signed.signature.bytes);
+    assert_eq!(expected_signature, signed.signature);
 }
 
 #[test]
@@ -170,7 +169,7 @@ fn test_verify_signature() {
 
     let (sk2, pk2) = keypair([0xef; 32]);
 
-    assert!(verify(intent(), signed.signature.clone(), pk));
-    assert!(!verify(intent(), Signature { bytes: [0u8; 64] }, pk));
+    assert!(verify(intent(), signed.signature, pk));
+    assert!(!verify(intent(), [0u8; 64], pk));
     assert!(!verify(intent(), signed.signature, pk2));
 }
