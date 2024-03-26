@@ -1,17 +1,16 @@
-use std::vec;
-
 use essential_types::{ContentAddress, IntentAddress, StorageLayout};
 use rqlite_storage::RqliteStorage;
+use std::vec;
 use storage::Storage;
-use test_utils::{empty_intent, empty_solution, intent_with_vars, sign};
-use utils::hash;
+use test_utils::{empty_intent, empty_solution, intent_with_vars, random_keypair};
+use utils::{hash, sign};
 
 #[tokio::test]
 #[ignore]
 async fn test_create() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
     let storage_layout = StorageLayout;
-    let intent = sign(vec![empty_intent()]);
+    let intent = sign(vec![empty_intent()], random_keypair().0);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
@@ -23,7 +22,7 @@ async fn test_create() {
 async fn test_update_state() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
     let storage_layout = StorageLayout;
-    let intent = sign(vec![empty_intent()]);
+    let intent = sign(vec![empty_intent()], random_keypair().0);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
@@ -49,12 +48,15 @@ async fn test_update_state() {
 async fn test_insert_intent_set() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
     let storage_layout = StorageLayout;
-    let intent = sign(vec![empty_intent()]);
+    let intent = sign(vec![empty_intent()], random_keypair().0);
     storage
         .insert_intent_set(storage_layout.clone(), intent)
         .await
         .unwrap();
-    let intent = sign(vec![intent_with_vars(1), intent_with_vars(2)]);
+    let intent = sign(
+        vec![intent_with_vars(1), intent_with_vars(2)],
+        random_keypair().0,
+    );
     storage
         .insert_intent_set(storage_layout, intent)
         .await
@@ -71,7 +73,10 @@ async fn test_insert_intent_set() {
         .get_intent_set(&ContentAddress(hash(&vec![empty_intent()])))
         .await
         .unwrap();
-    assert_eq!(intent_set, Some(sign(vec![empty_intent()])));
+    assert_eq!(
+        intent_set,
+        Some(sign(vec![empty_intent()], random_keypair().0))
+    );
 
     let address = IntentAddress {
         set: ContentAddress(hash(&vec![empty_intent()])),
@@ -86,7 +91,7 @@ async fn test_insert_intent_set() {
 #[ignore]
 async fn test_insert_solution_into_pool() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
-    let solution = sign(empty_solution());
+    let solution = sign(empty_solution(), random_keypair().0);
     storage.insert_solution_into_pool(solution).await.unwrap();
     let solutions = storage.list_solutions_pool().await.unwrap();
     assert_eq!(solutions.len(), 1);
@@ -101,6 +106,6 @@ async fn test_insert_solution_into_pool() {
     assert_eq!(batches.len(), 1);
     assert_eq!(
         hash(&batches[0].batch.solutions),
-        hash(&vec![sign(empty_solution())])
+        hash(&vec![sign(empty_solution(), random_keypair().0)])
     );
 }

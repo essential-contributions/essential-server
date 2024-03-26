@@ -239,15 +239,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "essential-constraint-asm"
-version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#856501e9f4d0aa0686181a66963361ab05c15674"
-dependencies = [
- "essential-types",
- "serde",
-]
-
-[[package]]
 name = "essential-server"
 version = "0.1.0"
 dependencies = [
@@ -261,18 +252,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "essential-state-asm"
-version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#856501e9f4d0aa0686181a66963361ab05c15674"
-dependencies = [
- "essential-constraint-asm",
- "serde",
-]
-
-[[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#856501e9f4d0aa0686181a66963361ab05c15674"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#46ddacb0e6f6349be1c9e22aebe5726581444141"
 dependencies = [
  "serde",
 ]
@@ -1269,7 +1251,6 @@ dependencies = [
  "essential-types",
  "secp256k1",
  "serde",
- "utils",
 ]
 
 [[package]]
@@ -1437,12 +1418,12 @@ dependencies = [
 name = "utils"
 version = "0.1.0"
 dependencies = [
- "essential-state-asm",
  "essential-types",
  "postcard",
  "secp256k1",
  "serde",
  "sha2",
+ "test-utils",
 ]
 
 [[package]]
