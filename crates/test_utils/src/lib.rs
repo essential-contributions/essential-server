@@ -2,8 +2,11 @@ use essential_types::{
     intent::{Directive, Intent},
     slots::Slots,
     solution::Solution,
+    Signed,
 };
 use secp256k1::{rand::rngs::OsRng, PublicKey, Secp256k1, SecretKey};
+use serde::Serialize;
+use utils::sign;
 
 pub fn empty_intent() -> Intent {
     Intent {
@@ -47,4 +50,8 @@ pub fn keypair(key: [u8; 32]) -> (SecretKey, PublicKey) {
     let secret_key = SecretKey::from_slice(&key).unwrap();
     let public_key = PublicKey::from_secret_key(&secp, &secret_key);
     (secret_key, public_key)
+}
+
+pub fn sign_with_random_keypair<T: Serialize>(data: T) -> Signed<T> {
+    sign(data, random_keypair().0)
 }

@@ -1251,6 +1251,7 @@ dependencies = [
  "essential-types",
  "secp256k1",
  "serde",
+ "utils",
 ]
 
 [[package]]
