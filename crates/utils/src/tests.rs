@@ -1,4 +1,5 @@
-use crate::{hash, serialize, sign, verify};
+use crate::{hash, recover, serialize, sign, verify};
+use essential_types::Signature;
 use secp256k1::hashes::hex::DisplayHex;
 use test_utils::{intent_with_vars, keypair};
 
@@ -23,24 +24,32 @@ fn test_sign_intent() {
         "60b75a25dfa1a5b55d1b38dfdf2ff0f1ddf9028ac5ed282071ef5a766db8031d",
         "60b40d7b69691598f154860bf59be18ec822232dfe58ced59bf68e2522303688"
     );
-    assert_eq!(expected_signature, signed.signature.to_lower_hex_string());
+    assert_eq!(expected_signature, signed.signature.0.to_lower_hex_string());
 }
 
 #[test]
-fn test_verify_signature_intent() {
+fn test_recover() {
     let (sk, pk) = keypair([0xcd; 32]);
-    let signed_by_first_keypair = sign(intent_with_vars(1), sk);
-    assert!(verify(
-        intent_with_vars(1),
-        signed_by_first_keypair.signature,
-        pk
-    ));
+    let data = intent_with_vars(1);
+    let signed = sign(data.clone(), sk);
+    let recovered_pk = recover(signed).unwrap();
+    assert_eq!(pk, recovered_pk);
+}
+
+#[test]
+fn test_fail_to_recover() {
+    let (sk, _pk) = keypair([0xcd; 32]);
+    let data = intent_with_vars(1);
+    let signed = sign(data.clone(), sk);
+    let mut corrupted_signed = signed.clone();
+    corrupted_signed.signature.1 = (corrupted_signed.signature.1 + 1) % 4;
+    assert!(recover(corrupted_signed).is_err());
+}
+
+#[test]
+fn test_verify_signature() {
+    let signed = sign(intent_with_vars(1), keypair([0xcd; 32]).0);
+    assert!(verify(intent_with_vars(1), signed.signature));
     // verify against a different signature
-    assert!(!verify(intent_with_vars(1), [0u8; 64], pk));
-    // verify against another public key
-    assert!(!verify(
-        intent_with_vars(1),
-        signed_by_first_keypair.signature,
-        keypair([0xef; 32]).1
-    ));
+    assert!(!verify(intent_with_vars(1), Signature([0u8; 64], 0)));
 }

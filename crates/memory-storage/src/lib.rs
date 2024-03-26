@@ -146,7 +146,7 @@ impl Storage for MemoryStorage {
                 .collect::<Option<Vec<_>>>()?;
             Some(Signed {
                 data,
-                signature: set.signature,
+                signature: set.signature.clone(),
             })
         });
         Ok(v)
