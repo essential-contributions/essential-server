@@ -1,8 +1,8 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Block, ContentAddress, Eoa, Hash, IntentAddress, Key,
-    Signed, StorageLayout, Word,
+    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
+    StorageLayout, Word,
 };
 use storage::Storage;
 
@@ -82,10 +82,6 @@ where
         key: &Key,
     ) -> anyhow::Result<Option<Word>> {
         self.storage.query_state(address, key).await
-    }
-
-    pub async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
-        self.storage.query_eoa_state(address, key).await
     }
 
     pub async fn get_storage_layout(
