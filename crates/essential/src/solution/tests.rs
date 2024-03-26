@@ -24,7 +24,7 @@ async fn test_solve() {
     let intent = empty_intent();
     let intent = sign(vec![intent], random_keypair().0);
     let _result = deploy(&storage, intent.clone()).await.unwrap();
-    let mut solution = empty_solution();
+    let solution = empty_solution();
     // solution.data.push(SolutionData {
     //     intent_to_solve: todo!(),
     //     decision_variables: todo!(),
