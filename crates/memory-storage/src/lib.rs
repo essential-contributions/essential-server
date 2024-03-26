@@ -5,8 +5,8 @@ use std::{
 };
 
 use essential_types::{
-    intent::Intent, solution::Solution, Batch, Block, ContentAddress, Eoa, Hash, IntentAddress,
-    Key, Signature, Signed, StorageLayout, Word,
+    intent::Intent, solution::Solution, Batch, Block, ContentAddress, Hash, IntentAddress, Key,
+    Signature, Signed, StorageLayout, Word,
 };
 use storage::Storage;
 use utils::Lock;
@@ -38,7 +38,6 @@ struct Inner {
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
     state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
-    eoa_state: HashMap<Eoa, BTreeMap<Key, Word>>,
 }
 
 struct IntentSet {
@@ -83,13 +82,6 @@ impl Storage for MemoryStorage {
         Ok(())
     }
 
-    async fn insert_eoa(&self, eoa: Eoa) -> anyhow::Result<()> {
-        self.inner.apply(|i| {
-            i.eoa_state.entry(eoa).or_default();
-        });
-        Ok(())
-    }
-
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
         let hash = utils::hash(&solution.data);
         self.inner.apply(|i| i.solution_pool.insert(hash, solution));
@@ -130,23 +122,6 @@ impl Storage for MemoryStorage {
             }
         });
         Ok(v)
-    }
-
-    async fn update_eoa_state(
-        &self,
-        address: &Eoa,
-        key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>> {
-        self.inner.apply(|i| {
-            let Some(map) = i.eoa_state.get_mut(address) else {
-                anyhow::bail!("eoa not found");
-            };
-            match value {
-                None => Ok(map.remove(key)),
-                Some(value) => Ok(map.insert(*key, value)),
-            }
-        })
     }
 
     async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
@@ -279,15 +254,6 @@ impl Storage for MemoryStorage {
     ) -> anyhow::Result<Option<Word>> {
         let v = self.inner.apply(|i| {
             let map = i.state.get(address)?;
-            let v = map.get(key)?;
-            Some(*v)
-        });
-        Ok(v)
-    }
-
-    async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>> {
-        let v = self.inner.apply(|i| {
-            let map = i.eoa_state.get(address)?;
             let v = map.get(key)?;
             Some(*v)
         });

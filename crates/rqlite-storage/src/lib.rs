@@ -4,7 +4,7 @@
 
 use anyhow::{bail, ensure};
 use base64::Engine;
-use essential_types::{Block, ContentAddress, Eoa, Signature, Signed, StorageLayout, Word};
+use essential_types::{Block, ContentAddress, Signature, Signed, StorageLayout, Word};
 use storage::Storage;
 use utils::hash;
 
@@ -246,12 +246,6 @@ impl Storage for RqliteStorage {
         self.execute(&inserts[..]).await
     }
 
-    async fn insert_eoa(&self, eoa: Eoa) -> anyhow::Result<()> {
-        let eoa = encode(&eoa);
-        let inserts = &[include_sql!("insert/eoa.sql", eoa)];
-        self.execute(&inserts[..]).await
-    }
-
     async fn insert_solution_into_pool(
         &self,
         solution: Signed<essential_types::solution::Solution>,
@@ -326,34 +320,6 @@ impl Storage for RqliteStorage {
                 let inserts = &[
                     include_sql!("query/get_state.sql", address.clone(), key.clone()),
                     include_sql!("update/delete_state.sql", address, key),
-                ];
-                self.execute_query_word(&inserts[..]).await
-            }
-        }
-    }
-
-    async fn update_eoa_state(
-        &self,
-        address: &essential_types::Eoa,
-        key: &essential_types::Key,
-        value: Option<essential_types::Word>,
-    ) -> anyhow::Result<Option<essential_types::Word>> {
-        let address = encode(address);
-        let key = encode(key);
-        match value {
-            Some(value) => {
-                // Update the value and return the existing value if it exists.
-                let inserts = &[
-                    include_sql!("query/get_eoa_state.sql", address.clone(), key.clone()),
-                    include_sql!("update/update_eoa_state.sql", key, value, address),
-                ];
-                self.execute_query_word(&inserts[..]).await
-            }
-            None => {
-                // Delete the value and return the existing value if it exists.
-                let inserts = &[
-                    include_sql!("query/get_eoa_state.sql", address.clone(), key.clone()),
-                    include_sql!("update/delete_eoa_state.sql", address, key),
                 ];
                 self.execute_query_word(&inserts[..]).await
             }
@@ -462,22 +428,6 @@ impl Storage for RqliteStorage {
         let address = encode(address);
         let key = encode(key);
         let sql = &[include_sql!("query/get_state.sql", address, key)];
-        let queries = self.query_values(sql).await?;
-        let r = single_value(queries).and_then(|v| match v {
-            serde_json::Value::Number(v) => v.as_i64(),
-            _ => None,
-        });
-        Ok(r)
-    }
-
-    async fn query_eoa_state(
-        &self,
-        address: &essential_types::Eoa,
-        key: &essential_types::Key,
-    ) -> anyhow::Result<Option<essential_types::Word>> {
-        let address = encode(address);
-        let key = encode(key);
-        let sql = &[include_sql!("query/get_eoa_state.sql", address, key)];
         let queries = self.query_values(sql).await?;
         let r = single_value(queries).and_then(|v| match v {
             serde_json::Value::Number(v) => v.as_i64(),
