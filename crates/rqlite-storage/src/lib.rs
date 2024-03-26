@@ -2,7 +2,7 @@
 //! # Rqlite storage
 //! This uses a remote rqlite server to store data.
 
-use anyhow::{bail, ensure};
+use anyhow::ensure;
 use base64::Engine;
 use essential_types::{Block, ContentAddress, Signature, Signed, StorageLayout, Word};
 use storage::Storage;
@@ -43,17 +43,14 @@ fn decode<T: serde::de::DeserializeOwned>(value: &str) -> anyhow::Result<T> {
 
 /// Encodes a type into blob data which is then base64 encoded.
 fn encode_signature(sig: &Signature) -> String {
-    let value = postcard::to_allocvec(&sig[..]).expect("How can this fail?");
+    let value = postcard::to_allocvec(&sig).expect("How can this fail?");
     base64::engine::general_purpose::STANDARD.encode(value)
 }
 
 /// Decodes a base64 encoded blob into a type.
 fn decode_signature(value: &str) -> anyhow::Result<Signature> {
     let value = base64::engine::general_purpose::STANDARD.decode(value)?;
-    let sig: Vec<u8> = postcard::from_bytes(&value)?;
-    let Ok(sig): Result<Signature, _> = sig.try_into() else {
-        bail!("Failed to convert signature");
-    };
+    let sig = postcard::from_bytes::<Signature>(&value)?;
     Ok(sig)
 }
 

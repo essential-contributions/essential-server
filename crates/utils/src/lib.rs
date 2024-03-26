@@ -2,7 +2,10 @@
 mod tests;
 
 use essential_types::{Hash, Signature, Signed};
-use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+use secp256k1::{
+    ecdsa::{RecoverableSignature, RecoveryId},
+    Message, PublicKey, Secp256k1, SecretKey,
+};
 use serde::Serialize;
 use sha2::Digest;
 use std::sync::Mutex;
@@ -41,20 +44,41 @@ pub fn sign<T: Serialize>(data: T, sk: SecretKey) -> Signed<T> {
     let secp = Secp256k1::new();
     let hashed_data = hash(&data);
     let message = Message::from_digest(hashed_data);
-    let signature: Signature = secp.sign_ecdsa(&message, &sk).serialize_compact();
 
+    let (rec_id, sig) = secp
+        .sign_ecdsa_recoverable(&message, &sk)
+        .serialize_compact();
+    let signature: Signature = Signature(sig, rec_id.to_i32().try_into().unwrap());
     Signed { data, signature }
 }
 
-/// Verify signature against public key
-pub fn verify<T: Serialize>(data: T, sig: Signature, pk: PublicKey) -> bool {
+/// Verify signature against data
+pub fn verify<T: Serialize>(data: T, sig: Signature) -> bool {
     let secp = Secp256k1::new();
     let hashed_data = hash(&data);
     let message = Message::from_digest(hashed_data);
-    secp.verify_ecdsa(
-        &message,
-        &secp256k1::ecdsa::Signature::from_compact(&sig).unwrap(),
-        &pk,
-    )
-    .is_ok()
+    if let Ok(pk) = recover_from_message(message, sig.clone()) {
+        secp.verify_ecdsa(
+            &message,
+            &secp256k1::ecdsa::Signature::from_compact(&sig.0).unwrap(),
+            &pk,
+        )
+        .is_ok()
+    } else {
+        false
+    }
+}
+
+pub fn recover<T: Serialize>(signed: Signed<T>) -> anyhow::Result<PublicKey> {
+    let hashed_data = hash(&signed.data);
+    let message = Message::from_digest(hashed_data);
+    recover_from_message(message, signed.signature)
+}
+
+pub fn recover_from_message(message: Message, signature: Signature) -> anyhow::Result<PublicKey> {
+    let recovery_id = RecoveryId::from_i32(i32::from(signature.1 as u16))?;
+    let recoverable_signature = RecoverableSignature::from_compact(&signature.0, recovery_id)?;
+    let secp = Secp256k1::new();
+    let public_key = secp.recover_ecdsa(&message, &recoverable_signature)?;
+    Ok(public_key)
 }
