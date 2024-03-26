@@ -6,8 +6,8 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Block, ContentAddress, Eoa, Hash, IntentAddress, Key,
-    Signed, StorageLayout, Word,
+    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
+    StorageLayout, Word,
 };
 
 // TODO: Maybe this warning is right,
@@ -25,9 +25,6 @@ pub trait Storage {
         intent: Signed<Vec<Intent>>,
     ) -> anyhow::Result<()>;
 
-    /// Add an EOA account that state can be added too.
-    async fn insert_eoa(&self, eoa: Eoa) -> anyhow::Result<()>;
-
     /// Add a solution to the pool of unsolved solutions.
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()>;
 
@@ -38,14 +35,6 @@ pub trait Storage {
     async fn update_state(
         &self,
         address: &ContentAddress,
-        key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>>;
-
-    /// Update the state of an EOA.
-    async fn update_eoa_state(
-        &self,
-        address: &Eoa,
         key: &Key,
         value: Option<Word>,
     ) -> anyhow::Result<Option<Word>>;
@@ -86,9 +75,6 @@ pub trait Storage {
         address: &ContentAddress,
         key: &Key,
     ) -> anyhow::Result<Option<Word>>;
-
-    /// Query the state of an EOA.
-    async fn query_eoa_state(&self, address: &Eoa, key: &Key) -> anyhow::Result<Option<Word>>;
 
     /// Get the storage layout of a content address.
     async fn get_storage_layout(
