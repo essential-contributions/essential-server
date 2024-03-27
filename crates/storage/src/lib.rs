@@ -6,8 +6,9 @@
 use std::{ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
-    StorageLayout, Word,
+    intent::Intent,
+    solution::{PartialSolution, Solution},
+    Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
 
 // TODO: Maybe this warning is right,
@@ -28,8 +29,20 @@ pub trait Storage {
     /// Add a solution to the pool of unsolved solutions.
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()>;
 
+    /// Add a partial solution to the pool of unsolved partial solutions.
+    async fn insert_partial_solution_into_pool(
+        &self,
+        solution: Signed<PartialSolution>,
+    ) -> anyhow::Result<()>;
+
     /// Move these solutions from the pool to the solved state.
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()>;
+
+    /// Move these partial solutions from the pool to the solved state.
+    async fn move_partial_solutions_to_solved(
+        &self,
+        partial_solutions: &[Hash],
+    ) -> anyhow::Result<()>;
 
     /// Update the state of a content address.
     async fn update_state(
@@ -50,6 +63,18 @@ pub trait Storage {
         address: &ContentAddress,
     ) -> anyhow::Result<Option<Signed<Vec<Intent>>>>;
 
+    /// Get a partial solution from either the pool or the solved state.
+    async fn get_partial_solution(
+        &self,
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<Signed<PartialSolution>>>;
+
+    /// Check if a partial solution is solved or not.
+    async fn is_partial_solution_solved(
+        &self,
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<bool>>;
+
     /// List all intents. This will paginate the results. The page is 0-indexed.
     /// A time range can optionally be provided to filter the results.
     /// The time is duration since the Unix epoch.
@@ -61,6 +86,9 @@ pub trait Storage {
 
     /// List all solutions in the pool.
     async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>>;
+
+    /// List all partial solutions in the pool.
+    async fn list_partial_solutions_pool(&self) -> anyhow::Result<Vec<Signed<PartialSolution>>>;
 
     /// List all blocks of solutions that have been solved.
     async fn list_winning_blocks(

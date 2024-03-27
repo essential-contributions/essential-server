@@ -4,7 +4,9 @@
 
 use anyhow::ensure;
 use base64::Engine;
-use essential_types::{Block, ContentAddress, Signed, StorageLayout, Word};
+use essential_types::{
+    solution::PartialSolution, Block, ContentAddress, Signed, StorageLayout, Word,
+};
 use storage::Storage;
 use utils::hash;
 
@@ -89,6 +91,7 @@ impl RqliteStorage {
             include_sql!("create/intent_set_pairing.sql"),
             include_sql!("create/storage_layout.sql"),
             include_sql!("create/solutions_pool.sql"),
+            include_sql!("create/partial_solutions.sql"),
             include_sql!("create/solved.sql"),
             include_sql!("create/intent_state.sql"),
             include_sql!("create/eoa.sql"),
@@ -247,6 +250,23 @@ impl Storage for RqliteStorage {
         self.execute(&inserts[..]).await
     }
 
+    async fn insert_partial_solution_into_pool(
+        &self,
+        solution: Signed<PartialSolution>,
+    ) -> anyhow::Result<()> {
+        let hash = encode(&hash(&solution.data));
+        let signature = encode(&solution.signature);
+        let solution = encode(&solution.data);
+
+        let inserts = &[include_sql!(
+            "insert/partial_solutions.sql",
+            hash,
+            solution,
+            signature
+        )];
+        self.execute(&inserts[..]).await
+    }
+
     async fn move_solutions_to_solved(
         &self,
         solutions: &[essential_types::Hash],
@@ -275,6 +295,24 @@ impl Storage for RqliteStorage {
             unix_time.subsec_nanos()
         )];
         sql.extend(inserts);
+
+        // TODO: Is there a way to avoid this?
+        // Maybe create an owned version of execute.
+        let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| v.as_slice()).collect();
+        self.execute(&sql[..]).await
+    }
+
+    async fn move_partial_solutions_to_solved(
+        &self,
+        partial_solutions: &[essential_types::Hash],
+    ) -> anyhow::Result<()> {
+        let sql: Vec<_> = partial_solutions
+            .iter()
+            .flat_map(|hash| {
+                let hash = encode(hash);
+                [include_sql!(owned "update/set_partial_solution_to_solved.sql", hash)]
+            })
+            .collect();
 
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
@@ -338,6 +376,31 @@ impl Storage for RqliteStorage {
         values::get_intent_set(queries)
     }
 
+    async fn get_partial_solution(
+        &self,
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<Signed<PartialSolution>>> {
+        let hash = encode(&address.0);
+        let sql = &[include_sql!("query/get_partial_solution.sql", hash)];
+        let queries = self.query_values(sql).await?;
+        values::get_partial_solution(queries)
+    }
+
+    async fn is_partial_solution_solved(
+        &self,
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<bool>> {
+        let hash = encode(&address.0);
+        let sql = &[include_sql!("query/is_partial_solution_solved.sql", hash)];
+        let queries = self.query_values(sql).await?;
+
+        // Expecting single query, single row, single column
+        let Some(serde_json::Value::Bool(solved)) = single_value(queries) else {
+            return Ok(None);
+        };
+        Ok(Some(solved))
+    }
+
     async fn list_intent_sets(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
@@ -374,6 +437,13 @@ impl Storage for RqliteStorage {
         let sql = &[include_sql!("query/list_solutions_pool.sql")];
         let queries = self.query_values(sql).await?;
         values::list_solutions_pool(queries)
+    }
+
+    async fn list_partial_solutions_pool(&self) -> anyhow::Result<Vec<Signed<PartialSolution>>> {
+        // TODO: Maybe we want to page this?
+        let sql = &[include_sql!("query/list_partial_solutions.sql")];
+        let queries = self.query_values(sql).await?;
+        values::list_partial_solutions_pool(queries)
     }
 
     async fn list_winning_blocks(

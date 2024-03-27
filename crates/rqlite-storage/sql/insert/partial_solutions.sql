@@ -1,0 +1,1 @@
+INSERT OR IGNORE INTO partial_solutions (content_hash, solution, signature) VALUES (?, ?, ?)

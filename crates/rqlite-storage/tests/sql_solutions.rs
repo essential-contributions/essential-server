@@ -159,6 +159,194 @@ fn test_insert_solutions() {
 }
 
 #[test]
+fn test_insert_partial_solutions() {
+    let conn = Connection::open_in_memory().unwrap();
+    create_tables(&conn);
+
+    // Double insert is a noop
+    conn.execute(
+        include_sql!("insert", "partial_solutions"),
+        ["hash1", "solution1", "signature1"],
+    )
+    .unwrap();
+
+    conn.execute(
+        include_sql!("insert", "partial_solutions"),
+        ["hash1", "solution1", "signature1"],
+    )
+    .unwrap();
+
+    let result = query(&conn, "select * from partial_solutions", [], |row| {
+        (
+            row.get::<_, usize>(0).unwrap(),
+            row.get::<_, String>(1).unwrap(),
+            row.get::<_, String>(2).unwrap(),
+            row.get::<_, String>(3).unwrap(),
+            row.get::<_, bool>(4).unwrap(),
+        )
+    });
+    assert_eq!(
+        result,
+        vec![(
+            1,
+            "hash1".to_string(),
+            "solution1".to_string(),
+            "signature1".to_string(),
+            false
+        )]
+    );
+
+    // Can insert a second solution
+    conn.execute(
+        include_sql!("insert", "partial_solutions"),
+        ["hash2", "solution2", "signature2"],
+    )
+    .unwrap();
+
+    let result = query(&conn, "select * from partial_solutions", [], |row| {
+        (
+            row.get::<_, usize>(0).unwrap(),
+            row.get::<_, String>(1).unwrap(),
+            row.get::<_, String>(2).unwrap(),
+            row.get::<_, String>(3).unwrap(),
+            row.get::<_, bool>(4).unwrap(),
+        )
+    });
+    assert_eq!(
+        result,
+        vec![
+            (
+                1,
+                "hash1".to_string(),
+                "solution1".to_string(),
+                "signature1".to_string(),
+                false
+            ),
+            (
+                2,
+                "hash2".to_string(),
+                "solution2".to_string(),
+                "signature2".to_string(),
+                false
+            ),
+        ]
+    );
+
+    // list solutions pool
+    let result = query(
+        &conn,
+        include_sql!("query", "list_partial_solutions"),
+        [],
+        |row| {
+            (
+                row.get::<_, String>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+            )
+        },
+    );
+    assert_eq!(
+        result,
+        vec![
+            ("signature1".to_string(), "solution1".to_string(),),
+            ("signature2".to_string(), "solution2".to_string(),),
+        ]
+    );
+
+    let result = query(
+        &conn,
+        include_sql!("query", "is_partial_solution_solved"),
+        ["hash1"],
+        |row| row.get::<_, bool>(0).unwrap(),
+    );
+    assert_eq!(result, vec![false]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "is_partial_solution_solved"),
+        ["hash2"],
+        |row| row.get::<_, bool>(0).unwrap(),
+    );
+    assert_eq!(result, vec![false]);
+
+    // Move solutions to solved
+    conn.execute(
+        include_sql!("update", "set_partial_solution_to_solved"),
+        ["hash1"],
+    )
+    .unwrap();
+    conn.execute(
+        include_sql!("update", "set_partial_solution_to_solved"),
+        ["hash2"],
+    )
+    .unwrap();
+
+    let result = query(
+        &conn,
+        include_sql!("query", "is_partial_solution_solved"),
+        ["hash1"],
+        |row| row.get::<_, bool>(0).unwrap(),
+    );
+    assert_eq!(result, vec![true]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "is_partial_solution_solved"),
+        ["hash2"],
+        |row| row.get::<_, bool>(0).unwrap(),
+    );
+    assert_eq!(result, vec![true]);
+
+    // pool is empty
+    let result = query(
+        &conn,
+        include_sql!("query", "list_partial_solutions"),
+        [],
+        |row| {
+            (
+                row.get::<_, String>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+            )
+        },
+    );
+    assert_eq!(result, vec![]);
+
+    // Get partial solutions
+    let result = query(
+        &conn,
+        include_sql!("query", "get_partial_solution"),
+        ["hash1"],
+        |row| {
+            (
+                row.get::<_, String>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+            )
+        },
+    );
+
+    assert_eq!(
+        result,
+        vec![("solution1".to_string(), "signature1".to_string()),]
+    );
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_partial_solution"),
+        ["hash2"],
+        |row| {
+            (
+                row.get::<_, String>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+            )
+        },
+    );
+
+    assert_eq!(
+        result,
+        vec![("solution2".to_string(), "signature2".to_string()),]
+    );
+}
+
+#[test]
 fn test_batch_paging() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
