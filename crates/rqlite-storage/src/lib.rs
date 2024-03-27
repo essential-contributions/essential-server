@@ -4,7 +4,7 @@
 
 use anyhow::ensure;
 use base64::Engine;
-use essential_types::{Block, ContentAddress, Signature, Signed, StorageLayout, Word};
+use essential_types::{Block, ContentAddress, Signed, StorageLayout, Word};
 use storage::Storage;
 use utils::hash;
 
@@ -39,19 +39,6 @@ fn encode<T: serde::Serialize>(value: &T) -> String {
 fn decode<T: serde::de::DeserializeOwned>(value: &str) -> anyhow::Result<T> {
     let value = base64::engine::general_purpose::STANDARD.decode(value)?;
     Ok(postcard::from_bytes(&value)?)
-}
-
-/// Encodes a type into blob data which is then base64 encoded.
-fn encode_signature(sig: &Signature) -> String {
-    let value = postcard::to_allocvec(&sig).expect("How can this fail?");
-    base64::engine::general_purpose::STANDARD.encode(value)
-}
-
-/// Decodes a base64 encoded blob into a type.
-fn decode_signature(value: &str) -> anyhow::Result<Signature> {
-    let value = base64::engine::general_purpose::STANDARD.decode(value)?;
-    let sig = postcard::from_bytes::<Signature>(&value)?;
-    Ok(sig)
 }
 
 /// Constructs an SQL statement ready for execution in the form of a list of JSON values,
@@ -201,7 +188,7 @@ impl Storage for RqliteStorage {
 
         // Encode the data into base64 blobs.
         let address = encode(&ContentAddress(hash(&intents.data)));
-        let signature = encode_signature(&intents.signature);
+        let signature = encode(&intents.signature);
         let storage_layout = encode(&storage_layout);
 
         // For each intent, insert the intent and the intent set pairing.
@@ -248,7 +235,7 @@ impl Storage for RqliteStorage {
         solution: Signed<essential_types::solution::Solution>,
     ) -> anyhow::Result<()> {
         let hash = encode(&hash(&solution.data));
-        let signature = encode_signature(&solution.signature);
+        let signature = encode(&solution.signature);
         let solution = encode(&solution.data);
 
         let inserts = &[include_sql!(

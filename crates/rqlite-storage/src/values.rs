@@ -4,7 +4,7 @@ use anyhow::bail;
 use essential_types::{intent::Intent, solution::Solution, Batch, Block, Signature, Signed, Word};
 use serde_json::Value;
 
-use crate::{decode, decode_signature, RESULTS_KEY};
+use crate::{decode, RESULTS_KEY};
 
 #[derive(Debug)]
 pub struct QueryValues {
@@ -54,7 +54,7 @@ pub fn get_intent_set(
         return Ok(None);
     };
 
-    let signature: Signature = decode_signature(&signature)?;
+    let signature: Signature = decode(&signature)?;
 
     // Decode the intents
     let intents: Vec<Intent> = intents
@@ -123,9 +123,7 @@ pub fn list_solutions_pool(
                             _ => None,
                         };
                         let signature = match signature {
-                            serde_json::Value::String(signature) => {
-                                decode_signature(signature).ok()
-                            }
+                            serde_json::Value::String(signature) => decode(signature).ok(),
                             _ => None,
                         };
                         Some(Signed {
@@ -166,7 +164,7 @@ fn map_solution_to_block(
             ) {
                 (Some(batch_id), Some(created_at_secs), Some(created_at_nanos)) => {
                     let solution = decode(solution)?;
-                    let signature = decode_signature(signature)?;
+                    let signature = decode(signature)?;
                     map.entry(batch_id)
                         .or_insert_with(|| Block {
                             number: batch_id - 1,
