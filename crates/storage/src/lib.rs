@@ -17,7 +17,7 @@ use essential_types::{
 #[allow(async_fn_in_trait)]
 /// Storage trait for the Essential platform.
 /// All inserts and updates are idempotent.
-pub trait Storage {
+pub trait Storage: StateStorage {
     // Updates
     /// Insert a set of intents with their storage layout.
     async fn insert_intent_set(
@@ -43,14 +43,6 @@ pub trait Storage {
         &self,
         partial_solutions: &[Hash],
     ) -> anyhow::Result<()>;
-
-    /// Update the state of a content address.
-    async fn update_state(
-        &self,
-        address: &ContentAddress,
-        key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>>;
 
     // Reads
     /// Get an individual intent.
@@ -97,16 +89,36 @@ pub trait Storage {
         page: Option<usize>,
     ) -> anyhow::Result<Vec<Block>>;
 
+    /// Get the storage layout of a content address.
+    async fn get_storage_layout(
+        &self,
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<StorageLayout>>;
+}
+
+// TODO: Maybe this warning is right,
+// we will find out when we try to use this trait
+// with tokio.
+#[allow(async_fn_in_trait)]
+/// Storage trait just for state reads and writes.
+pub trait StateStorage {
+    /// Update the state of a content address.
+    async fn update_state(
+        &self,
+        address: &ContentAddress,
+        key: &Key,
+        value: Option<Word>,
+    ) -> anyhow::Result<Option<Word>>;
+
+    /// Update a batch of state in one transaction.
+    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
+    where
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)>;
+
     /// Query the state of a content address.
     async fn query_state(
         &self,
         address: &ContentAddress,
         key: &Key,
     ) -> anyhow::Result<Option<Word>>;
-
-    /// Get the storage layout of a content address.
-    async fn get_storage_layout(
-        &self,
-        address: &ContentAddress,
-    ) -> anyhow::Result<Option<StorageLayout>>;
 }

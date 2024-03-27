@@ -255,6 +255,23 @@ pub fn map_execute_to_word(
     Ok(value)
 }
 
+pub fn map_execute_to_words(QueryValues { queries }: QueryValues) -> Vec<Option<Word>> {
+    queries
+        .into_iter()
+        .enumerate()
+        .filter(|(i, _)| i % 2 == 0)
+        .map(|(_, row)| {
+            row.and_then(|Rows { rows }| {
+                let col = rows.into_iter().next()?.columns.into_iter().next()?;
+                match col {
+                    Value::Number(n) => n.as_i64(),
+                    _ => None,
+                }
+            })
+        })
+        .collect()
+}
+
 pub fn map_query_to_query_values(
     mut value: serde_json::Map<String, serde_json::Value>,
 ) -> anyhow::Result<QueryValues> {

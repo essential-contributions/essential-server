@@ -7,7 +7,7 @@ use base64::Engine;
 use essential_types::{
     solution::PartialSolution, Block, ContentAddress, Signed, StorageLayout, Word,
 };
-use storage::Storage;
+use storage::{StateStorage, Storage};
 use utils::hash;
 
 use values::{single_value, QueryValues};
@@ -120,6 +120,24 @@ impl RqliteStorage {
         Ok(())
     }
 
+    async fn execute_query(&self, sql: &[&[serde_json::Value]]) -> anyhow::Result<QueryValues> {
+        let r = self
+            .http
+            .post(self.server.join("/db/request?transaction&level=strong")?)
+            .json(&sql)
+            .send()
+            .await?;
+        ensure!(
+            r.status().is_success(),
+            "failed to query values {:?}",
+            r.text().await?
+        );
+
+        let value: serde_json::Map<String, serde_json::Value> = r.json().await?;
+        handle_errors(&value, sql)?;
+        values::map_query_to_query_values(value)
+    }
+
     /// Execute a sql statement on the rqlite server and return a single word.
     /// This is useful for mixing word queries in the same transaction
     /// as an execute statement.
@@ -177,6 +195,87 @@ fn handle_errors(
         }
     }
     Ok(())
+}
+
+impl StateStorage for RqliteStorage {
+    async fn update_state(
+        &self,
+        address: &essential_types::ContentAddress,
+        key: &essential_types::Key,
+        value: Option<essential_types::Word>,
+    ) -> anyhow::Result<Option<essential_types::Word>> {
+        let address = encode(address);
+        let key = encode(key);
+        match value {
+            Some(value) => {
+                // Update the value and return the existing value if it exists.
+                let inserts = &[
+                    include_sql!("query/get_state.sql", address.clone(), key.clone()),
+                    include_sql!("update/update_state.sql", key, value, address),
+                ];
+                self.execute_query_word(&inserts[..]).await
+            }
+            None => {
+                // Delete the value and return the existing value if it exists.
+                let inserts = &[
+                    include_sql!("query/get_state.sql", address.clone(), key.clone()),
+                    include_sql!("update/delete_state.sql", address, key),
+                ];
+                self.execute_query_word(&inserts[..]).await
+            }
+        }
+    }
+
+    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
+    where
+        U: IntoIterator<Item = (ContentAddress, essential_types::Key, Option<Word>)>,
+    {
+        let sql: Vec<_> = updates
+            .into_iter()
+            .flat_map(|(address, key, value)| {
+                let address = encode(&address);
+                let key = encode(&key);
+                match value {
+                    Some(value) => {
+                        // Update the value and return the existing value if it exists.
+                        [
+                            include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
+                            include_sql!(owned "update/update_state.sql", key, value, address),
+                        ]
+                    }
+                    None => {
+                        // Delete the value and return the existing value if it exists.
+                        [
+                            include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
+                            include_sql!(owned "update/delete_state.sql", address, key),
+                        ]
+                    }
+                }
+            })
+            .collect();
+
+        // TODO: Is there a way to avoid this?
+        // Maybe create an owned version of execute.
+        let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| &v[..]).collect();
+        let queries = self.execute_query(&sql).await?;
+        Ok(values::map_execute_to_words(queries))
+    }
+
+    async fn query_state(
+        &self,
+        address: &essential_types::ContentAddress,
+        key: &essential_types::Key,
+    ) -> anyhow::Result<Option<essential_types::Word>> {
+        let address = encode(address);
+        let key = encode(key);
+        let sql = &[include_sql!("query/get_state.sql", address, key)];
+        let queries = self.query_values(sql).await?;
+        let r = single_value(queries).and_then(|v| match v {
+            serde_json::Value::Number(v) => v.as_i64(),
+            _ => None,
+        });
+        Ok(r)
+    }
 }
 
 impl Storage for RqliteStorage {
@@ -320,34 +419,6 @@ impl Storage for RqliteStorage {
         self.execute(&sql[..]).await
     }
 
-    async fn update_state(
-        &self,
-        address: &essential_types::ContentAddress,
-        key: &essential_types::Key,
-        value: Option<essential_types::Word>,
-    ) -> anyhow::Result<Option<essential_types::Word>> {
-        let address = encode(address);
-        let key = encode(key);
-        match value {
-            Some(value) => {
-                // Update the value and return the existing value if it exists.
-                let inserts = &[
-                    include_sql!("query/get_state.sql", address.clone(), key.clone()),
-                    include_sql!("update/update_state.sql", key, value, address),
-                ];
-                self.execute_query_word(&inserts[..]).await
-            }
-            None => {
-                // Delete the value and return the existing value if it exists.
-                let inserts = &[
-                    include_sql!("query/get_state.sql", address.clone(), key.clone()),
-                    include_sql!("update/delete_state.sql", address, key),
-                ];
-                self.execute_query_word(&inserts[..]).await
-            }
-        }
-    }
-
     async fn get_intent(
         &self,
         address: &essential_types::IntentAddress,
@@ -472,22 +543,6 @@ impl Storage for RqliteStorage {
             }
         };
         values::list_winning_blocks(queries)
-    }
-
-    async fn query_state(
-        &self,
-        address: &essential_types::ContentAddress,
-        key: &essential_types::Key,
-    ) -> anyhow::Result<Option<essential_types::Word>> {
-        let address = encode(address);
-        let key = encode(key);
-        let sql = &[include_sql!("query/get_state.sql", address, key)];
-        let queries = self.query_values(sql).await?;
-        let r = single_value(queries).and_then(|v| match v {
-            serde_json::Value::Number(v) => v.as_i64(),
-            _ => None,
-        });
-        Ok(r)
     }
 
     async fn get_storage_layout(

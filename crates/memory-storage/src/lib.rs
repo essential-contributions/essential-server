@@ -9,7 +9,7 @@ use essential_types::{
     solution::{PartialSolution, Solution},
     Batch, Block, ContentAddress, Hash, IntentAddress, Key, Signature, Signed, StorageLayout, Word,
 };
-use storage::Storage;
+use storage::{StateStorage, Storage};
 use utils::Lock;
 
 #[cfg(test)]
@@ -55,6 +55,56 @@ impl MemoryStorage {
         Self {
             inner: Arc::new(Lock::new(Inner::default())),
         }
+    }
+}
+
+impl StateStorage for MemoryStorage {
+    async fn update_state(
+        &self,
+        address: &ContentAddress,
+        key: &Key,
+        value: Option<Word>,
+    ) -> anyhow::Result<Option<Word>> {
+        let v = self.inner.apply(|i| {
+            let map = i.state.entry(address.clone()).or_default();
+            match value {
+                None => map.remove(key),
+                Some(value) => map.insert(*key, value),
+            }
+        });
+        Ok(v)
+    }
+
+    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
+    where
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)>,
+    {
+        let v = self.inner.apply(|i| {
+            updates
+                .into_iter()
+                .map(|(address, key, value)| {
+                    let map = i.state.entry(address).or_default();
+                    match value {
+                        None => map.remove(&key),
+                        Some(value) => map.insert(key, value),
+                    }
+                })
+                .collect()
+        });
+        Ok(v)
+    }
+
+    async fn query_state(
+        &self,
+        address: &ContentAddress,
+        key: &Key,
+    ) -> anyhow::Result<Option<Word>> {
+        let v = self.inner.apply(|i| {
+            let map = i.state.get(address)?;
+            let v = map.get(key)?;
+            Some(*v)
+        });
+        Ok(v)
     }
 }
 
@@ -136,22 +186,6 @@ impl Storage for MemoryStorage {
             }
         });
         Ok(())
-    }
-
-    async fn update_state(
-        &self,
-        address: &ContentAddress,
-        key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>> {
-        let v = self.inner.apply(|i| {
-            let map = i.state.entry(address.clone()).or_default();
-            match value {
-                None => map.remove(key),
-                Some(value) => map.insert(*key, value),
-            }
-        });
-        Ok(v)
     }
 
     async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
@@ -314,19 +348,6 @@ impl Storage for MemoryStorage {
         let v = self.inner.apply(|i| {
             let set = i.intents.get(address)?;
             Some(set.storage_layout.clone())
-        });
-        Ok(v)
-    }
-
-    async fn query_state(
-        &self,
-        address: &ContentAddress,
-        key: &Key,
-    ) -> anyhow::Result<Option<Word>> {
-        let v = self.inner.apply(|i| {
-            let map = i.state.get(address)?;
-            let v = map.get(key)?;
-            Some(*v)
         });
         Ok(v)
     }
