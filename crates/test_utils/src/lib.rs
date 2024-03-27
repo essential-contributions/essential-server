@@ -1,7 +1,7 @@
 use essential_types::{
     intent::{Directive, Intent},
     slots::Slots,
-    solution::Solution,
+    solution::{PartialSolution, Solution},
     Signed,
 };
 use secp256k1::{rand::rngs::OsRng, PublicKey, Secp256k1, SecretKey};
@@ -37,6 +37,13 @@ pub fn empty_solution() -> Solution {
         data: Default::default(),
         state_mutations: Default::default(),
         partial_solutions: Default::default(),
+    }
+}
+
+pub fn empty_partial_solution() -> PartialSolution {
+    PartialSolution {
+        data: Default::default(),
+        state_mutations: Default::default(),
     }
 }
 

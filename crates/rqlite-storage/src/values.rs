@@ -1,7 +1,12 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::bail;
-use essential_types::{intent::Intent, solution::Solution, Batch, Block, Signature, Signed, Word};
+use essential_types::{
+    intent::Intent,
+    solution::{PartialSolution, Solution},
+    Batch, Block, Signature, Signed, Word,
+};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::{decode, RESULTS_KEY};
@@ -71,6 +76,31 @@ pub fn get_intent_set(
     }))
 }
 
+pub fn get_partial_solution(
+    QueryValues { queries }: QueryValues,
+) -> Result<Option<Signed<PartialSolution>>, anyhow::Error> {
+    let Some(Columns { columns }) = queries
+        .into_iter()
+        .next()
+        .flatten()
+        .and_then(|rows| rows.rows.into_iter().next())
+    else {
+        return Ok(None);
+    };
+
+    match &columns[..] {
+        [Value::String(solution), Value::String(signature)] => {
+            let solution = decode(solution)?;
+            let signature = decode(signature)?;
+            Ok(Some(Signed {
+                data: solution,
+                signature,
+            }))
+        }
+        _ => bail!("unexpected columns: {:?}", columns),
+    }
+}
+
 pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Vec<Intent>>> {
     // Only expecting a single query because
     // we only made a single query
@@ -107,9 +137,20 @@ pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<
     Ok(out)
 }
 
-pub fn list_solutions_pool(
-    QueryValues { queries }: QueryValues,
-) -> anyhow::Result<Vec<Signed<Solution>>> {
+pub fn list_solutions_pool(queries: QueryValues) -> anyhow::Result<Vec<Signed<Solution>>> {
+    list_solutions(queries)
+}
+
+pub fn list_partial_solutions_pool(
+    queries: QueryValues,
+) -> Result<Vec<Signed<PartialSolution>>, anyhow::Error> {
+    list_solutions(queries)
+}
+
+fn list_solutions<S>(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Signed<S>>>
+where
+    S: DeserializeOwned,
+{
     let r = queries
         .into_iter()
         .next()
