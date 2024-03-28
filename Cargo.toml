@@ -3,6 +3,7 @@ members = [
     "crates/essential",
     "crates/memory-storage",
     "crates/rqlite-storage",
+    "crates/transaction-storage",
     "crates/storage",
     "crates/utils",
 ]

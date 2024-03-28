@@ -1,0 +1,15 @@
+[package]
+edition = "2021"
+name = "transaction-storage"
+version = "0.1.0"
+
+[dependencies]
+anyhow = { workspace = true }
+essential-types = { workspace = true }
+storage = { workspace = true }
+utils = { workspace = true }
+
+[dev-dependencies]
+memory-storage = { workspace = true }
+test-utils = { workspace = true }
+tokio = { workspace = true }

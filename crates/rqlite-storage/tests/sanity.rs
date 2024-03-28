@@ -1,7 +1,7 @@
 use essential_types::{ContentAddress, IntentAddress, StorageLayout};
 use rqlite_storage::RqliteStorage;
 use std::vec;
-use storage::Storage;
+use storage::{StateStorage, Storage};
 use test_utils::{
     empty_intent, empty_partial_solution, empty_solution, intent_with_vars,
     sign_with_random_keypair,
@@ -44,6 +44,63 @@ async fn test_update_state() {
     assert_eq!(v, None);
     let v = storage.query_state(&address, &key).await.unwrap();
     assert_eq!(v, Some(1));
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_update_state_batch() {
+    let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
+    let storage_layout = StorageLayout;
+    let intent = sign_with_random_keypair(vec![empty_intent()]);
+    storage
+        .insert_intent_set(storage_layout.clone(), intent)
+        .await
+        .unwrap();
+    let intent = sign_with_random_keypair(vec![intent_with_vars(3)]);
+    storage
+        .insert_intent_set(storage_layout, intent)
+        .await
+        .unwrap();
+    let address_0 = ContentAddress(hash(&vec![empty_intent()]));
+    let address_1 = ContentAddress(hash(&vec![intent_with_vars(3)]));
+    let key = [0; 4];
+    let v = storage
+        .update_state(&address_0, &key, Some(1))
+        .await
+        .unwrap();
+    assert_eq!(v, None);
+    let v = storage
+        .update_state(&address_1, &[1; 4], Some(2))
+        .await
+        .unwrap();
+    assert_eq!(v, None);
+    let updates = (0..10).map(|i| {
+        let address = if i % 2 == 0 {
+            address_0.clone()
+        } else {
+            address_1.clone()
+        };
+        (address, [i; 4], Some(i))
+    });
+    let v = storage.update_state_batch(updates).await.unwrap();
+    assert_eq!(
+        v,
+        vec![
+            Some(1),
+            Some(2),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None
+        ]
+    );
+
+    let v = storage.query_state(&address_0, &[8; 4]).await.unwrap();
+    assert_eq!(v, Some(8));
 }
 
 #[tokio::test]
