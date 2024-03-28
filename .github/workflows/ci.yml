@@ -14,16 +14,28 @@ jobs:
   nix-fmt-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: DeterminateSystems/nix-installer-action@main
-      - run: nix fmt -- --check ./
+    - name: Provide Access to Private Repos
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_SELF }}
+    - uses: actions/checkout@v3
+    - uses: DeterminateSystems/nix-installer-action@main
+    - run: nix fmt -- --check ./
 
   nix-flake-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: DeterminateSystems/nix-installer-action@main
-      - run: nix flake check --all-systems
+    - name: Provide Access to Private Repos
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY }}
+            ${{ secrets.SSH_PRIVATE_KEY_SELF }}
+    - uses: actions/checkout@v3
+    - uses: DeterminateSystems/nix-installer-action@main
+    - run: nix flake check --all-systems
 
   cargo:
     runs-on: ubuntu-latest
