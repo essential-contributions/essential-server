@@ -17,7 +17,7 @@ pub enum CheckError {
     Alu(#[from] AluError),
     #[error("stack operation error: {0}")]
     Stack(#[from] StackError),
-    #[error("encountered bytecode error: {0}")]
+    #[error("bytecode error: {0}")]
     FromBytes(#[from] asm::FromBytesError),
     #[error("invalid constraint evaluation result {0}, exepcted `0` (false) or `1` (true)")]
     InvalidConstraintValue(Word),
@@ -75,11 +75,7 @@ pub fn eval_bytecode(bytes: impl IntoIterator<Item = u8>, input: CheckInput) -> 
 ///
 /// This is the same as `exec_ops`, but retrieves the boolean result from the resulting stack.
 pub fn eval_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> CheckResult<bool> {
-    let mut stack: Stack = vec![];
-    for op in ops {
-        step_op(input, op, &mut stack)?;
-        println!("{:?}: {:?}", op, &stack);
-    }
+    let mut stack = exec_ops(ops, input)?;
     let word = pop(&mut stack)?;
     bool_from_word(word).map_err(CheckError::InvalidConstraintValue)
 }
