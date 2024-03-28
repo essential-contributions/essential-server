@@ -1,7 +1,11 @@
 //! The essential constraint checking implementation.
 
 use essential_constraint_asm::{self as asm, Op};
-pub use essential_types::{intent::Directive, solution::SolutionData, ConstraintBytecode, Word};
+pub use essential_types::{
+    intent::Directive,
+    solution::{DecisionVariable, SolutionData},
+    ConstraintBytecode, Word,
+};
 use thiserror::Error;
 
 /// All required input data for checking an intent's constraints.
@@ -13,6 +17,8 @@ pub struct CheckInput<'a> {
 
 #[derive(Debug, Error)]
 pub enum CheckError {
+    #[error("access error: {0}")]
+    Access(#[from] AccessError),
     #[error("ALU operation error: {0}")]
     Alu(#[from] AluError),
     #[error("stack operation error: {0}")]
@@ -24,11 +30,9 @@ pub enum CheckError {
 }
 
 #[derive(Debug, Error)]
-pub enum StackError {
-    #[error("attempted to pop an empty stack")]
-    Empty,
-    #[error("indexed stack out of bounds")]
-    IndexOutOfBounds,
+pub enum AccessError {
+    #[error("decision variable slot out of bounds")]
+    DecisionSlotOutOfBounds,
 }
 
 #[derive(Debug, Error)]
@@ -41,9 +45,15 @@ pub enum AluError {
     DivideByZero,
 }
 
-pub type CheckResult<T> = Result<T, CheckError>;
+#[derive(Debug, Error)]
+pub enum StackError {
+    #[error("attempted to pop an empty stack")]
+    Empty,
+    #[error("indexed stack out of bounds")]
+    IndexOutOfBounds,
+}
 
-pub type AluResult<T> = Result<T, AluError>;
+pub type CheckResult<T> = Result<T, CheckError>;
 
 pub type Stack = Vec<Word>;
 
@@ -123,8 +133,8 @@ pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> CheckResult<()> 
 
 pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Access::DecisionVar => todo!(),
-        asm::Access::DecisionVarRange => todo!(),
+        asm::Access::DecisionVar => pop_1_push_1(stack, |slot| access_decision_var(input, slot)),
+        asm::Access::DecisionVarRange => access_decision_var_range(input, stack),
         asm::Access::MutKeysLen => todo!(),
         asm::Access::State => todo!(),
         asm::Access::StateRange => todo!(),
@@ -133,6 +143,46 @@ pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> 
         asm::Access::ThisAddress => todo!(),
         asm::Access::ThisSetAddress => todo!(),
     }
+}
+
+fn access_decision_var(input: CheckInput, slot: Word) -> CheckResult<Word> {
+    let ix = usize::try_from(slot).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
+    let dec_var = input
+        .solution_data
+        .decision_variables
+        .get(ix)
+        .ok_or(AccessError::DecisionSlotOutOfBounds)?;
+    match *dec_var {
+        DecisionVariable::Inline(w) => Ok(w),
+        DecisionVariable::Transient(ref _dec_var_ix) => {
+            todo!("we must pass in all solution data to support transient decision variables")
+        }
+    }
+}
+
+fn access_decision_var_range(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
+    let [slot, len] = pop2(stack)?;
+    let len = usize::try_from(len).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
+    let start = usize::try_from(slot).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
+    let end = start
+        .checked_add(len)
+        .ok_or(AccessError::DecisionSlotOutOfBounds)?;
+    let range = start..end;
+    let iter = input
+        .solution_data
+        .decision_variables
+        .get(range)
+        .ok_or(AccessError::DecisionSlotOutOfBounds)?;
+    for dec_var in iter {
+        let w = match *dec_var {
+            DecisionVariable::Inline(w) => w,
+            DecisionVariable::Transient(ref _dec_var_ix) => {
+                todo!("we must pass in all solution data to support transient decision variables")
+            }
+        };
+        stack.push(w);
+    }
+    Ok(())
 }
 
 pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> CheckResult<()> {
@@ -182,6 +232,24 @@ fn pop(stack: &mut Stack) -> CheckResult<Word> {
     Ok(stack.pop().ok_or(StackError::Empty)?)
 }
 
+fn pop2(stack: &mut Stack) -> CheckResult<[Word; 2]> {
+    let w1 = pop(stack)?;
+    let w0 = pop(stack)?;
+    Ok([w0, w1])
+}
+
+fn pop4(stack: &mut Stack) -> CheckResult<[Word; 4]> {
+    let [w2, w3] = pop2(stack)?;
+    let [w0, w1] = pop2(stack)?;
+    Ok([w0, w1, w2, w3])
+}
+
+fn pop8(stack: &mut Stack) -> CheckResult<[Word; 8]> {
+    let [w4, w5, w6, w7] = pop4(stack)?;
+    let [w0, w1, w2, w3] = pop4(stack)?;
+    Ok([w0, w1, w2, w3, w4, w5, w6, w7])
+}
+
 pub fn pop_1_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word) -> CheckResult<Word>,
@@ -196,8 +264,7 @@ pub fn pop_2_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word, Word) -> CheckResult<Word>,
 {
-    let w1 = pop(stack)?;
-    let w0 = pop(stack)?;
+    let [w0, w1] = pop2(stack)?;
     let x = f(w0, w1)?;
     stack.push(x);
     Ok(())
@@ -207,15 +274,8 @@ pub fn pop_8_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce([Word; 8]) -> CheckResult<Word>,
 {
-    let w7 = pop(stack)?;
-    let w6 = pop(stack)?;
-    let w5 = pop(stack)?;
-    let w4 = pop(stack)?;
-    let w3 = pop(stack)?;
-    let w2 = pop(stack)?;
-    let w1 = pop(stack)?;
-    let w0 = pop(stack)?;
-    let x = f([w0, w1, w2, w3, w4, w5, w6, w7])?;
+    let ws = pop8(stack)?;
+    let x = f(ws)?;
     stack.push(x);
     Ok(())
 }
@@ -225,9 +285,9 @@ where
     F: FnOnce(Word) -> CheckResult<[Word; 2]>,
 {
     let w = pop(stack)?;
-    let [w0, w1] = f(w)?;
-    stack.push(w0);
-    stack.push(w1);
+    let [x0, x1] = f(w)?;
+    stack.push(x0);
+    stack.push(x1);
     Ok(())
 }
 
@@ -235,11 +295,10 @@ pub fn pop_2_push_2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word, Word) -> CheckResult<[Word; 2]>,
 {
-    let w1 = pop(stack)?;
-    let w0 = pop(stack)?;
-    let [w0, w1] = f(w0, w1)?;
-    stack.push(w0);
-    stack.push(w1);
+    let [w0, w1] = pop2(stack)?;
+    let [x0, x1] = f(w0, w1)?;
+    stack.push(x0);
+    stack.push(x1);
     Ok(())
 }
 
