@@ -15,12 +15,20 @@ pub struct CheckInput<'a> {
 pub enum CheckError {
     #[error("ALU operation error: {0}")]
     Alu(#[from] AluError),
-    #[error("")]
-    EmptyStack,
+    #[error("stack operation error: {0}")]
+    Stack(#[from] StackError),
     #[error("encountered bytecode error: {0}")]
     FromBytes(#[from] asm::FromBytesError),
     #[error("invalid constraint evaluation result {0}, exepcted `0` (false) or `1` (true)")]
     InvalidConstraintValue(Word),
+}
+
+#[derive(Debug, Error)]
+pub enum StackError {
+    #[error("attempted to pop an empty stack")]
+    Empty,
+    #[error("indexed stack out of bounds")]
+    IndexOutOfBounds,
 }
 
 #[derive(Debug, Error)]
@@ -59,7 +67,7 @@ pub fn check_intent(
 /// This is the same as `exec_bytecode`, but retrieves the boolean result from the resulting stack.
 pub fn eval_bytecode(bytes: impl IntoIterator<Item = u8>, input: CheckInput) -> CheckResult<bool> {
     let mut stack = exec_bytecode(bytes, input)?;
-    let word = stack.pop().ok_or(CheckError::EmptyStack)?;
+    let word = pop(&mut stack)?;
     bool_from_word(word).map_err(CheckError::InvalidConstraintValue)
 }
 
@@ -72,7 +80,7 @@ pub fn eval_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> CheckRe
         step_op(input, op, &mut stack)?;
         println!("{:?}: {:?}", op, &stack);
     }
-    let word = stack.pop().ok_or(CheckError::EmptyStack)?;
+    let word = pop(&mut stack)?;
     bool_from_word(word).map_err(CheckError::InvalidConstraintValue)
 }
 
@@ -166,19 +174,23 @@ pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> CheckResult<()> {
 
 pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Stack::Dup => todo!(),
-        asm::Stack::DupFrom => todo!(),
+        asm::Stack::Dup => pop_1_push_2(stack, |w| Ok([w, w])),
+        asm::Stack::DupFrom => dup_from(stack),
         asm::Stack::Push(word) => Ok(stack.push(word)),
-        asm::Stack::Pop => stack.pop().map(|_| ()).ok_or(CheckError::EmptyStack),
-        asm::Stack::Swap => todo!(),
+        asm::Stack::Pop => pop(stack).map(|_| ()),
+        asm::Stack::Swap => pop_2_push_2(stack, |a, b| Ok([b, a])),
     }
+}
+
+fn pop(stack: &mut Stack) -> CheckResult<Word> {
+    Ok(stack.pop().ok_or(StackError::Empty)?)
 }
 
 pub fn pop_1_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word) -> CheckResult<Word>,
 {
-    let w = stack.pop().ok_or(CheckError::EmptyStack)?;
+    let w = pop(stack)?;
     let x = f(w)?;
     stack.push(x);
     Ok(())
@@ -188,8 +200,8 @@ pub fn pop_2_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word, Word) -> CheckResult<Word>,
 {
-    let w1 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w0 = stack.pop().ok_or(CheckError::EmptyStack)?;
+    let w1 = pop(stack)?;
+    let w0 = pop(stack)?;
     let x = f(w0, w1)?;
     stack.push(x);
     Ok(())
@@ -199,16 +211,52 @@ pub fn pop_8_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce([Word; 8]) -> CheckResult<Word>,
 {
-    let w7 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w6 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w5 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w4 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w3 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w2 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w1 = stack.pop().ok_or(CheckError::EmptyStack)?;
-    let w0 = stack.pop().ok_or(CheckError::EmptyStack)?;
+    let w7 = pop(stack)?;
+    let w6 = pop(stack)?;
+    let w5 = pop(stack)?;
+    let w4 = pop(stack)?;
+    let w3 = pop(stack)?;
+    let w2 = pop(stack)?;
+    let w1 = pop(stack)?;
+    let w0 = pop(stack)?;
     let x = f([w0, w1, w2, w3, w4, w5, w6, w7])?;
     stack.push(x);
+    Ok(())
+}
+
+pub fn pop_1_push_2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+where
+    F: FnOnce(Word) -> CheckResult<[Word; 2]>,
+{
+    let w = pop(stack)?;
+    let [w0, w1] = f(w)?;
+    stack.push(w0);
+    stack.push(w1);
+    Ok(())
+}
+
+pub fn pop_2_push_2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+where
+    F: FnOnce(Word, Word) -> CheckResult<[Word; 2]>,
+{
+    let w1 = pop(stack)?;
+    let w0 = pop(stack)?;
+    let [w0, w1] = f(w0, w1)?;
+    stack.push(w0);
+    stack.push(w1);
+    Ok(())
+}
+
+fn dup_from(stack: &mut Stack) -> CheckResult<()> {
+    let rev_ix_w = pop(stack)?;
+    let rev_ix = usize::try_from(rev_ix_w).map_err(|_| StackError::IndexOutOfBounds)?;
+    let ix = stack
+        .len()
+        .checked_sub(rev_ix)
+        .and_then(|i| i.checked_sub(1))
+        .ok_or(StackError::IndexOutOfBounds)?;
+    let w = *stack.get(ix).ok_or(StackError::IndexOutOfBounds)?;
+    stack.push(w);
     Ok(())
 }
 
