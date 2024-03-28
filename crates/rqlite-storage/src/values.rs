@@ -255,10 +255,16 @@ pub fn map_execute_to_word(
     Ok(value)
 }
 
+/// Map the execute query results to words.
+///
+/// Note this is designed for queries where the first query is a read query
+/// then it alternates between write and read queries.
 pub fn map_execute_to_words(QueryValues { queries }: QueryValues) -> Vec<Option<Word>> {
     queries
         .into_iter()
         .enumerate()
+        // Skip every second result as they are the results of the write queries
+        // and not the read queries that we are interested in.
         .filter(|(i, _)| i % 2 == 0)
         .map(|(_, row)| {
             row.and_then(|Rows { rows }| {
