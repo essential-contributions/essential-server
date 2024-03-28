@@ -1,0 +1,10 @@
+[package]
+name = "essential-constraint-vm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+essential-types = { workspace = true }
+# essential-constraint-asm = { workspace = true }
+essential-constraint-asm = { path = "./../../../base/crates/constraint-asm" }
+thiserror = "1"

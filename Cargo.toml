@@ -1,11 +1,6 @@
 [workspace]
 members = [
-    "crates/essential",
-    "crates/memory-storage",
-    "crates/rqlite-storage",
-    "crates/transaction-storage",
-    "crates/storage",
-    "crates/utils",
+  "crates/*"
 ]
 resolver = "2"
 
@@ -23,6 +18,7 @@ serde_json = "1.0.114"
 sha2 = "0.10.8"
 tokio = { version = "1.36.0", features = ["full"] }
 
+constraint-vm = { path = "crates/constraint-vm", package = "essential-constraint-vm" }
 memory-storage = { path = "crates/memory-storage" }
 storage = { path = "crates/storage" }
 test-utils = { path = "crates/test_utils" }
