@@ -1,12 +1,15 @@
 //! The essential constraint checking implementation.
 
-use essential_constraint_asm::{self as asm, Op};
+pub use access::AccessError;
+use essential_constraint_asm::{self as asm, Op, Word};
 pub use essential_types::{
     intent::Directive,
     solution::{DecisionVariable, SolutionData},
-    ConstraintBytecode, Word,
+    ConstraintBytecode,
 };
 use thiserror::Error;
+
+mod access;
 
 /// All required input data for checking an intent's constraints.
 #[derive(Clone, Copy, Debug)]
@@ -27,12 +30,6 @@ pub enum CheckError {
     FromBytes(#[from] asm::FromBytesError),
     #[error("invalid constraint evaluation result {0}, exepcted `0` (false) or `1` (true)")]
     InvalidConstraintValue(Word),
-}
-
-#[derive(Debug, Error)]
-pub enum AccessError {
-    #[error("decision variable slot out of bounds")]
-    DecisionSlotOutOfBounds,
 }
 
 #[derive(Debug, Error)]
@@ -133,56 +130,16 @@ pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> CheckResult<()> 
 
 pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Access::DecisionVar => pop_1_push_1(stack, |slot| access_decision_var(input, slot)),
-        asm::Access::DecisionVarRange => access_decision_var_range(input, stack),
+        asm::Access::DecisionVar => pop_1_push_1(stack, |slot| access::decision_var(input, slot)),
+        asm::Access::DecisionVarRange => access::decision_var_range(input, stack),
         asm::Access::MutKeysLen => todo!(),
-        asm::Access::State => todo!(),
+        asm::Access::State => pop_2_push_1(stack, |slot, delta| access::state(input, slot, delta)),
         asm::Access::StateRange => todo!(),
         asm::Access::StateIsSome => todo!(),
         asm::Access::StateIsSomeRange => todo!(),
         asm::Access::ThisAddress => todo!(),
         asm::Access::ThisSetAddress => todo!(),
     }
-}
-
-fn access_decision_var(input: CheckInput, slot: Word) -> CheckResult<Word> {
-    let ix = usize::try_from(slot).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
-    let dec_var = input
-        .solution_data
-        .decision_variables
-        .get(ix)
-        .ok_or(AccessError::DecisionSlotOutOfBounds)?;
-    match *dec_var {
-        DecisionVariable::Inline(w) => Ok(w),
-        DecisionVariable::Transient(ref _dec_var_ix) => {
-            todo!("we must pass in all solution data to support transient decision variables")
-        }
-    }
-}
-
-fn access_decision_var_range(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
-    let [slot, len] = pop2(stack)?;
-    let len = usize::try_from(len).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
-    let start = usize::try_from(slot).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
-    let end = start
-        .checked_add(len)
-        .ok_or(AccessError::DecisionSlotOutOfBounds)?;
-    let range = start..end;
-    let iter = input
-        .solution_data
-        .decision_variables
-        .get(range)
-        .ok_or(AccessError::DecisionSlotOutOfBounds)?;
-    for dec_var in iter {
-        let w = match *dec_var {
-            DecisionVariable::Inline(w) => w,
-            DecisionVariable::Transient(ref _dec_var_ix) => {
-                todo!("we must pass in all solution data to support transient decision variables")
-            }
-        };
-        stack.push(w);
-    }
-    Ok(())
 }
 
 pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> CheckResult<()> {

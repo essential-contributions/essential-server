@@ -1453,7 +1453,7 @@ name = "transaction-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "essential-types",
+ "essential-types 0.1.0 (git+ssh://git@github.com/essential-contributions/essential-base.git)",
  "memory-storage",
  "storage",
  "test-utils",
