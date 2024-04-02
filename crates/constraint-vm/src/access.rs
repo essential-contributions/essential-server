@@ -1,14 +1,11 @@
 //! Access operation implementations.
 
-use crate::{
-    bool_from_word, error::AccessError, pop1_push1, pop2, pop2_push1, pop3, CheckInput,
-    CheckResult, Stack, StateSlots,
-};
+use crate::{bool_from_word, error::AccessError, CheckInput, ConstraintResult, Stack, StateSlots};
 use essential_constraint_asm::Word;
 use essential_types::{convert::word_4_from_u8_32, solution::DecisionVariable};
 
-pub(crate) fn decision_var(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
-    pop1_push1(stack, |slot| {
+pub(crate) fn decision_var(input: CheckInput, stack: &mut Stack) -> ConstraintResult<()> {
+    stack.pop1_push1(|slot| {
         let ix = usize::try_from(slot).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
         let dec_var = input
             .solution_data
@@ -24,8 +21,8 @@ pub(crate) fn decision_var(input: CheckInput, stack: &mut Stack) -> CheckResult<
     })
 }
 
-pub(crate) fn decision_var_range(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
-    let [slot, len] = pop2(stack)?;
+pub(crate) fn decision_var_range(input: CheckInput, stack: &mut Stack) -> ConstraintResult<()> {
+    let [slot, len] = stack.pop2()?;
     let range = range_from_start_len(slot, len).ok_or(AccessError::DecisionSlotOutOfBounds)?;
     let iter = input
         .solution_data
@@ -44,16 +41,16 @@ pub(crate) fn decision_var_range(input: CheckInput, stack: &mut Stack) -> CheckR
     Ok(())
 }
 
-pub(crate) fn state(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
-    pop2_push1(stack, |slot, delta| {
+pub(crate) fn state(input: CheckInput, stack: &mut Stack) -> ConstraintResult<()> {
+    stack.pop2_push1(|slot, delta| {
         let slot = state_slot(input, slot, delta)?;
         let word = slot.ok_or(AccessError::StateSlotWasNone)?;
         Ok(word)
     })
 }
 
-pub(crate) fn state_range(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
-    let [slot, len, delta] = pop3(stack)?;
+pub(crate) fn state_range(input: CheckInput, stack: &mut Stack) -> ConstraintResult<()> {
+    let [slot, len, delta] = stack.pop3()?;
     let slice = state_slot_range(input, slot, len, delta)?;
     for slot in slice {
         let word = slot.ok_or(AccessError::StateSlotWasNone)?;
@@ -62,16 +59,16 @@ pub(crate) fn state_range(input: CheckInput, stack: &mut Stack) -> CheckResult<(
     Ok(())
 }
 
-pub(crate) fn state_is_some(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
-    pop2_push1(stack, |slot, delta| {
+pub(crate) fn state_is_some(input: CheckInput, stack: &mut Stack) -> ConstraintResult<()> {
+    stack.pop2_push1(|slot, delta| {
         let slot = state_slot(input, slot, delta)?;
         let is_some = Word::from(slot.is_some());
         Ok(is_some)
     })
 }
 
-pub(crate) fn state_is_some_range(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
-    let [slot, len, delta] = pop3(stack)?;
+pub(crate) fn state_is_some_range(input: CheckInput, stack: &mut Stack) -> ConstraintResult<()> {
+    let [slot, len, delta] = stack.pop3()?;
     let slice = state_slot_range(input, slot, len, delta)?;
     for slot in slice {
         let is_some = Word::from(slot.is_some());
@@ -90,7 +87,7 @@ pub(crate) fn this_set_address(input: CheckInput, stack: &mut Stack) {
     stack.extend(words);
 }
 
-fn state_slot(input: CheckInput, slot: Word, delta: Word) -> CheckResult<&Option<Word>> {
+fn state_slot(input: CheckInput, slot: Word, delta: Word) -> ConstraintResult<&Option<Word>> {
     let delta = bool_from_word(delta).map_err(AccessError::InvalidStateSlotDelta)?;
     let slots = state_slots_from_delta(input, delta);
     let ix = usize::try_from(slot).map_err(|_| AccessError::StateSlotOutOfBounds)?;
@@ -103,7 +100,7 @@ fn state_slot_range(
     slot: Word,
     len: Word,
     delta: Word,
-) -> CheckResult<&[Option<Word>]> {
+) -> ConstraintResult<&[Option<Word>]> {
     let delta = bool_from_word(delta).map_err(AccessError::InvalidStateSlotDelta)?;
     let slots = state_slots_from_delta(input, delta);
     let range = range_from_start_len(slot, len).ok_or(AccessError::StateSlotOutOfBounds)?;

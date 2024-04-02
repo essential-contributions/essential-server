@@ -1,72 +1,98 @@
 //! The essential constraint checking implementation.
 
-pub use error::CheckError;
-use error::{AluError, StackError};
+pub use error::{CheckError, ConstraintError, ConstraintResult};
+use error::{ConstraintErrors, ConstraintsUnsatisfied};
+#[doc(inline)]
 pub use essential_constraint_asm as asm;
 use essential_constraint_asm::{Op, Word};
-pub use essential_types::{
-    intent::Directive,
-    solution::{DecisionVariable, SolutionData},
-    ConstraintBytecode,
-};
+pub use essential_types as types;
+use essential_types::{solution::SolutionData, ConstraintBytecode};
+pub use stack::Stack;
 
 mod access;
+mod alu;
 mod crypto;
 pub mod error;
+pub mod stack;
 
-/// All required input data for checking an intent's constraints.
+/// All required input data for checking an intent's constraints against a proposed solution.
 #[derive(Clone, Copy, Debug)]
 pub struct CheckInput<'a> {
     pub solution_data: &'a SolutionData,
+    /// Intent state slot values before the associated solution's mutations are applied.
     pub pre_state: &'a StateSlots,
+    /// Intent state slot values after the associated solution's mutations are applied.
     pub post_state: &'a StateSlots,
 }
 
-/// Shorthand for a `Result` where the error type is a `CheckError`.
-pub type CheckResult<T> = Result<T, CheckError>;
-
-/// The VM's `Stack` is just a `Vec` of `Word`s.
-pub type Stack = Vec<Word>;
-
 /// The state slots declared within the intent.
 pub type StateSlots = [Option<Word>];
+
+/// The `Ok` case of the `Result` when checking an intent.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum CheckedIntent {
+    /// All constraints were satisfied.
+    Satisfied,
+    /// The constraints at the following indices were not satisifed.
+    Unsatisfied(Vec<usize>),
+}
 
 /// Check whether the constraints of a single intent are met by the given
 /// solution data and state.
 ///
 /// Returns the `Directive`, indicating the quality of the solution.
-pub fn check_intent(
-    intent: &[ConstraintBytecode],
-    input: CheckInput,
-) -> Result<Directive, CheckError> {
-    intent
+pub fn check_intent(intent: &[ConstraintBytecode], input: CheckInput) -> Result<(), CheckError> {
+    let (unsatisfied, failed) = intent
         .iter()
         .map(|bytecode| eval_bytecode(bytecode.iter().copied(), input))
-        .fold(Ok(true), |acc, res| acc.and_then(|b| res.map(|b2| b && b2)))?;
-    todo!()
+        .enumerate()
+        .fold(
+            (vec![], vec![]),
+            |(mut unsatisfied, mut failed), (i, constraint_res)| {
+                match constraint_res {
+                    Ok(b) if !b => unsatisfied.push(i),
+                    Err(err) => failed.push((i, err)),
+                    _ => (),
+                }
+                (unsatisfied, failed)
+            },
+        );
+    if !failed.is_empty() {
+        return Err(ConstraintErrors(failed).into());
+    }
+    if !unsatisfied.is_empty() {
+        return Err(ConstraintsUnsatisfied(unsatisfied).into());
+    }
+    Ok(())
 }
 
 /// Evaluate the bytecode of a single constraint and return its boolean result.
 ///
 /// This is the same as `exec_bytecode`, but retrieves the boolean result from the resulting stack.
-pub fn eval_bytecode(bytes: impl IntoIterator<Item = u8>, input: CheckInput) -> CheckResult<bool> {
+pub fn eval_bytecode(
+    bytes: impl IntoIterator<Item = u8>,
+    input: CheckInput,
+) -> ConstraintResult<bool> {
     let mut stack = exec_bytecode(bytes, input)?;
-    let word = pop(&mut stack)?;
-    bool_from_word(word).map_err(CheckError::InvalidConstraintValue)
+    let word = stack.pop1()?;
+    bool_from_word(word).map_err(ConstraintError::InvalidConstraintValue)
 }
 
 /// Evaluate the operations of a single constraint and return its boolean result.
 ///
 /// This is the same as `exec_ops`, but retrieves the boolean result from the resulting stack.
-pub fn eval_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> CheckResult<bool> {
+pub fn eval_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> ConstraintResult<bool> {
     let mut stack = exec_ops(ops, input)?;
-    let word = pop(&mut stack)?;
-    bool_from_word(word).map_err(CheckError::InvalidConstraintValue)
+    let word = stack.pop1()?;
+    bool_from_word(word).map_err(ConstraintError::InvalidConstraintValue)
 }
 
 /// Execute the bytecode of a constraint and return the resulting stack.
-pub fn exec_bytecode(bytes: impl IntoIterator<Item = u8>, input: CheckInput) -> CheckResult<Stack> {
-    let mut stack: Stack = vec![];
+pub fn exec_bytecode(
+    bytes: impl IntoIterator<Item = u8>,
+    input: CheckInput,
+) -> ConstraintResult<Stack> {
+    let mut stack = Stack::default();
     for res in asm::from_bytes(bytes.into_iter()) {
         let op = res?;
         step_op(input, op, &mut stack)?;
@@ -76,8 +102,8 @@ pub fn exec_bytecode(bytes: impl IntoIterator<Item = u8>, input: CheckInput) -> 
 }
 
 /// Execute the operations of a constraint and return the resulting stack.
-pub fn exec_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> CheckResult<Stack> {
-    let mut stack: Stack = vec![];
+pub fn exec_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> ConstraintResult<Stack> {
+    let mut stack = Stack::default();
     for op in ops {
         step_op(input, op, &mut stack)?;
         println!("{:?}: {:?}", op, &stack);
@@ -85,17 +111,8 @@ pub fn exec_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> CheckRe
     Ok(stack)
 }
 
-/// Parse a `bool` from a word, where 0 is false, 1 is true and any other value is invalid.
-fn bool_from_word(word: Word) -> Result<bool, Word> {
-    match word {
-        0 => Ok(false),
-        1 => Ok(true),
-        _ => Err(word),
-    }
-}
-
 /// Step forward constraint checking by the given operation.
-pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> CheckResult<()> {
+pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
         Op::Access(op) => step_op_access(input, op, stack),
         Op::Alu(op) => step_op_alu(op, stack),
@@ -106,7 +123,11 @@ pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> CheckResult<()> 
 }
 
 /// Step forward constraint checking by the given access operation.
-pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> CheckResult<()> {
+pub fn step_op_access(
+    input: CheckInput,
+    op: asm::Access,
+    stack: &mut Stack,
+) -> ConstraintResult<()> {
     match op {
         asm::Access::DecisionVar => access::decision_var(input, stack),
         asm::Access::DecisionVarRange => access::decision_var_range(input, stack),
@@ -121,18 +142,18 @@ pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> 
 }
 
 /// Step forward constraint checking by the given ALU operation.
-pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> CheckResult<()> {
+pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
-        asm::Alu::Add => pop2_push1(stack, alu_add),
-        asm::Alu::Sub => pop2_push1(stack, alu_sub),
-        asm::Alu::Mul => pop2_push1(stack, alu_mul),
-        asm::Alu::Div => pop2_push1(stack, alu_div),
-        asm::Alu::Mod => pop2_push1(stack, alu_mod),
+        asm::Alu::Add => stack.pop2_push1(alu::add),
+        asm::Alu::Sub => stack.pop2_push1(alu::sub),
+        asm::Alu::Mul => stack.pop2_push1(alu::mul),
+        asm::Alu::Div => stack.pop2_push1(alu::div),
+        asm::Alu::Mod => stack.pop2_push1(alu::mod_),
     }
 }
 
 /// Step forward constraint checking by the given crypto operation.
-pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> CheckResult<()> {
+pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
         asm::Crypto::Sha256 => crypto::sha256(stack),
         asm::Crypto::VerifyEd25519 => crypto::verify_ed25519(stack),
@@ -140,193 +161,63 @@ pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> CheckResult<()> {
 }
 
 /// Step forward constraint checking by the given predicate operation.
-pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> CheckResult<()> {
+pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
-        asm::Pred::Eq => pop2_push1(stack, |a, b| Ok((a == b).into())),
-        asm::Pred::Eq4 => pop8_push1(stack, |ws| Ok((ws[0..4] == ws[4..8]).into())),
-        asm::Pred::Gt => pop2_push1(stack, |a, b| Ok((a > b).into())),
-        asm::Pred::Lt => pop2_push1(stack, |a, b| Ok((a < b).into())),
-        asm::Pred::Gte => pop2_push1(stack, |a, b| Ok((a >= b).into())),
-        asm::Pred::Lte => pop2_push1(stack, |a, b| Ok((a <= b).into())),
-        asm::Pred::And => pop2_push1(stack, |a, b| Ok((a != 0 && b != 0).into())),
-        asm::Pred::Or => pop2_push1(stack, |a, b| Ok((a != 0 || b != 0).into())),
-        asm::Pred::Not => pop1_push1(stack, |a| Ok((a == 0).into())),
+        asm::Pred::Eq => stack.pop2_push1(|a, b| Ok((a == b).into())),
+        asm::Pred::Eq4 => stack.pop8_push1(|ws| Ok((ws[0..4] == ws[4..8]).into())),
+        asm::Pred::Gt => stack.pop2_push1(|a, b| Ok((a > b).into())),
+        asm::Pred::Lt => stack.pop2_push1(|a, b| Ok((a < b).into())),
+        asm::Pred::Gte => stack.pop2_push1(|a, b| Ok((a >= b).into())),
+        asm::Pred::Lte => stack.pop2_push1(|a, b| Ok((a <= b).into())),
+        asm::Pred::And => stack.pop2_push1(|a, b| Ok((a != 0 && b != 0).into())),
+        asm::Pred::Or => stack.pop2_push1(|a, b| Ok((a != 0 || b != 0).into())),
+        asm::Pred::Not => stack.pop1_push1(|a| Ok((a == 0).into())),
     }
 }
 
 /// Step forward constraint checking by the given stack operation.
-pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> CheckResult<()> {
+pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
-        asm::Stack::Dup => pop1_push2(stack, |w| Ok([w, w])),
-        asm::Stack::DupFrom => dup_from(stack),
+        asm::Stack::Dup => stack.pop1_push2(|w| Ok([w, w])),
+        asm::Stack::DupFrom => stack.dup_from(),
         asm::Stack::Push(word) => Ok(stack.push(word)),
-        asm::Stack::Pop => pop(stack).map(|_| ()),
-        asm::Stack::Swap => pop2_push2(stack, |a, b| Ok([b, a])),
+        asm::Stack::Pop => Ok(stack.pop1().map(|_| ())?),
+        asm::Stack::Swap => stack.pop2_push2(|a, b| Ok([b, a])),
     }
 }
 
-fn pop(stack: &mut Stack) -> CheckResult<Word> {
-    Ok(stack.pop().ok_or(StackError::Empty)?)
-}
-
-fn pop2(stack: &mut Stack) -> CheckResult<[Word; 2]> {
-    let w1 = pop(stack)?;
-    let w0 = pop(stack)?;
-    Ok([w0, w1])
-}
-
-fn pop3(stack: &mut Stack) -> CheckResult<[Word; 3]> {
-    let w2 = pop(stack)?;
-    let [w0, w1] = pop2(stack)?;
-    Ok([w0, w1, w2])
-}
-
-fn pop4(stack: &mut Stack) -> CheckResult<[Word; 4]> {
-    let w3 = pop(stack)?;
-    let [w0, w1, w2] = pop3(stack)?;
-    Ok([w0, w1, w2, w3])
-}
-
-fn pop8(stack: &mut Stack) -> CheckResult<[Word; 8]> {
-    let [w4, w5, w6, w7] = pop4(stack)?;
-    let [w0, w1, w2, w3] = pop4(stack)?;
-    Ok([w0, w1, w2, w3, w4, w5, w6, w7])
-}
-
-pub fn pop1_push1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
-where
-    F: FnOnce(Word) -> CheckResult<Word>,
-{
-    let w = pop(stack)?;
-    let x = f(w)?;
-    stack.push(x);
-    Ok(())
-}
-
-pub fn pop2_push1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
-where
-    F: FnOnce(Word, Word) -> CheckResult<Word>,
-{
-    let [w0, w1] = pop2(stack)?;
-    let x = f(w0, w1)?;
-    stack.push(x);
-    Ok(())
-}
-
-pub fn pop8_push1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
-where
-    F: FnOnce([Word; 8]) -> CheckResult<Word>,
-{
-    let ws = pop8(stack)?;
-    let x = f(ws)?;
-    stack.push(x);
-    Ok(())
-}
-
-pub fn pop1_push2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
-where
-    F: FnOnce(Word) -> CheckResult<[Word; 2]>,
-{
-    let w = pop(stack)?;
-    let xs = f(w)?;
-    stack.extend(xs);
-    Ok(())
-}
-
-pub fn pop2_push2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
-where
-    F: FnOnce(Word, Word) -> CheckResult<[Word; 2]>,
-{
-    let [w0, w1] = pop2(stack)?;
-    let xs = f(w0, w1)?;
-    stack.extend(xs);
-    Ok(())
-}
-
-pub fn pop2_push4<F>(stack: &mut Stack, f: F) -> CheckResult<()>
-where
-    F: FnOnce(Word, Word) -> CheckResult<[Word; 4]>,
-{
-    let [w0, w1] = pop2(stack)?;
-    let xs = f(w0, w1)?;
-    stack.extend(xs);
-    Ok(())
-}
-
-/// Pop a length value from the top of the stack.
-pub fn pop_len(stack: &mut Stack) -> CheckResult<usize> {
-    let len_word = pop(stack)?;
-    let len = usize::try_from(len_word).map_err(|_| StackError::IndexOutOfBounds)?;
-    Ok(len)
-}
-
-/// Pop the length from the top of the stack, then pop and return that many words.
-pub fn pop_len_words<F, O>(stack: &mut Stack, f: F) -> CheckResult<O>
-where
-    F: FnOnce(&[Word]) -> CheckResult<O>,
-{
-    let len = pop_len(stack)?;
-    let ix = stack
-        .len()
-        .checked_sub(len)
-        .ok_or(StackError::IndexOutOfBounds)?;
-    f(&stack[ix..])
-}
-
-fn dup_from(stack: &mut Stack) -> CheckResult<()> {
-    let rev_ix_w = pop(stack)?;
-    let rev_ix = usize::try_from(rev_ix_w).map_err(|_| StackError::IndexOutOfBounds)?;
-    let ix = stack
-        .len()
-        .checked_sub(rev_ix)
-        .and_then(|i| i.checked_sub(1))
-        .ok_or(StackError::IndexOutOfBounds)?;
-    let w = *stack.get(ix).ok_or(StackError::IndexOutOfBounds)?;
-    stack.push(w);
-    Ok(())
-}
-
-pub fn alu_add(a: Word, b: Word) -> CheckResult<Word> {
-    a.checked_add(b).ok_or(AluError::Overflow.into())
-}
-
-pub fn alu_sub(a: Word, b: Word) -> CheckResult<Word> {
-    a.checked_sub(b).ok_or(AluError::Underflow.into())
-}
-
-pub fn alu_mul(a: Word, b: Word) -> CheckResult<Word> {
-    a.checked_mul(b).ok_or(AluError::Overflow.into())
-}
-
-pub fn alu_div(a: Word, b: Word) -> CheckResult<Word> {
-    a.checked_div(b).ok_or(AluError::DivideByZero.into())
-}
-
-pub fn alu_mod(a: Word, b: Word) -> CheckResult<Word> {
-    a.checked_rem(b).ok_or(AluError::DivideByZero.into())
+/// Parse a `bool` from a word, where 0 is false, 1 is true and any other value is invalid.
+fn bool_from_word(word: Word) -> Result<bool, Word> {
+    match word {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(word),
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use essential_constraint_asm::{to_bytes, Alu, Op, Pred, Stack};
-    use essential_types::{solution::SolutionData, ContentAddress, IntentAddress};
+pub(crate) mod test_util {
+    use crate::{
+        asm,
+        types::{solution::SolutionData, ContentAddress, IntentAddress},
+        *,
+    };
 
-    const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
-    const TEST_INTENT_CA: ContentAddress = ContentAddress([0xAA; 32]);
-    const TEST_INTENT_ADDR: IntentAddress = IntentAddress {
+    pub const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
+    pub const TEST_INTENT_CA: ContentAddress = ContentAddress([0xAA; 32]);
+    pub const TEST_INTENT_ADDR: IntentAddress = IntentAddress {
         set: TEST_SET_CA,
         intent: TEST_INTENT_CA,
     };
 
-    fn empty_solution_data() -> SolutionData {
+    pub fn empty_solution_data() -> SolutionData {
         SolutionData {
             intent_to_solve: TEST_INTENT_ADDR,
             decision_variables: vec![],
         }
     }
 
-    fn with_test_input<O>(f: impl FnOnce(CheckInput) -> O) -> O {
+    pub fn with_empty_check_input<O>(f: impl FnOnce(CheckInput) -> O) -> O {
         let solution_data = &empty_solution_data();
         let pre_state = &[];
         let post_state = &[];
@@ -338,92 +229,16 @@ mod tests {
         f(input)
     }
 
-    fn eval(ops: &[Op]) -> CheckResult<bool> {
-        with_test_input(|input| {
+    pub fn eval_with_empty_check_input(ops: &[Op]) -> ConstraintResult<bool> {
+        with_empty_check_input(|input| {
             let ops_res = eval_ops(ops.iter().cloned(), input);
             // Ensure eval_bytecode produces the same result as eval_ops.
-            let bytecode: Vec<u8> = to_bytes(ops.iter().cloned()).collect();
+            let bytecode: Vec<u8> = asm::to_bytes(ops.iter().cloned()).collect();
             let bytecode_res = eval_bytecode(bytecode.iter().cloned(), input);
             if let (Ok(a), Ok(b)) = (&ops_res, &bytecode_res) {
                 assert_eq!(a, b);
             }
             ops_res
         })
-    }
-
-    #[test]
-    fn eval_6_mul_7_eq_42() {
-        eval(&[
-            Stack::Push(6).into(),
-            Stack::Push(7).into(),
-            Alu::Mul.into(),
-            Stack::Push(42).into(),
-            Pred::Eq.into(),
-        ])
-        .unwrap();
-    }
-
-    #[test]
-    fn eval_42_div_6_eq_7() {
-        eval(&[
-            Stack::Push(42).into(),
-            Stack::Push(7).into(),
-            Alu::Div.into(),
-            Stack::Push(6).into(),
-            Pred::Eq.into(),
-        ])
-        .unwrap();
-    }
-
-    #[test]
-    fn eval_divide_by_zero() {
-        let res = eval(&[
-            Stack::Push(42).into(),
-            Stack::Push(0).into(),
-            Alu::Div.into(),
-        ]);
-        match res {
-            Err(CheckError::Alu(AluError::DivideByZero)) => (),
-            _ => panic!("Unexpected error variant"),
-        }
-    }
-
-    #[test]
-    fn eval_add_overflow() {
-        let res = eval(&[
-            Stack::Push(Word::MAX).into(),
-            Stack::Push(1).into(),
-            Alu::Add.into(),
-        ]);
-        match res {
-            Err(CheckError::Alu(AluError::Overflow)) => (),
-            _ => panic!("Unexpected error variant"),
-        }
-    }
-
-    #[test]
-    fn eval_mul_overflow() {
-        let res = eval(&[
-            Stack::Push(Word::MAX).into(),
-            Stack::Push(2).into(),
-            Alu::Mul.into(),
-        ]);
-        match res {
-            Err(CheckError::Alu(AluError::Overflow)) => (),
-            _ => panic!("Unexpected error variant"),
-        }
-    }
-
-    #[test]
-    fn eval_sub_underflow() {
-        let res = eval(&[
-            Stack::Push(Word::MIN).into(),
-            Stack::Push(1).into(),
-            Alu::Sub.into(),
-        ]);
-        match res {
-            Err(CheckError::Alu(AluError::Underflow)) => (),
-            _ => panic!("Unexpected error variant"),
-        }
     }
 }

@@ -1,11 +1,32 @@
 //! The types of errors that might occur throughout constraint checking.
 
 use crate::asm::{self, Word};
+use core::fmt;
 use thiserror::Error;
 
-/// The top-level error type for constraint checking.
+/// Intent checking error.
 #[derive(Debug, Error)]
 pub enum CheckError {
+    #[error("errors occurred while executing one or more constraints: {0}")]
+    ConstraintErrors(#[from] ConstraintErrors),
+    #[error("one or more constraints were unsatisfied: {0}")]
+    ConstraintsUnsatisfied(#[from] ConstraintsUnsatisfied),
+}
+
+/// The index of each failed constraint alongside the error it produced.
+#[derive(Debug, Error)]
+pub struct ConstraintErrors(pub Vec<(usize, ConstraintError)>);
+
+/// The index of each constraint that was not satisfied.
+#[derive(Debug, Error)]
+pub struct ConstraintsUnsatisfied(pub Vec<usize>);
+
+/// Shorthand for a `Result` where the error type is a `ConstraintError`.
+pub type ConstraintResult<T> = Result<T, ConstraintError>;
+
+/// Constraint checking error.
+#[derive(Debug, Error)]
+pub enum ConstraintError {
     #[error("access error: {0}")]
     Access(#[from] AccessError),
     #[error("ALU operation error: {0}")]
@@ -58,4 +79,24 @@ pub enum StackError {
     Empty,
     #[error("indexed stack out of bounds")]
     IndexOutOfBounds,
+}
+
+impl fmt::Display for ConstraintErrors {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("the constraints at the following indices failed: \n")?;
+        for (ix, err) in &self.0 {
+            f.write_str(&format!("  {ix}: {err}\n"))?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for ConstraintsUnsatisfied {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("the constraints at the following indices returned false: \n")?;
+        for ix in &self.0 {
+            f.write_str(&format!("  {ix}\n"))?;
+        }
+        Ok(())
+    }
 }
