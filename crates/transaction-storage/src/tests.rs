@@ -1,13 +1,23 @@
+use essential_types::StorageLayout;
 use memory_storage::MemoryStorage;
+use storage::Storage;
+use test_utils::{empty_intent, sign_with_random_keypair};
+use utils::hash;
 
 use super::*;
 
 #[tokio::test]
 async fn test_can_query() {
     let storage = MemoryStorage::new();
-    let address = ContentAddress([0; 32]);
+    let intent = empty_intent();
+    let address = ContentAddress(hash(&vec![intent.clone()]));
+    let signed = sign_with_random_keypair(vec![intent]);
     let key = [0; 4];
     let value = Some(1);
+    storage
+        .insert_intent_set(StorageLayout {}, signed)
+        .await
+        .unwrap();
     storage.update_state(&address, &key, value).await.unwrap();
 
     let mut storage = storage.transaction();

@@ -4,6 +4,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use anyhow::bail;
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
@@ -14,6 +15,7 @@ use utils::Lock;
 
 #[cfg(test)]
 mod tests;
+mod values;
 
 /// Amount of values returned in a single page.
 const PAGE_SIZE: usize = 100;
@@ -32,8 +34,6 @@ impl Default for MemoryStorage {
 #[derive(Default)]
 struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
-    // TODO: Is it possible that multiple intent sets are created at the
-    // exact same time? This is nanosecond precision.
     intent_time_index: BTreeMap<Duration, ContentAddress>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
     partial_solution_pool: HashMap<Hash, Signed<PartialSolution>>,
@@ -65,14 +65,16 @@ impl StateStorage for MemoryStorage {
         key: &Key,
         value: Option<Word>,
     ) -> anyhow::Result<Option<Word>> {
-        let v = self.inner.apply(|i| {
-            let map = i.state.entry(address.clone()).or_default();
-            match value {
+        self.inner.apply(|i| {
+            let Some(map) = i.state.get_mut(address) else {
+                bail!("No state for address, {:?}", address);
+            };
+            let v = match value {
                 None => map.remove(key),
                 Some(value) => map.insert(*key, value),
-            }
-        });
-        Ok(v)
+            };
+            Ok(v)
+        })
     }
 
     async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
@@ -127,12 +129,18 @@ impl Storage for MemoryStorage {
             data: map,
             signature,
         };
-        let time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
         self.inner.apply(|i| {
-            i.intents.insert(hash.clone(), set);
-            i.intent_time_index.insert(time, hash);
-        });
-        Ok(())
+            if i.intent_time_index.contains_key(&time) {
+                bail!("Two intent sets created at the same time");
+            }
+            let contains = i.intents.insert(hash.clone(), set);
+            if contains.is_none() {
+                i.intent_time_index.insert(time, hash.clone());
+            }
+            i.state.entry(hash).or_default();
+            Ok(())
+        })
     }
 
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
@@ -152,23 +160,24 @@ impl Storage for MemoryStorage {
     }
 
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
+        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
         self.inner.apply(|i| {
+            if i.solved.contains_key(&timestamp) {
+                bail!("Two blocks created at the same time");
+            }
             let solutions = solutions
                 .iter()
                 .filter_map(|h| i.solution_pool.remove(h))
                 .collect();
             let number = i.solved.len() as u64;
-            let timestamp = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap();
             let batch = Block {
                 number,
                 timestamp,
                 batch: Batch { solutions },
             };
             i.solved.insert(timestamp, batch);
-        });
-        Ok(())
+            Ok(())
+        })
     }
 
     async fn move_partial_solutions_to_solved(
@@ -258,35 +267,19 @@ impl Storage for MemoryStorage {
         match time_range {
             Some(range) => {
                 let v = self.inner.apply(|i| {
-                    let start = page * PAGE_SIZE;
-                    i.intent_time_index
-                        .range(range)
-                        .skip(start)
-                        // TODO: Should this be silent when the intent set is missing?
-                        // By construction it shouldn't ever be but still maybe it's better
-                        // to check?
-                        .filter_map(|(_, v)| {
-                            Some(i.intents.get(v)?.data.values().cloned().collect())
-                        })
-                        .take(PAGE_SIZE)
-                        .collect()
+                    values::page_intents_by_time(
+                        &i.intent_time_index,
+                        &i.intents,
+                        range,
+                        page,
+                        PAGE_SIZE,
+                    )
                 });
                 Ok(v)
             }
             None => {
                 let v = self.inner.apply(|i| {
-                    let start = page * PAGE_SIZE;
-                    i.intent_time_index
-                        .iter()
-                        .skip(start)
-                        // TODO: Should this be silent when the intent set is missing?
-                        // By construction it shouldn't ever be but still maybe it's better
-                        // to check?
-                        .filter_map(|(_, v)| {
-                            Some(i.intents.get(v)?.data.values().cloned().collect())
-                        })
-                        .take(PAGE_SIZE)
-                        .collect()
+                    values::page_intents(i.intent_time_index.values(), &i.intents, page, PAGE_SIZE)
                 });
                 Ok(v)
             }
@@ -313,32 +306,10 @@ impl Storage for MemoryStorage {
         page: Option<usize>,
     ) -> anyhow::Result<Vec<Block>> {
         let page = page.unwrap_or(0);
-        match time_range {
-            Some(range) => {
-                let v = self.inner.apply(|i| {
-                    let start = page * PAGE_SIZE;
-                    i.solved
-                        .range(range)
-                        .skip(start)
-                        .map(|(_, v)| v.clone())
-                        .take(PAGE_SIZE)
-                        .collect()
-                });
-                Ok(v)
-            }
-            None => {
-                let v = self.inner.apply(|i| {
-                    let start = page * PAGE_SIZE;
-                    i.solved
-                        .iter()
-                        .skip(start)
-                        .map(|(_, v)| v.clone())
-                        .take(PAGE_SIZE)
-                        .collect()
-                });
-                Ok(v)
-            }
-        }
+        let v = self
+            .inner
+            .apply(|i| values::page_winning_blocks(&i.solved, time_range, page, PAGE_SIZE));
+        Ok(v)
     }
 
     async fn get_storage_layout(
