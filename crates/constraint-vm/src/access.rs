@@ -122,8 +122,8 @@ fn range_from_start_len(start: Word, len: Word) -> Option<std::ops::Range<usize>
 
 fn state_slots_from_delta(slots: StateSlots, delta: bool) -> &StateSlotSlice {
     if delta {
-        &slots.post
+        slots.post
     } else {
-        &slots.pre
+        slots.pre
     }
 }
