@@ -2,7 +2,7 @@
 //! # Rqlite storage
 //! This uses a remote rqlite server to store data.
 
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use base64::Engine;
 use essential_types::{
     solution::PartialSolution, Block, ContentAddress, Signed, StorageLayout, Word,
@@ -12,6 +12,8 @@ use utils::hash;
 
 use values::{single_value, QueryValues};
 
+#[cfg(test)]
+mod test_encode_decode;
 mod values;
 
 /// Amount of values returned in a single page.
@@ -270,11 +272,14 @@ impl StateStorage for RqliteStorage {
         let key = encode(key);
         let sql = &[include_sql!("query/get_state.sql", address, key)];
         let queries = self.query_values(sql).await?;
-        let r = single_value(queries).and_then(|v| match v {
-            serde_json::Value::Number(v) => v.as_i64(),
-            _ => None,
-        });
-        Ok(r)
+        match single_value(&queries) {
+            Some(serde_json::Value::Number(v)) => match v.as_i64() {
+                Some(r) => Ok(Some(r)),
+                None => bail!("State stored incorrectly"),
+            },
+            None => Ok(None),
+            _ => bail!("State stored incorrectly"),
+        }
     }
 }
 
@@ -428,10 +433,11 @@ impl Storage for RqliteStorage {
         let queries = self.query_values(sql).await?;
 
         // Expecting single query, single row, single column
-        let Some(serde_json::Value::String(intent)) = single_value(queries) else {
-            return Ok(None);
-        };
-        Ok(Some(decode(&intent)?))
+        match single_value(&queries) {
+            Some(serde_json::Value::String(intent)) => Ok(Some(decode(intent)?)),
+            None => Ok(None),
+            _ => bail!("Intent stored incorrectly"),
+        }
     }
 
     async fn get_intent_set(
@@ -466,10 +472,11 @@ impl Storage for RqliteStorage {
         let queries = self.query_values(sql).await?;
 
         // Expecting single query, single row, single column
-        let Some(serde_json::Value::Bool(solved)) = single_value(queries) else {
-            return Ok(None);
-        };
-        Ok(Some(solved))
+        match single_value(&queries) {
+            Some(serde_json::Value::Bool(solved)) => Ok(Some(*solved)),
+            None => Ok(None),
+            _ => bail!("Partial solution stored incorrectly"),
+        }
     }
 
     async fn list_intent_sets(
@@ -552,10 +559,10 @@ impl Storage for RqliteStorage {
         let address = encode(address);
         let sql = &[include_sql!("query/get_storage_layout.sql", address)];
         let queries = self.query_values(sql).await?;
-        let r = single_value(queries).and_then(|v| match v {
-            serde_json::Value::String(v) => decode(&v).ok(),
-            _ => None,
-        });
-        Ok(r)
+        match single_value(&queries) {
+            Some(serde_json::Value::String(v)) => Ok(Some(decode(v)?)),
+            None => Ok(None),
+            _ => bail!("Storage layout stored incorrectly"),
+        }
     }
 }

@@ -11,62 +11,85 @@ use serde_json::Value;
 
 use crate::{decode, RESULTS_KEY};
 
-#[derive(Debug)]
+#[cfg(test)]
+mod test_get_intent_set;
+#[cfg(test)]
+mod test_get_partial_solution;
+#[cfg(test)]
+mod test_list_intent_sets;
+#[cfg(test)]
+mod test_list_solutions;
+#[cfg(test)]
+mod test_list_winning_blocks;
+#[cfg(test)]
+mod test_map_execute_to_word;
+#[cfg(test)]
+mod test_map_query_to_query_values;
+#[cfg(test)]
+mod test_map_solution_to_block;
+#[cfg(test)]
+mod test_single_value;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueryValues {
     pub queries: Vec<Option<Rows>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Columns {
     pub columns: Vec<Value>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rows {
     pub rows: Vec<Columns>,
 }
 
 /// Get a single value from the query results.
-pub fn single_value(queries: QueryValues) -> Option<Value> {
-    queries
-        .queries
-        .into_iter()
-        .next()
-        .flatten()
-        .and_then(|rows| rows.rows.into_iter().next())
-        .and_then(|columns| columns.columns.into_iter().next())
+pub fn single_value(queries: &QueryValues) -> Option<&Value> {
+    if let [Some(Rows { rows })] = &queries.queries[..] {
+        if let [Columns { columns }] = &rows[..] {
+            if let [value] = &columns[..] {
+                return Some(value);
+            }
+        }
+    }
+
+    None
 }
 
-pub fn get_intent_set(
-    QueryValues { queries }: QueryValues,
-) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
+pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
     // Expecting two results because we made two queries
-    let mut queries = queries.into_iter();
-    let (Some(serde_json::Value::String(signature)), Some(intents)) = (
-        // Expecting only a single row and single column for signature.
-        queries
-            .next()
-            .flatten()
-            .and_then(|Rows { rows }| rows.into_iter().next())
-            .and_then(|Columns { columns }| columns.into_iter().next()),
-        // Expecting only a single row and multiple columns for intents.
-        queries
-            .next()
-            .flatten()
-            .and_then(|Rows { rows }| rows.into_iter().next())
-            .map(|Columns { columns }| columns),
-    ) else {
-        return Ok(None);
+    let (signature, intents) = match &queries.queries[..] {
+        [Some(Rows { rows: signature }), Some(Rows { rows: intents })] => (signature, intents),
+        [None, None] => return Ok(None),
+        _ => bail!("expected two queries {:?}", queries),
     };
 
-    let signature: Signature = decode(&signature)?;
+    // Signature should only have a single row
+    let [Columns { columns: signature }] = &signature[..] else {
+        bail!("expected a single row");
+    };
+
+    // Signature should only have a single column
+    let [Value::String(signature)] = &signature[..] else {
+        bail!("expected a single column");
+    };
+
+    // Intents should only have a single row
+    let [Columns { columns: intents }] = &intents[..] else {
+        bail!("expected a single row");
+    };
+
+    // Decode the signature
+    let signature: Signature = decode(signature)?;
 
     // Decode the intents
     let intents: Vec<Intent> = intents
-        .into_iter()
-        .filter_map(|intent| match intent {
-            serde_json::Value::String(intent) => Some(decode(&intent)),
-            _ => None,
+        .iter()
+        .map(|intent| match intent {
+            serde_json::Value::String(intent) => decode(intent),
+            _ => Err(anyhow::anyhow!("unexpected column type")),
         })
         .collect::<Result<_, _>>()?;
 
@@ -79,60 +102,69 @@ pub fn get_intent_set(
 pub fn get_partial_solution(
     QueryValues { queries }: QueryValues,
 ) -> Result<Option<Signed<PartialSolution>>, anyhow::Error> {
-    let Some(Columns { columns }) = queries
-        .into_iter()
-        .next()
-        .flatten()
-        .and_then(|rows| rows.rows.into_iter().next())
-    else {
-        return Ok(None);
+    let rows = match &queries[..] {
+        [Some(Rows { rows })] => rows,
+        [None] => return Ok(None),
+        _ => bail!("expected a single query {:?}", queries),
     };
 
-    match &columns[..] {
-        [Value::String(solution), Value::String(signature)] => {
-            let solution = decode(solution)?;
-            let signature = decode(signature)?;
-            Ok(Some(Signed {
-                data: solution,
-                signature,
-            }))
-        }
-        _ => bail!("unexpected columns: {:?}", columns),
-    }
+    let [Columns { columns }] = &rows[..] else {
+        bail!("expected a single row");
+    };
+
+    let [Value::String(solution), Value::String(signature)] = &columns[..] else {
+        bail!("expected two columns");
+    };
+
+    let solution = decode(solution)?;
+    let signature = decode(signature)?;
+
+    Ok(Some(Signed {
+        data: solution,
+        signature,
+    }))
 }
 
 pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Vec<Intent>>> {
-    // Only expecting a single query because
-    // we only made a single query
-    let out = queries
-        .into_iter()
-        .next()
-        .flatten()
-        // Expecting only a multiple rows and multiple columns for intents.
-        .map(|Rows { rows }| {
-            rows.into_iter()
-                .fold(
-                    BTreeMap::<_, Vec<_>>::new(),
-                    |mut map, Columns { mut columns }| {
-                        if let (
-                            Some(serde_json::Value::String(intent)),
-                            Some(serde_json::Value::Number(set_id)),
-                        ) = (columns.pop(), columns.pop())
-                        {
-                            if let Some(set_id) = set_id.as_u64() {
-                                let intent: Option<Intent> = decode(&intent).ok();
-                                if let Some(intent) = intent {
-                                    map.entry(set_id).or_default().push(intent);
-                                }
-                            }
+    // Only expecting a single query.
+    let rows = match &queries[..] {
+        [Some(Rows { rows })] => rows,
+        [None] => return Ok(Vec::with_capacity(0)),
+        _ => bail!("expected a single query {:?}", queries),
+    };
+
+    // If the query isn't empty there should be at least one row.
+    if rows.is_empty() {
+        bail!("expected at least one row")
+    }
+
+    // Expecting an intent per row with two columns.
+    // The first column is the set_id and the second column is the intent.
+    // The intents are grouped into their respective sets.
+    //
+    // TODO: The sql outputs the intents ordered by set_id, then by intent id.
+    // Could we use this fact to avoid needing to sort them into a BTreeMap?
+    let out = rows
+        .iter()
+        .try_fold(
+            BTreeMap::<_, Vec<_>>::new(),
+            |mut map, Columns { columns }| match &columns[..] {
+                [serde_json::Value::Number(set_id), serde_json::Value::String(intent)] => {
+                    match set_id.as_u64() {
+                        Some(set_id) => {
+                            let intent: Intent = decode(intent)?;
+                            map.entry(set_id).or_default().push(intent);
+                            Ok(map)
                         }
-                        map
-                    },
-                )
-                .into_values()
-                .collect()
-        })
-        .unwrap_or_else(|| Vec::with_capacity(0));
+                        None => Err(anyhow::anyhow!("failed to parse set_id")),
+                    }
+                }
+                _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
+            },
+        )?
+        // TODO: Is there a way to avoid this double iteration?
+        .into_values()
+        .collect();
 
     Ok(out)
 }
@@ -151,43 +183,61 @@ fn list_solutions<S>(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec
 where
     S: DeserializeOwned,
 {
-    let r = queries
-        .into_iter()
-        .next()
-        .flatten()
-        .map(|Rows { rows }| {
-            rows.into_iter()
-                .filter_map(|Columns { columns }| match &columns[..] {
-                    [signature, solution] => {
-                        let solution = match solution {
-                            serde_json::Value::String(solution) => decode(solution).ok(),
-                            _ => None,
-                        };
-                        let signature = match signature {
-                            serde_json::Value::String(signature) => decode(signature).ok(),
-                            _ => None,
-                        };
-                        Some(Signed {
-                            data: solution?,
-                            signature: signature?,
-                        })
-                    }
-                    _ => None,
+    // Only expecting a single query.
+    let rows = match &queries[..] {
+        [Some(Rows { rows })] => rows,
+        [None] => return Ok(Vec::with_capacity(0)),
+        _ => bail!("expected a single query {:?}", queries),
+    };
+
+    // If the query isn't empty there should be at least one row.
+    if rows.is_empty() {
+        bail!("expected at least one row")
+    }
+
+    // Decode signature and solution from each row.
+    rows.iter()
+        .map(|Columns { columns }| match &columns[..] {
+            [signature, solution] => {
+                let signature = match signature {
+                    serde_json::Value::String(signature) => decode(signature)?,
+                    _ => bail!("unexpected column type {:?} for signature", signature),
+                };
+                let solution = match solution {
+                    serde_json::Value::String(solution) => decode(solution)?,
+                    _ => bail!("unexpected column type {:?} for solution", solution),
+                };
+                Ok(Signed {
+                    data: solution,
+                    signature,
                 })
-                .collect()
+            }
+            _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
         })
-        .unwrap_or_else(|| Vec::with_capacity(0));
-    Ok(r)
+        .collect()
 }
 
 pub fn list_winning_blocks(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Block>> {
-    let Some(Rows { rows }) = queries.into_iter().next().flatten() else {
-        return Ok(Vec::with_capacity(0));
+    // Only expecting a single query.
+    let rows = match &queries[..] {
+        [Some(Rows { rows })] => rows,
+        [None] => return Ok(Vec::with_capacity(0)),
+        _ => bail!("expected a single query {:?}", queries),
     };
+
+    // If the query isn't empty there should be at least one row.
+    if rows.is_empty() {
+        bail!("expected at least one row")
+    }
+
+    // Map the rows to blocks.
+    //
+    // TODO: The sql outputs the blocks ordered by batch_id.
+    // Could we use this fact to avoid needing to sort them into a BTreeMap?
     let r = rows
-        .into_iter()
+        .iter()
         .try_fold(BTreeMap::new(), |map, Columns { columns }| {
-            map_solution_to_block(map, &columns)
+            map_solution_to_block(map, columns)
         });
     Ok(r?.into_values().collect())
 }
@@ -206,9 +256,12 @@ fn map_solution_to_block(
                 (Some(batch_id), Some(created_at_secs), Some(created_at_nanos)) => {
                     let solution = decode(solution)?;
                     let signature = decode(signature)?;
+                    let Some(number) = batch_id.checked_sub(1) else {
+                        bail!("batch_id must be greater than 0");
+                    };
                     map.entry(batch_id)
                         .or_insert_with(|| Block {
-                            number: batch_id - 1,
+                            number,
                             timestamp: Duration::new(created_at_secs, created_at_nanos as u32),
                             batch: Batch {
                                 solutions: Vec::with_capacity(1),
@@ -232,27 +285,42 @@ fn map_solution_to_block(
 pub fn map_execute_to_word(
     mut value: serde_json::Map<String, serde_json::Value>,
 ) -> anyhow::Result<Option<Word>> {
-    let value = value
-        .remove(RESULTS_KEY)
-        .and_then(|r| match r {
-            serde_json::Value::Array(a) => a.into_iter().next(),
-            _ => None,
-        })
-        .and_then(|r| match r {
-            serde_json::Value::Object(mut o) => o.remove("values"),
-            _ => None,
-        })
-        .and_then(|r| match r {
-            serde_json::Value::Array(a) => match a.into_iter().next()? {
-                serde_json::Value::Array(a) => match a.into_iter().next()? {
-                    serde_json::Value::Number(n) => n.as_i64(),
-                    _ => None,
-                },
-                _ => None,
-            },
-            _ => None,
-        });
-    Ok(value)
+    // Must have results key
+    let Some(results) = value.remove(RESULTS_KEY) else {
+        bail!("Query results are invalid");
+    };
+
+    // Results must be an array
+    let serde_json::Value::Array(results) = results else {
+        bail!("Query results are invalid");
+    };
+
+    // Results must have a single object
+    let [serde_json::Value::Object(results), _] = &results[..] else {
+        bail!("invalid amount of results");
+    };
+
+    // If the results doesn't contain the values key, return None
+    let Some(serde_json::Value::Array(rows)) = results.get("values") else {
+        return Ok(None);
+    };
+
+    // There must be a single row which is an array
+    let [serde_json::Value::Array(columns)] = &rows[..] else {
+        bail!("expected a single row");
+    };
+
+    // There must be a single column which is a number
+    let [serde_json::Value::Number(word)] = &columns[..] else {
+        bail!("expected a single column");
+    };
+
+    // Parse the word
+    let Some(word) = word.as_i64() else {
+        bail!("failed to parse word");
+    };
+
+    Ok(Some(word))
 }
 
 /// Map the execute query results to words.
@@ -281,34 +349,37 @@ pub fn map_execute_to_words(QueryValues { queries }: QueryValues) -> Vec<Option<
 pub fn map_query_to_query_values(
     mut value: serde_json::Map<String, serde_json::Value>,
 ) -> anyhow::Result<QueryValues> {
-    let queries = value
-        .remove(RESULTS_KEY)
-        .and_then(|r| match r {
-            serde_json::Value::Array(queries) => {
-                let queries = queries
-                    .into_iter()
-                    .map(|r| match r {
-                        serde_json::Value::Object(mut o) => o.remove("values"),
-                        _ => None,
-                    })
-                    .map(|rows| match rows {
-                        Some(serde_json::Value::Array(rows)) => {
-                            let rows = rows
-                                .into_iter()
-                                .filter_map(|columns| match columns {
-                                    serde_json::Value::Array(columns) => Some(Columns { columns }),
-                                    _ => None,
-                                })
-                                .collect();
-                            Some(Rows { rows })
-                        }
-                        _ => None,
-                    })
-                    .collect();
-                Some(queries)
-            }
-            _ => None,
-        })
-        .unwrap_or_else(|| Vec::with_capacity(0));
+    // Must have results key
+    let Some(results) = value.remove(RESULTS_KEY) else {
+        bail!("Query results are invalid");
+    };
+
+    let queries = match results {
+        serde_json::Value::Array(queries) => {
+            let queries = queries
+                .into_iter()
+                .map(|r| match r {
+                    serde_json::Value::Object(mut o) => o.remove("values"),
+                    _ => None,
+                })
+                .map(|rows| match rows {
+                    Some(serde_json::Value::Array(rows)) => {
+                        let rows = rows
+                            .into_iter()
+                            .filter_map(|columns| match columns {
+                                serde_json::Value::Array(columns) => Some(Columns { columns }),
+                                _ => None,
+                            })
+                            .collect();
+                        Some(Rows { rows })
+                    }
+                    _ => None,
+                })
+                .collect();
+            Some(queries)
+        }
+        _ => None,
+    };
+    let queries = queries.unwrap_or_else(|| Vec::with_capacity(0));
     Ok(QueryValues { queries })
 }
