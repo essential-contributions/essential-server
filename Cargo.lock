@@ -315,9 +315,10 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/error-impls#f6178542f96eb6fbf34029803d6670104d7e14b4"
 dependencies = [
  "essential-asm-spec",
- "essential-types 0.1.0",
+ "essential-types 0.1.0 (git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/error-impls)",
  "proc-macro2",
  "quote",
  "syn",
@@ -326,6 +327,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/error-impls#f6178542f96eb6fbf34029803d6670104d7e14b4"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -334,9 +336,10 @@ dependencies = [
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/error-impls#f6178542f96eb6fbf34029803d6670104d7e14b4"
 dependencies = [
  "essential-asm-gen",
- "essential-types 0.1.0",
+ "essential-types 0.1.0 (git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/error-impls)",
  "serde",
 ]
 
@@ -346,7 +349,7 @@ version = "0.1.0"
 dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
- "essential-types 0.1.0",
+ "essential-types 0.1.0 (git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/error-impls)",
  "sha2",
  "thiserror",
 ]
@@ -367,6 +370,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/error-impls#f6178542f96eb6fbf34029803d6670104d7e14b4"
 dependencies = [
  "serde",
 ]

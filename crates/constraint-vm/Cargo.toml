@@ -6,9 +6,10 @@ edition = "2021"
 [dependencies]
 ed25519-dalek = "2.1.0"
 # essential-types = { workspace = true }
-essential-types = { path = "./../../../base/crates/types" }
-# TODO: Switch back after upstreaming errors.
 # essential-constraint-asm = { workspace = true }
-essential-constraint-asm = { path = "./../../../base/crates/constraint-asm" }
 sha2 = "0.10.8"
 thiserror = "1"
+
+# TODO: Remove these after essential-base#55 lands.
+essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/error-impls" }
+essential-constraint-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/error-impls" }
