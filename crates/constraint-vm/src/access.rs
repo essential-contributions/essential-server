@@ -1,24 +1,11 @@
 //! Access operation implementations.
 
 use crate::{
-    bool_from_word, pop1_push1, pop2, pop2_push1, pop3, CheckInput, CheckResult, Stack, StateSlots,
+    bool_from_word, error::AccessError, pop1_push1, pop2, pop2_push1, pop3, CheckInput,
+    CheckResult, Stack, StateSlots,
 };
 use essential_constraint_asm::Word;
 use essential_types::{convert::word_4_from_u8_32, solution::DecisionVariable};
-use thiserror::Error;
-
-/// Errors that may occur during the execution of an operation.
-#[derive(Debug, Error)]
-pub enum AccessError {
-    #[error("decision variable slot out of bounds")]
-    DecisionSlotOutOfBounds,
-    #[error("state slot out of bounds")]
-    StateSlotOutOfBounds,
-    #[error("invalid state slot delta: expected `0` or `1`, found {0}")]
-    InvalidStateSlotDelta(Word),
-    #[error("attempted to access a state slot that has no value")]
-    StateSlotWasNone,
-}
 
 pub(crate) fn decision_var(input: CheckInput, stack: &mut Stack) -> CheckResult<()> {
     pop1_push1(stack, |slot| {

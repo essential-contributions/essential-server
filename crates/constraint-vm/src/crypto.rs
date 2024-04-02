@@ -1,16 +1,9 @@
 //! Crypto operation implementations.
 
-use crate::{asm::Word, pop4, pop8, pop_len_words, CheckResult, Stack};
+use crate::{asm::Word, error::CryptoError, pop4, pop8, pop_len_words, CheckResult, Stack};
 use essential_types::convert::{
     bytes_from_word, u8_32_from_word_4, u8_64_from_word_8, word_4_from_u8_32,
 };
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum CryptoError {
-    #[error("failed to verify ed25519 signature: {0}")]
-    Ed25519(#[from] ed25519_dalek::ed25519::Error),
-}
 
 pub fn sha256(stack: &mut Stack) -> CheckResult<()> {
     use sha2::Digest;

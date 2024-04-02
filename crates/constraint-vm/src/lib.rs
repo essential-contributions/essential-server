@@ -1,7 +1,7 @@
 //! The essential constraint checking implementation.
 
-pub use access::AccessError;
-pub use crypto::CryptoError;
+pub use error::CheckError;
+use error::{AluError, StackError};
 pub use essential_constraint_asm as asm;
 use essential_constraint_asm::{Op, Word};
 pub use essential_types::{
@@ -9,10 +9,10 @@ pub use essential_types::{
     solution::{DecisionVariable, SolutionData},
     ConstraintBytecode,
 };
-use thiserror::Error;
 
 mod access;
 mod crypto;
+pub mod error;
 
 /// All required input data for checking an intent's constraints.
 #[derive(Clone, Copy, Debug)]
@@ -22,44 +22,13 @@ pub struct CheckInput<'a> {
     pub post_state: &'a StateSlots,
 }
 
-#[derive(Debug, Error)]
-pub enum CheckError {
-    #[error("access error: {0}")]
-    Access(#[from] AccessError),
-    #[error("ALU operation error: {0}")]
-    Alu(#[from] AluError),
-    #[error("crypto operation error: {0}")]
-    Crypto(#[from] CryptoError),
-    #[error("stack operation error: {0}")]
-    Stack(#[from] StackError),
-    #[error("bytecode error: {0}")]
-    FromBytes(#[from] asm::FromBytesError),
-    #[error("invalid constraint evaluation result {0}, exepcted `0` (false) or `1` (true)")]
-    InvalidConstraintValue(Word),
-}
-
-#[derive(Debug, Error)]
-pub enum AluError {
-    #[error("word overflow")]
-    Overflow,
-    #[error("word underflow")]
-    Underflow,
-    #[error("attempted to divide by zero")]
-    DivideByZero,
-}
-
-#[derive(Debug, Error)]
-pub enum StackError {
-    #[error("attempted to pop an empty stack")]
-    Empty,
-    #[error("indexed stack out of bounds")]
-    IndexOutOfBounds,
-}
-
+/// Shorthand for a `Result` where the error type is a `CheckError`.
 pub type CheckResult<T> = Result<T, CheckError>;
 
+/// The VM's `Stack` is just a `Vec` of `Word`s.
 pub type Stack = Vec<Word>;
 
+/// The state slots declared within the intent.
 pub type StateSlots = [Option<Word>];
 
 /// Check whether the constraints of a single intent are met by the given
@@ -117,7 +86,7 @@ pub fn exec_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> CheckRe
 }
 
 /// Parse a `bool` from a word, where 0 is false, 1 is true and any other value is invalid.
-pub fn bool_from_word(word: Word) -> Result<bool, Word> {
+fn bool_from_word(word: Word) -> Result<bool, Word> {
     match word {
         0 => Ok(false),
         1 => Ok(true),
@@ -136,6 +105,7 @@ pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> CheckResult<()> 
     }
 }
 
+/// Step forward constraint checking by the given access operation.
 pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> CheckResult<()> {
     match op {
         asm::Access::DecisionVar => access::decision_var(input, stack),
@@ -150,6 +120,7 @@ pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> 
     }
 }
 
+/// Step forward constraint checking by the given ALU operation.
 pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> CheckResult<()> {
     match op {
         asm::Alu::Add => pop2_push1(stack, alu_add),
@@ -160,6 +131,7 @@ pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> CheckResult<()> {
     }
 }
 
+/// Step forward constraint checking by the given crypto operation.
 pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> CheckResult<()> {
     match op {
         asm::Crypto::Sha256 => crypto::sha256(stack),
@@ -167,6 +139,7 @@ pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> CheckResult<()> {
     }
 }
 
+/// Step forward constraint checking by the given predicate operation.
 pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> CheckResult<()> {
     match op {
         asm::Pred::Eq => pop2_push1(stack, |a, b| Ok((a == b).into())),
@@ -181,6 +154,7 @@ pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> CheckResult<()> {
     }
 }
 
+/// Step forward constraint checking by the given stack operation.
 pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> CheckResult<()> {
     match op {
         asm::Stack::Dup => pop1_push2(stack, |w| Ok([w, w])),
