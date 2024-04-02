@@ -15,36 +15,41 @@ mod crypto;
 pub mod error;
 pub mod stack;
 
-/// All required input data for checking an intent's constraints against a proposed solution.
+/// All required input data for access operations.
 #[derive(Clone, Copy, Debug)]
-pub struct CheckInput<'a> {
+pub struct Access<'a> {
     pub solution_data: &'a SolutionData,
-    /// Intent state slot values before the associated solution's mutations are applied.
-    pub pre_state: &'a StateSlots,
-    /// Intent state slot values after the associated solution's mutations are applied.
-    pub post_state: &'a StateSlots,
+    pub state_slots: StateSlots<'a>,
+}
+
+/// The pre and post mutation state slot values for the intent being solved.
+#[derive(Clone, Copy, Debug)]
+pub struct StateSlots<'a> {
+    /// Intent state slot values before the solution's mutations are applied.
+    pub pre: &'a StateSlotSlice,
+    /// Intent state slot values after the solution's mutations are applied.
+    pub post: &'a StateSlotSlice,
 }
 
 /// The state slots declared within the intent.
-pub type StateSlots = [Option<Word>];
+pub type StateSlotSlice = [Option<Word>];
 
-/// The `Ok` case of the `Result` when checking an intent.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum CheckedIntent {
-    /// All constraints were satisfied.
-    Satisfied,
-    /// The constraints at the following indices were not satisifed.
-    Unsatisfied(Vec<usize>),
+impl<'a> StateSlots<'a> {
+    /// Empty state slots.
+    pub const EMPTY: Self = Self {
+        pre: &[],
+        post: &[],
+    };
 }
 
 /// Check whether the constraints of a single intent are met by the given
 /// solution data and state.
 ///
 /// Returns the `Directive`, indicating the quality of the solution.
-pub fn check_intent(intent: &[ConstraintBytecode], input: CheckInput) -> Result<(), CheckError> {
+pub fn check_intent(intent: &[ConstraintBytecode], access: Access) -> Result<(), CheckError> {
     let (unsatisfied, failed) = intent
         .iter()
-        .map(|bytecode| eval_bytecode(bytecode.iter().copied(), input))
+        .map(|bytecode| eval_bytecode(bytecode.iter().copied(), access))
         .enumerate()
         .fold(
             (vec![], vec![]),
@@ -71,9 +76,9 @@ pub fn check_intent(intent: &[ConstraintBytecode], input: CheckInput) -> Result<
 /// This is the same as `exec_bytecode`, but retrieves the boolean result from the resulting stack.
 pub fn eval_bytecode(
     bytes: impl IntoIterator<Item = u8>,
-    input: CheckInput,
+    access: Access,
 ) -> ConstraintResult<bool> {
-    let mut stack = exec_bytecode(bytes, input)?;
+    let mut stack = exec_bytecode(bytes, access)?;
     let word = stack.pop1()?;
     bool_from_word(word).map_err(ConstraintError::InvalidConstraintValue)
 }
@@ -81,8 +86,8 @@ pub fn eval_bytecode(
 /// Evaluate the operations of a single constraint and return its boolean result.
 ///
 /// This is the same as `exec_ops`, but retrieves the boolean result from the resulting stack.
-pub fn eval_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> ConstraintResult<bool> {
-    let mut stack = exec_ops(ops, input)?;
+pub fn eval_ops(ops: impl IntoIterator<Item = Op>, access: Access) -> ConstraintResult<bool> {
+    let mut stack = exec_ops(ops, access)?;
     let word = stack.pop1()?;
     bool_from_word(word).map_err(ConstraintError::InvalidConstraintValue)
 }
@@ -90,31 +95,31 @@ pub fn eval_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> Constra
 /// Execute the bytecode of a constraint and return the resulting stack.
 pub fn exec_bytecode(
     bytes: impl IntoIterator<Item = u8>,
-    input: CheckInput,
+    access: Access,
 ) -> ConstraintResult<Stack> {
     let mut stack = Stack::default();
     for res in asm::from_bytes(bytes.into_iter()) {
         let op = res?;
-        step_op(input, op, &mut stack)?;
-        println!("{:?}: {:?}", op, &stack);
+        step_op(access, op, &mut stack)?;
+        println!("{:016?}: {:016X?}", op, &stack);
     }
     Ok(stack)
 }
 
 /// Execute the operations of a constraint and return the resulting stack.
-pub fn exec_ops(ops: impl IntoIterator<Item = Op>, input: CheckInput) -> ConstraintResult<Stack> {
+pub fn exec_ops(ops: impl IntoIterator<Item = Op>, access: Access) -> ConstraintResult<Stack> {
     let mut stack = Stack::default();
     for op in ops {
-        step_op(input, op, &mut stack)?;
-        println!("{:?}: {:?}", op, &stack);
+        step_op(access, op, &mut stack)?;
+        println!("{:016X?}: {:016X?}", op, &stack);
     }
     Ok(stack)
 }
 
 /// Step forward constraint checking by the given operation.
-pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> ConstraintResult<()> {
+pub fn step_op(access: Access, op: Op, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
-        Op::Access(op) => step_op_access(input, op, stack),
+        Op::Access(op) => step_op_access(access, op, stack),
         Op::Alu(op) => step_op_alu(op, stack),
         Op::Crypto(op) => step_op_crypto(op, stack),
         Op::Pred(op) => step_op_pred(op, stack),
@@ -123,21 +128,17 @@ pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> ConstraintResult
 }
 
 /// Step forward constraint checking by the given access operation.
-pub fn step_op_access(
-    input: CheckInput,
-    op: asm::Access,
-    stack: &mut Stack,
-) -> ConstraintResult<()> {
+pub fn step_op_access(access: Access, op: asm::Access, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
-        asm::Access::DecisionVar => access::decision_var(input, stack),
-        asm::Access::DecisionVarRange => access::decision_var_range(input, stack),
+        asm::Access::DecisionVar => access::decision_var(&access.solution_data, stack),
+        asm::Access::DecisionVarRange => access::decision_var_range(&access.solution_data, stack),
         asm::Access::MutKeysLen => todo!(),
-        asm::Access::State => access::state(input, stack),
-        asm::Access::StateRange => access::state_range(input, stack),
-        asm::Access::StateIsSome => access::state_is_some(input, stack),
-        asm::Access::StateIsSomeRange => access::state_is_some_range(input, stack),
-        asm::Access::ThisAddress => Ok(access::this_address(input, stack)),
-        asm::Access::ThisSetAddress => Ok(access::this_set_address(input, stack)),
+        asm::Access::State => access::state(access.state_slots, stack),
+        asm::Access::StateRange => access::state_range(access.state_slots, stack),
+        asm::Access::StateIsSome => access::state_is_some(access.state_slots, stack),
+        asm::Access::StateIsSomeRange => access::state_is_some_range(access.state_slots, stack),
+        asm::Access::ThisAddress => Ok(access::this_address(access.solution_data, stack)),
+        asm::Access::ThisSetAddress => Ok(access::this_set_address(access.solution_data, stack)),
     }
 }
 
@@ -203,42 +204,30 @@ pub(crate) mod test_util {
         *,
     };
 
-    pub const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
-    pub const TEST_INTENT_CA: ContentAddress = ContentAddress([0xAA; 32]);
-    pub const TEST_INTENT_ADDR: IntentAddress = IntentAddress {
+    pub(crate) const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
+    pub(crate) const TEST_INTENT_CA: ContentAddress = ContentAddress([0xAA; 32]);
+    pub(crate) const TEST_INTENT_ADDR: IntentAddress = IntentAddress {
         set: TEST_SET_CA,
         intent: TEST_INTENT_CA,
     };
+    pub(crate) const TEST_SOLUTION_DATA: SolutionData = SolutionData {
+        intent_to_solve: TEST_INTENT_ADDR,
+        decision_variables: vec![],
+    };
+    pub(crate) const TEST_ACCESS: Access = Access {
+        solution_data: &TEST_SOLUTION_DATA,
+        state_slots: StateSlots::EMPTY,
+    };
 
-    pub fn empty_solution_data() -> SolutionData {
-        SolutionData {
-            intent_to_solve: TEST_INTENT_ADDR,
-            decision_variables: vec![],
+    // Similar to `eval_ops` but tests roundtrip convert to/from bytecode and checks results match.
+    pub(crate) fn eval(ops: &[Op], access: Access) -> ConstraintResult<bool> {
+        let ops_res = eval_ops(ops.iter().cloned(), access);
+        // Ensure eval_bytecode produces the same result as eval_ops.
+        let bytecode: Vec<u8> = asm::to_bytes(ops.iter().cloned()).collect();
+        let bytecode_res = eval_bytecode(bytecode.iter().cloned(), access);
+        if let (Ok(a), Ok(b)) = (&ops_res, &bytecode_res) {
+            assert_eq!(a, b);
         }
-    }
-
-    pub fn with_empty_check_input<O>(f: impl FnOnce(CheckInput) -> O) -> O {
-        let solution_data = &empty_solution_data();
-        let pre_state = &[];
-        let post_state = &[];
-        let input = CheckInput {
-            solution_data,
-            pre_state,
-            post_state,
-        };
-        f(input)
-    }
-
-    pub fn eval_with_empty_check_input(ops: &[Op]) -> ConstraintResult<bool> {
-        with_empty_check_input(|input| {
-            let ops_res = eval_ops(ops.iter().cloned(), input);
-            // Ensure eval_bytecode produces the same result as eval_ops.
-            let bytecode: Vec<u8> = asm::to_bytes(ops.iter().cloned()).collect();
-            let bytecode_res = eval_bytecode(bytecode.iter().cloned(), input);
-            if let (Ok(a), Ok(b)) = (&ops_res, &bytecode_res) {
-                assert_eq!(a, b);
-            }
-            ops_res
-        })
+        ops_res
     }
 }

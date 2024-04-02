@@ -33,77 +33,77 @@ mod tests {
 
     #[test]
     fn eval_6_mul_7_eq_42() {
-        eval_with_empty_check_input(&[
+        let ops = &[
             Stack::Push(6).into(),
             Stack::Push(7).into(),
             Alu::Mul.into(),
             Stack::Push(42).into(),
             Pred::Eq.into(),
-        ])
-        .unwrap();
+        ];
+        eval(ops, TEST_ACCESS).unwrap();
     }
 
     #[test]
     fn eval_42_div_6_eq_7() {
-        eval_with_empty_check_input(&[
+        let ops = &[
             Stack::Push(42).into(),
             Stack::Push(7).into(),
             Alu::Div.into(),
             Stack::Push(6).into(),
             Pred::Eq.into(),
-        ])
-        .unwrap();
+        ];
+        eval(ops, TEST_ACCESS).unwrap();
     }
 
     #[test]
     fn eval_divide_by_zero() {
-        let res = eval_with_empty_check_input(&[
+        let ops = &[
             Stack::Push(42).into(),
             Stack::Push(0).into(),
             Alu::Div.into(),
-        ]);
-        match res {
+        ];
+        match eval(ops, TEST_ACCESS) {
             Err(ConstraintError::Alu(AluError::DivideByZero)) => (),
-            _ => panic!("Unexpected error variant"),
+            _ => panic!("expected ALU divide-by-zero error"),
         }
     }
 
     #[test]
     fn eval_add_overflow() {
-        let res = eval_with_empty_check_input(&[
+        let ops = &[
             Stack::Push(Word::MAX).into(),
             Stack::Push(1).into(),
             Alu::Add.into(),
-        ]);
-        match res {
+        ];
+        match eval(ops, TEST_ACCESS) {
             Err(ConstraintError::Alu(AluError::Overflow)) => (),
-            _ => panic!("Unexpected error variant"),
+            _ => panic!("expected ALU overflow error"),
         }
     }
 
     #[test]
     fn eval_mul_overflow() {
-        let res = eval_with_empty_check_input(&[
+        let ops = &[
             Stack::Push(Word::MAX).into(),
             Stack::Push(2).into(),
             Alu::Mul.into(),
-        ]);
-        match res {
+        ];
+        match eval(ops, TEST_ACCESS) {
             Err(ConstraintError::Alu(AluError::Overflow)) => (),
-            _ => panic!("Unexpected error variant"),
+            _ => panic!("expected ALU overflow error"),
         }
     }
 
     #[test]
     fn eval_sub_underflow() {
-        let res = eval_with_empty_check_input(&[
+        let ops = &[
             Stack::Push(Word::MIN).into(),
             Stack::Push(1).into(),
             Alu::Sub.into(),
-        ]);
-        match res {
+        ];
+        match eval(ops, TEST_ACCESS) {
             Err(ConstraintError::Alu(AluError::Underflow)) => (),
-            _ => panic!("Unexpected error variant"),
+            _ => panic!("expected ALU underflow error"),
         }
     }
 }

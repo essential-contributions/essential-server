@@ -6,7 +6,7 @@ use crate::{asm::Word, error::StackError, ConstraintResult};
 ///
 /// A light wrapper around `Vec<Word>` providing helper methods specific to
 /// essential VM execution.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Stack(Vec<Word>);
 
 impl Stack {
@@ -149,7 +149,9 @@ impl Stack {
             .len()
             .checked_sub(len)
             .ok_or(StackError::IndexOutOfBounds)?;
-        f(&self[ix..])
+        let out = f(&self[ix..])?;
+        self.truncate(ix);
+        Ok(out)
     }
 }
 
@@ -175,5 +177,80 @@ impl core::ops::Deref for Stack {
 impl core::ops::DerefMut for Stack {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        asm::Stack,
+        error::{ConstraintError, StackError},
+        eval_ops, exec_ops,
+        test_util::*,
+    };
+
+    #[test]
+    fn dup_from_1() {
+        let ops = &[
+            Stack::Push(42).into(),
+            Stack::Push(2).into(),
+            Stack::Push(1).into(),
+            Stack::Push(0).into(),
+            Stack::Push(3).into(), // Index `3` should be the `42` value.
+            Stack::DupFrom.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), TEST_ACCESS).unwrap();
+        assert_eq!(&stack[..], &[42, 2, 1, 0, 42]);
+    }
+
+    #[test]
+    fn dup_from_2() {
+        let ops = &[
+            Stack::Push(3).into(),
+            Stack::Push(2).into(),
+            Stack::Push(1).into(),
+            Stack::Push(42).into(),
+            Stack::Push(0).into(), // Index `0` should be the `42` value.
+            Stack::DupFrom.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), TEST_ACCESS).unwrap();
+        assert_eq!(&stack[..], &[3, 2, 1, 42, 42]);
+    }
+
+    #[test]
+    fn push1() {
+        let ops = &[Stack::Push(42).into()];
+        let stack = exec_ops(ops.iter().copied(), TEST_ACCESS).unwrap();
+        assert_eq!(&stack[..], &[42]);
+    }
+
+    #[test]
+    fn push2_pop_push() {
+        let ops = &[
+            Stack::Push(1).into(),
+            Stack::Push(2).into(),
+            Stack::Pop.into(),
+            Stack::Push(3).into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), TEST_ACCESS).unwrap();
+        assert_eq!(&stack[..], &[1, 3]);
+    }
+
+    #[test]
+    fn pop_empty() {
+        let ops = &[Stack::Pop.into()];
+        match eval_ops(ops.iter().copied(), TEST_ACCESS) {
+            Err(ConstraintError::Stack(StackError::Empty)) => (),
+            _ => panic!("expected empty stack error"),
+        }
+    }
+
+    #[test]
+    fn index_oob() {
+        let ops = &[Stack::Push(0).into(), Stack::DupFrom.into()];
+        match eval_ops(ops.iter().copied(), TEST_ACCESS) {
+            Err(ConstraintError::Stack(StackError::IndexOutOfBounds)) => (),
+            _ => panic!("expected index out-of-bounds stack error"),
+        }
     }
 }
