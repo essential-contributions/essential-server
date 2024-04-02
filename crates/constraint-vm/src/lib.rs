@@ -1,7 +1,9 @@
 //! The essential constraint checking implementation.
 
 pub use access::AccessError;
-use essential_constraint_asm::{self as asm, Op, Word};
+pub use crypto::CryptoError;
+pub use essential_constraint_asm as asm;
+use essential_constraint_asm::{Op, Word};
 pub use essential_types::{
     intent::Directive,
     solution::{DecisionVariable, SolutionData},
@@ -10,12 +12,14 @@ pub use essential_types::{
 use thiserror::Error;
 
 mod access;
+mod crypto;
 
 /// All required input data for checking an intent's constraints.
 #[derive(Clone, Copy, Debug)]
 pub struct CheckInput<'a> {
     pub solution_data: &'a SolutionData,
-    pub state_slots: &'a [Option<Word>],
+    pub pre_state: &'a StateSlots,
+    pub post_state: &'a StateSlots,
 }
 
 #[derive(Debug, Error)]
@@ -24,6 +28,8 @@ pub enum CheckError {
     Access(#[from] AccessError),
     #[error("ALU operation error: {0}")]
     Alu(#[from] AluError),
+    #[error("crypto operation error: {0}")]
+    Crypto(#[from] CryptoError),
     #[error("stack operation error: {0}")]
     Stack(#[from] StackError),
     #[error("bytecode error: {0}")]
@@ -53,6 +59,8 @@ pub enum StackError {
 pub type CheckResult<T> = Result<T, CheckError>;
 
 pub type Stack = Vec<Word>;
+
+pub type StateSlots = [Option<Word>];
 
 /// Check whether the constraints of a single intent are met by the given
 /// solution data and state.
@@ -130,58 +138,56 @@ pub fn step_op(input: CheckInput, op: Op, stack: &mut Stack) -> CheckResult<()> 
 
 pub fn step_op_access(input: CheckInput, op: asm::Access, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Access::DecisionVar => pop_1_push_1(stack, |slot| access::decision_var(input, slot)),
+        asm::Access::DecisionVar => access::decision_var(input, stack),
         asm::Access::DecisionVarRange => access::decision_var_range(input, stack),
         asm::Access::MutKeysLen => todo!(),
-        asm::Access::State => pop_2_push_1(stack, |slot, delta| access::state(input, slot, delta)),
-        asm::Access::StateRange => todo!(),
-        asm::Access::StateIsSome => todo!(),
-        asm::Access::StateIsSomeRange => todo!(),
-        asm::Access::ThisAddress => todo!(),
-        asm::Access::ThisSetAddress => todo!(),
+        asm::Access::State => access::state(input, stack),
+        asm::Access::StateRange => access::state_range(input, stack),
+        asm::Access::StateIsSome => access::state_is_some(input, stack),
+        asm::Access::StateIsSomeRange => access::state_is_some_range(input, stack),
+        asm::Access::ThisAddress => Ok(access::this_address(input, stack)),
+        asm::Access::ThisSetAddress => Ok(access::this_set_address(input, stack)),
     }
 }
 
 pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Alu::Add => pop_2_push_1(stack, alu_add),
-        asm::Alu::Sub => pop_2_push_1(stack, alu_sub),
-        asm::Alu::Mul => pop_2_push_1(stack, alu_mul),
-        asm::Alu::Div => pop_2_push_1(stack, alu_div),
-        asm::Alu::Mod => pop_2_push_1(stack, alu_mod),
+        asm::Alu::Add => pop2_push1(stack, alu_add),
+        asm::Alu::Sub => pop2_push1(stack, alu_sub),
+        asm::Alu::Mul => pop2_push1(stack, alu_mul),
+        asm::Alu::Div => pop2_push1(stack, alu_div),
+        asm::Alu::Mod => pop2_push1(stack, alu_mod),
     }
 }
 
 pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Crypto::Sha256 => todo!(),
-        asm::Crypto::VerifyEd25519 => todo!(),
+        asm::Crypto::Sha256 => crypto::sha256(stack),
+        asm::Crypto::VerifyEd25519 => crypto::verify_ed25519(stack),
     }
 }
 
 pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Pred::Eq => pop_2_push_1(stack, |a, b| Ok((a == b).into())),
-        asm::Pred::Eq4 => pop_8_push_1(stack, |[a0, a1, a2, a3, b0, b1, b2, b3]| {
-            Ok(([a0, a1, a2, a3] == [b0, b1, b2, b3]).into())
-        }),
-        asm::Pred::Gt => pop_2_push_1(stack, |a, b| Ok((a > b).into())),
-        asm::Pred::Lt => pop_2_push_1(stack, |a, b| Ok((a < b).into())),
-        asm::Pred::Gte => pop_2_push_1(stack, |a, b| Ok((a >= b).into())),
-        asm::Pred::Lte => pop_2_push_1(stack, |a, b| Ok((a <= b).into())),
-        asm::Pred::And => pop_2_push_1(stack, |a, b| Ok((a != 0 && b != 0).into())),
-        asm::Pred::Or => pop_2_push_1(stack, |a, b| Ok((a != 0 || b != 0).into())),
-        asm::Pred::Not => pop_1_push_1(stack, |a| Ok((a == 0).into())),
+        asm::Pred::Eq => pop2_push1(stack, |a, b| Ok((a == b).into())),
+        asm::Pred::Eq4 => pop8_push1(stack, |ws| Ok((ws[0..4] == ws[4..8]).into())),
+        asm::Pred::Gt => pop2_push1(stack, |a, b| Ok((a > b).into())),
+        asm::Pred::Lt => pop2_push1(stack, |a, b| Ok((a < b).into())),
+        asm::Pred::Gte => pop2_push1(stack, |a, b| Ok((a >= b).into())),
+        asm::Pred::Lte => pop2_push1(stack, |a, b| Ok((a <= b).into())),
+        asm::Pred::And => pop2_push1(stack, |a, b| Ok((a != 0 && b != 0).into())),
+        asm::Pred::Or => pop2_push1(stack, |a, b| Ok((a != 0 || b != 0).into())),
+        asm::Pred::Not => pop1_push1(stack, |a| Ok((a == 0).into())),
     }
 }
 
 pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> CheckResult<()> {
     match op {
-        asm::Stack::Dup => pop_1_push_2(stack, |w| Ok([w, w])),
+        asm::Stack::Dup => pop1_push2(stack, |w| Ok([w, w])),
         asm::Stack::DupFrom => dup_from(stack),
         asm::Stack::Push(word) => Ok(stack.push(word)),
         asm::Stack::Pop => pop(stack).map(|_| ()),
-        asm::Stack::Swap => pop_2_push_2(stack, |a, b| Ok([b, a])),
+        asm::Stack::Swap => pop2_push2(stack, |a, b| Ok([b, a])),
     }
 }
 
@@ -195,9 +201,15 @@ fn pop2(stack: &mut Stack) -> CheckResult<[Word; 2]> {
     Ok([w0, w1])
 }
 
-fn pop4(stack: &mut Stack) -> CheckResult<[Word; 4]> {
-    let [w2, w3] = pop2(stack)?;
+fn pop3(stack: &mut Stack) -> CheckResult<[Word; 3]> {
+    let w2 = pop(stack)?;
     let [w0, w1] = pop2(stack)?;
+    Ok([w0, w1, w2])
+}
+
+fn pop4(stack: &mut Stack) -> CheckResult<[Word; 4]> {
+    let w3 = pop(stack)?;
+    let [w0, w1, w2] = pop3(stack)?;
     Ok([w0, w1, w2, w3])
 }
 
@@ -207,7 +219,7 @@ fn pop8(stack: &mut Stack) -> CheckResult<[Word; 8]> {
     Ok([w0, w1, w2, w3, w4, w5, w6, w7])
 }
 
-pub fn pop_1_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+pub fn pop1_push1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word) -> CheckResult<Word>,
 {
@@ -217,7 +229,7 @@ where
     Ok(())
 }
 
-pub fn pop_2_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+pub fn pop2_push1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word, Word) -> CheckResult<Word>,
 {
@@ -227,7 +239,7 @@ where
     Ok(())
 }
 
-pub fn pop_8_push_1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+pub fn pop8_push1<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce([Word; 8]) -> CheckResult<Word>,
 {
@@ -237,26 +249,54 @@ where
     Ok(())
 }
 
-pub fn pop_1_push_2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+pub fn pop1_push2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word) -> CheckResult<[Word; 2]>,
 {
     let w = pop(stack)?;
-    let [x0, x1] = f(w)?;
-    stack.push(x0);
-    stack.push(x1);
+    let xs = f(w)?;
+    stack.extend(xs);
     Ok(())
 }
 
-pub fn pop_2_push_2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+pub fn pop2_push2<F>(stack: &mut Stack, f: F) -> CheckResult<()>
 where
     F: FnOnce(Word, Word) -> CheckResult<[Word; 2]>,
 {
     let [w0, w1] = pop2(stack)?;
-    let [x0, x1] = f(w0, w1)?;
-    stack.push(x0);
-    stack.push(x1);
+    let xs = f(w0, w1)?;
+    stack.extend(xs);
     Ok(())
+}
+
+pub fn pop2_push4<F>(stack: &mut Stack, f: F) -> CheckResult<()>
+where
+    F: FnOnce(Word, Word) -> CheckResult<[Word; 4]>,
+{
+    let [w0, w1] = pop2(stack)?;
+    let xs = f(w0, w1)?;
+    stack.extend(xs);
+    Ok(())
+}
+
+/// Pop a length value from the top of the stack.
+pub fn pop_len(stack: &mut Stack) -> CheckResult<usize> {
+    let len_word = pop(stack)?;
+    let len = usize::try_from(len_word).map_err(|_| StackError::IndexOutOfBounds)?;
+    Ok(len)
+}
+
+/// Pop the length from the top of the stack, then pop and return that many words.
+pub fn pop_len_words<F, O>(stack: &mut Stack, f: F) -> CheckResult<O>
+where
+    F: FnOnce(&[Word]) -> CheckResult<O>,
+{
+    let len = pop_len(stack)?;
+    let ix = stack
+        .len()
+        .checked_sub(len)
+        .ok_or(StackError::IndexOutOfBounds)?;
+    f(&stack[ix..])
 }
 
 fn dup_from(stack: &mut Stack) -> CheckResult<()> {
@@ -314,10 +354,12 @@ mod tests {
 
     fn with_test_input<O>(f: impl FnOnce(CheckInput) -> O) -> O {
         let solution_data = &empty_solution_data();
-        let state_slots = &[];
+        let pre_state = &[];
+        let post_state = &[];
         let input = CheckInput {
             solution_data,
-            state_slots,
+            pre_state,
+            post_state,
         };
         f(input)
     }
