@@ -381,6 +381,7 @@ dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
  "essential-types",
+ "rand",
  "rayon",
  "sha2",
  "thiserror",

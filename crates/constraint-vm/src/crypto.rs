@@ -42,10 +42,15 @@ fn bytes_from_words(words: impl IntoIterator<Item = Word>) -> impl Iterator<Item
 #[cfg(test)]
 mod tests {
     use crate::{
-        asm::{Crypto, Op, Stack},
-        exec_ops,
+        asm::{Crypto, Op, Stack, Word},
+        crypto::bytes_from_words,
+        error::{ConstraintError, CryptoError, OpError},
+        eval_ops, exec_ops,
         test_util::*,
-        types::{convert::bytes_from_word, Hash},
+        types::{
+            convert::{bytes_from_word, word_4_from_u8_32, word_8_from_u8_64},
+            Hash,
+        },
     };
 
     fn exec_ops_sha256(ops: &[Op]) -> Hash {
@@ -95,5 +100,67 @@ mod tests {
             0x00, 0xe2, 0xfc, 0x2d, 0xae, 0x75, 0x00, 0xd6,
         ];
         assert_eq!(&hash[..], &expected);
+    }
+
+    // Generate some test operations for a successful ed25519 verification.
+    fn test_ed25519_ops() -> Vec<Op> {
+        use ed25519_dalek::{Signer, SigningKey};
+        use rand::{Rng, SeedableRng};
+
+        // Test data.
+        let data: &[Word] = &[7, 3, 5, 7];
+        let data_bytes: Vec<_> = bytes_from_words(data.iter().copied()).collect();
+
+        // Generate keys.
+        let mut rng = rand::rngs::SmallRng::from_seed([0x00; 32]);
+        let key_bytes = rng.gen();
+        let privkey: SigningKey = SigningKey::from_bytes(&key_bytes);
+        let pubkey = privkey.verifying_key();
+        let pubkey_bytes = pubkey.to_bytes();
+
+        // Sign the data and check it verifies.
+        let signature = privkey.sign(&data_bytes);
+        pubkey.verify_strict(&data_bytes, &signature).unwrap();
+        let signature_bytes = signature.to_bytes();
+
+        // Push the data, length, signature, pubkey and finally the `VerifyEd25519` op.
+        data.iter()
+            .copied()
+            .chain(Some(Word::try_from(data.len()).unwrap()))
+            .chain(word_8_from_u8_64(signature_bytes))
+            .chain(word_4_from_u8_32(pubkey_bytes))
+            .map(Stack::Push)
+            .map(Op::from)
+            .chain(Some(Crypto::VerifyEd25519.into()))
+            .collect()
+    }
+
+    #[test]
+    fn verify_ed25519_true() {
+        let ops = test_ed25519_ops();
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn verify_ed25519_false() {
+        let mut ops = test_ed25519_ops();
+        ops[0] = Stack::Push(0).into(); // Invalidate data.
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn ed25519_error() {
+        let mut ops = test_ed25519_ops();
+        // Invalidate pubkey.
+        let key_ix = ops.len() - 5;
+        ops[key_ix] = Stack::Push(1).into();
+        ops[key_ix + 1] = Stack::Push(1).into();
+        ops[key_ix + 2] = Stack::Push(1).into();
+        ops[key_ix + 3] = Stack::Push(1).into();
+        let res = eval_ops(ops.iter().copied(), TEST_ACCESS);
+        match res {
+            Err(ConstraintError::Op(_, OpError::Crypto(CryptoError::Ed25519(_err)))) => (),
+            _ => panic!("expected ed25519 error, got {res:?}"),
+        }
     }
 }
