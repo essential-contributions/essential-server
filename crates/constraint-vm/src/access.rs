@@ -210,7 +210,7 @@ mod tests {
     use crate::{
         asm,
         error::{AccessError, ConstraintError, OpError},
-        exec_ops,
+        eval_ops, exec_ops,
         test_util::*,
     };
     use essential_types::solution::DecisionVariableIndex;
@@ -423,5 +423,155 @@ mod tests {
             }
             _ => panic!("expected transient decision variable cycle error, got {res:?}"),
         }
+    }
+
+    #[test]
+    fn state_pre_mutation() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(0), Some(42)],
+                post: &[Some(0), Some(0)],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(1).into(), // Slot index.
+            asm::Stack::Push(0).into(), // Delta (0 for pre-mutation state).
+            asm::Access::State.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[42]);
+    }
+
+    #[test]
+    fn state_post_mutation() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(0), Some(0)],
+                post: &[Some(42), Some(0)],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(1).into(), // Delta (1 for post-mutation state).
+            asm::Access::State.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[42]);
+    }
+
+    #[test]
+    fn state_range_pre_mutation() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(10), Some(20), Some(30)],
+                post: &[Some(0), Some(0), Some(0)],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(3).into(), // Range length.
+            asm::Stack::Push(0).into(), // Delta (0 for pre-mutation state).
+            asm::Access::StateRange.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[10, 20, 30]);
+    }
+
+    #[test]
+    fn state_range_post_mutation() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(0), Some(0), Some(0)],
+                post: &[Some(0), Some(40), Some(50)],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(1).into(), // Slot index.
+            asm::Stack::Push(2).into(), // Range length.
+            asm::Stack::Push(1).into(), // Delta (1 for post-mutation state).
+            asm::Access::StateRange.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[40, 50]);
+    }
+
+    #[test]
+    fn state_is_some_pre_mutation_false() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(0), None],
+                post: &[Some(0), Some(0)],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(1).into(), // Slot index.
+            asm::Stack::Push(0).into(), // Delta (0 for pre-mutation state).
+            asm::Access::StateIsSome.into(),
+        ];
+        // Expect false for `None`.
+        assert!(!eval_ops(ops.iter().copied(), access).unwrap());
+    }
+
+    #[test]
+    fn state_is_some_post_mutation_true() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[None, None],
+                post: &[Some(42), None],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(1).into(), // Delta (1 for post-mutation state).
+            asm::Access::StateIsSome.into(),
+        ];
+        // Expect true for `Some(42)`.
+        assert!(eval_ops(ops.iter().copied(), access).unwrap());
+    }
+
+    #[test]
+    fn state_is_some_range_pre_mutation() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(10), None, Some(30)],
+                post: &[None, None, None],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(3).into(), // Range length.
+            asm::Stack::Push(0).into(), // Delta (0 for pre-mutation state).
+            asm::Access::StateIsSomeRange.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        // Expect true, false, true for `Some(10), None, Some(30)`.
+        assert_eq!(&stack[..], &[1, 0, 1]);
+    }
+
+    #[test]
+    fn state_is_some_range_post_mutation() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[None, None, None],
+                post: &[None, Some(40), None],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(3).into(), // Range length.
+            asm::Stack::Push(1).into(), // Delta (1 for post-mutation state).
+            asm::Access::StateIsSomeRange.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        // Expect false, true, false for `None, Some(40), None`.
+        assert_eq!(&stack[..], &[0, 1, 0]);
     }
 }
