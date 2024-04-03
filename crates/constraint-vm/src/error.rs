@@ -46,6 +46,10 @@ pub enum ConstraintError {
 pub enum AccessError {
     #[error("decision variable slot out of bounds")]
     DecisionSlotOutOfBounds,
+    #[error("solution data index out of bounds")]
+    SolutionDataOutOfBounds,
+    #[error("a cycle was detected between transient decision variables")]
+    TransientDecisionVariableCycle,
     #[error("state slot out of bounds")]
     StateSlotOutOfBounds,
     #[error("invalid state slot delta: expected `0` or `1`, found {0}")]

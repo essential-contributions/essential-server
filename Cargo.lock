@@ -370,7 +370,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#2418fd0728beb53ccfb59fe6c13118038330600f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d82a6852ab5fc26cb208ff96dfd6a12019fa5eb0"
 dependencies = [
  "serde",
 ]

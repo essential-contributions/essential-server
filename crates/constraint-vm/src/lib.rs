@@ -15,11 +15,24 @@ mod crypto;
 pub mod error;
 pub mod stack;
 
-/// All required input data for access operations.
+/// All necessary solution data and state access required to check an individual intent.
 #[derive(Clone, Copy, Debug)]
 pub struct Access<'a> {
-    pub solution_data: &'a SolutionData,
+    pub solution: SolutionAccess<'a>,
     pub state_slots: StateSlots<'a>,
+}
+
+/// All necessary solution data access required to check an individual intent.
+#[derive(Clone, Copy, Debug)]
+pub struct SolutionAccess<'a> {
+    /// The input data for each intent being solved within the solution.
+    ///
+    /// We require *all* intent solution data in order to handle transient
+    /// decision variable access.
+    pub data: &'a [SolutionData],
+    /// Checking is performed for one intent at a time. This index refers to
+    /// the checked intent's associated solution data within `data`.
+    pub index: usize,
 }
 
 /// The pre and post mutation state slot values for the intent being solved.
@@ -33,6 +46,18 @@ pub struct StateSlots<'a> {
 
 /// The state slots declared within the intent.
 pub type StateSlotSlice = [Option<Word>];
+
+impl<'a> SolutionAccess<'a> {
+    /// The solution data associated with the intent currently being checked.
+    ///
+    /// **Panics** in the case that `self.intent_index` is out of range of the
+    /// `self.solution_data` slice.
+    pub fn this_data(&self) -> &SolutionData {
+        self.data
+            .get(self.index)
+            .expect("intent index out of range of solution data")
+    }
+}
 
 impl<'a> StateSlots<'a> {
     /// Empty state slots.
@@ -130,19 +155,19 @@ pub fn step_op(access: Access, op: Op, stack: &mut Stack) -> ConstraintResult<()
 /// Step forward constraint checking by the given access operation.
 pub fn step_op_access(access: Access, op: asm::Access, stack: &mut Stack) -> ConstraintResult<()> {
     match op {
-        asm::Access::DecisionVar => access::decision_var(access.solution_data, stack),
-        asm::Access::DecisionVarRange => access::decision_var_range(access.solution_data, stack),
+        asm::Access::DecisionVar => access::decision_var(access.solution, stack),
+        asm::Access::DecisionVarRange => access::decision_var_range(access.solution, stack),
         asm::Access::MutKeysLen => todo!(),
         asm::Access::State => access::state(access.state_slots, stack),
         asm::Access::StateRange => access::state_range(access.state_slots, stack),
         asm::Access::StateIsSome => access::state_is_some(access.state_slots, stack),
         asm::Access::StateIsSomeRange => access::state_is_some_range(access.state_slots, stack),
         asm::Access::ThisAddress => {
-            access::this_address(access.solution_data, stack);
+            access::this_address(access.solution.this_data(), stack);
             Ok(())
         }
         asm::Access::ThisSetAddress => {
-            access::this_set_address(access.solution_data, stack);
+            access::this_set_address(access.solution.this_data(), stack);
             Ok(())
         }
     }
@@ -223,8 +248,12 @@ pub(crate) mod test_util {
         intent_to_solve: TEST_INTENT_ADDR,
         decision_variables: vec![],
     };
+    pub(crate) const TEST_SOLUTION_ACCESS: SolutionAccess = SolutionAccess {
+        data: &[TEST_SOLUTION_DATA],
+        index: 0,
+    };
     pub(crate) const TEST_ACCESS: Access = Access {
-        solution_data: &TEST_SOLUTION_DATA,
+        solution: TEST_SOLUTION_ACCESS,
         state_slots: StateSlots::EMPTY,
     };
 
