@@ -2,11 +2,12 @@
 name = "essential-constraint-vm"
 version = "0.1.0"
 edition = "2021"
+description = "The Essential constraint checking VM"
 
 [dependencies]
-ed25519-dalek = "2.1.0"
+ed25519-dalek = { workspace = true }
 essential-constraint-asm = { workspace = true }
 essential-types = { workspace = true }
-rayon = "1"
+rayon = { workspace = true }
 sha2 = { workspace = true }
-thiserror = "1"
+thiserror = { workspace = true }
