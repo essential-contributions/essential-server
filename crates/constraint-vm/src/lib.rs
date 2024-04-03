@@ -16,26 +16,22 @@ mod crypto;
 pub mod error;
 pub mod stack;
 
-/// Check whether the constraints of a single intent are met by the given
+/// Check whether the constraints of a single intent are met for the given
 /// solution data and state.
 ///
-/// Returns the `Directive`, indicating the quality of the solution.
+/// The intent is considered to be satisfied if this function returns `Ok(())`.
 pub fn check_intent(intent: &[ConstraintBytecode], access: Access) -> Result<(), CheckError> {
-    let (unsatisfied, failed) = intent
-        .iter()
+    use rayon::{iter::Either, prelude::*};
+    let (failed, unsatisfied): (Vec<_>, Vec<_>) = intent
+        .par_iter()
         .map(|bytecode| eval_bytecode(bytecode.iter().copied(), access))
         .enumerate()
-        .fold(
-            (vec![], vec![]),
-            |(mut unsatisfied, mut failed), (i, constraint_res)| {
-                match constraint_res {
-                    Ok(b) if !b => unsatisfied.push(i),
-                    Err(err) => failed.push((i, err)),
-                    _ => (),
-                }
-                (unsatisfied, failed)
-            },
-        );
+        .filter_map(|(i, constraint_res)| match constraint_res {
+            Err(err) => Some(Either::Left((i, err))),
+            Ok(b) if !b => Some(Either::Right(i)),
+            _ => None,
+        })
+        .partition_map(|either| either);
     if !failed.is_empty() {
         return Err(ConstraintErrors(failed).into());
     }
