@@ -421,7 +421,7 @@ mod tests {
             Err(ConstraintError::Op(_, OpError::Access(AccessError::DecisionSlotOutOfBounds))) => {
                 ()
             }
-            _ => panic!("expected transient decision variable cycle error, got {res:?}"),
+            _ => panic!("expected decision variable slot out-of-bounds error, got {res:?}"),
         }
     }
 
@@ -459,6 +459,71 @@ mod tests {
         ];
         let stack = exec_ops(ops.iter().copied(), access).unwrap();
         assert_eq!(&stack[..], &[42]);
+    }
+
+    #[test]
+    fn state_pre_mutation_oob() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(0), Some(42)],
+                post: &[Some(0), Some(0)],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(2).into(), // Slot index (out-of-bounds).
+            asm::Stack::Push(0).into(), // Delta (0 for pre-mutation state).
+            asm::Access::State.into(),
+        ];
+        let res = exec_ops(ops.iter().copied(), access);
+        match res {
+            Err(ConstraintError::Op(_, OpError::Access(AccessError::StateSlotOutOfBounds))) => (),
+            _ => panic!("expected state slot out-of-bounds error, got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn invalid_state_slot_delta() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[Some(0), Some(42)],
+                post: &[Some(0), Some(0)],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(1).into(), // Slot index.
+            asm::Stack::Push(2).into(), // Delta (invalid).
+            asm::Access::State.into(),
+        ];
+        let res = exec_ops(ops.iter().copied(), access);
+        match res {
+            Err(ConstraintError::Op(_, OpError::Access(AccessError::InvalidStateSlotDelta(2)))) => {
+                ()
+            }
+            _ => panic!("expected invalid state slot delta error, got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn state_slot_was_none() {
+        let access = Access {
+            solution: TEST_SOLUTION_ACCESS,
+            state_slots: StateSlots {
+                pre: &[None],
+                post: &[None],
+            },
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(0).into(), // Delta.
+            asm::Access::State.into(),
+        ];
+        let res = exec_ops(ops.iter().copied(), access);
+        match res {
+            Err(ConstraintError::Op(_, OpError::Access(AccessError::StateSlotWasNone))) => (),
+            _ => panic!("expected state slot was none error, got {res:?}"),
+        }
     }
 
     #[test]
