@@ -574,4 +574,20 @@ mod tests {
         // Expect false, true, false for `None, Some(40), None`.
         assert_eq!(&stack[..], &[0, 1, 0]);
     }
+
+    #[test]
+    fn this_address() {
+        let ops = &[asm::Access::ThisAddress.into()];
+        let stack = exec_ops(ops.iter().copied(), TEST_ACCESS).unwrap();
+        let expected_words = word_4_from_u8_32(TEST_INTENT_ADDR.intent.0);
+        assert_eq!(&stack[..], expected_words);
+    }
+
+    #[test]
+    fn this_set_address() {
+        let ops = &[asm::Access::ThisSetAddress.into()];
+        let stack = exec_ops(ops.iter().copied(), TEST_ACCESS).unwrap();
+        let expected_words = word_4_from_u8_32(TEST_INTENT_ADDR.set.0);
+        assert_eq!(&stack[..], expected_words);
+    }
 }
