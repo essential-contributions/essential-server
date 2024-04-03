@@ -203,3 +203,225 @@ fn state_slots_from_delta(slots: StateSlots, delta: bool) -> &StateSlotSlice {
         slots.pre
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        asm,
+        error::{AccessError, ConstraintError, OpError},
+        exec_ops,
+        test_util::*,
+    };
+    use essential_types::solution::DecisionVariableIndex;
+
+    #[test]
+    fn decision_var_inline() {
+        let access = Access {
+            solution: SolutionAccess {
+                data: &[SolutionData {
+                    intent_to_solve: TEST_INTENT_ADDR,
+                    decision_variables: vec![DecisionVariable::Inline(42)],
+                }],
+                index: 0,
+            },
+            state_slots: StateSlots::EMPTY,
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Access::DecisionVar.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[42]);
+    }
+
+    #[test]
+    fn decision_var_transient() {
+        // Test resolution of transient decision vars over the following path:
+        // - Solution 1, Var 2 (start)
+        // - Solution 0, Var 3
+        // - Solution 2, Var 1
+        let access = Access {
+            solution: SolutionAccess {
+                data: &[
+                    SolutionData {
+                        intent_to_solve: TEST_INTENT_ADDR,
+                        decision_variables: vec![
+                            DecisionVariable::Inline(0),
+                            DecisionVariable::Inline(1),
+                            DecisionVariable::Inline(2),
+                            DecisionVariable::Transient(DecisionVariableIndex {
+                                solution_data_index: 2,
+                                variable_index: 1,
+                            }),
+                        ],
+                    },
+                    SolutionData {
+                        intent_to_solve: TEST_INTENT_ADDR,
+                        decision_variables: vec![
+                            DecisionVariable::Inline(0),
+                            DecisionVariable::Inline(1),
+                            DecisionVariable::Transient(DecisionVariableIndex {
+                                solution_data_index: 0,
+                                variable_index: 3,
+                            }),
+                            DecisionVariable::Inline(3),
+                        ],
+                    },
+                    SolutionData {
+                        intent_to_solve: TEST_INTENT_ADDR,
+                        decision_variables: vec![
+                            DecisionVariable::Inline(0),
+                            DecisionVariable::Inline(42),
+                        ],
+                    },
+                ],
+                // Solution data for intent being solved is at index 1.
+                index: 1,
+            },
+            state_slots: StateSlots::EMPTY,
+        };
+        let ops = &[
+            asm::Stack::Push(2).into(), // Slot index.
+            asm::Access::DecisionVar.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[42]);
+    }
+
+    #[test]
+    fn decision_var_range() {
+        let access = Access {
+            solution: SolutionAccess {
+                data: &[SolutionData {
+                    intent_to_solve: TEST_INTENT_ADDR,
+                    decision_variables: vec![
+                        DecisionVariable::Inline(7),
+                        DecisionVariable::Inline(8),
+                        DecisionVariable::Inline(9),
+                    ],
+                }],
+                index: 0,
+            },
+            state_slots: StateSlots::EMPTY,
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(3).into(), // Range length.
+            asm::Access::DecisionVarRange.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[7, 8, 9]);
+    }
+
+    #[test]
+    fn decision_var_range_transient() {
+        let access = Access {
+            solution: SolutionAccess {
+                data: &[
+                    SolutionData {
+                        intent_to_solve: TEST_INTENT_ADDR,
+                        decision_variables: vec![
+                            DecisionVariable::Transient(DecisionVariableIndex {
+                                solution_data_index: 1,
+                                variable_index: 2,
+                            }),
+                            DecisionVariable::Transient(DecisionVariableIndex {
+                                solution_data_index: 1,
+                                variable_index: 1,
+                            }),
+                            DecisionVariable::Transient(DecisionVariableIndex {
+                                solution_data_index: 1,
+                                variable_index: 0,
+                            }),
+                        ],
+                    },
+                    SolutionData {
+                        intent_to_solve: TEST_INTENT_ADDR,
+                        decision_variables: vec![
+                            DecisionVariable::Inline(7),
+                            DecisionVariable::Inline(8),
+                            DecisionVariable::Inline(9),
+                        ],
+                    },
+                ],
+                index: 0,
+            },
+            state_slots: StateSlots::EMPTY,
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Stack::Push(3).into(), // Range length.
+            asm::Access::DecisionVarRange.into(),
+        ];
+        let stack = exec_ops(ops.iter().copied(), access).unwrap();
+        assert_eq!(&stack[..], &[9, 8, 7]);
+    }
+
+    #[test]
+    fn decision_var_transient_cycle() {
+        let access = Access {
+            solution: SolutionAccess {
+                data: &[
+                    SolutionData {
+                        intent_to_solve: TEST_INTENT_ADDR,
+                        decision_variables: vec![DecisionVariable::Transient(
+                            DecisionVariableIndex {
+                                solution_data_index: 1,
+                                variable_index: 0,
+                            },
+                        )],
+                    },
+                    SolutionData {
+                        intent_to_solve: TEST_INTENT_ADDR,
+                        decision_variables: vec![DecisionVariable::Transient(
+                            DecisionVariableIndex {
+                                solution_data_index: 0,
+                                variable_index: 0,
+                            },
+                        )],
+                    },
+                ],
+                index: 0,
+            },
+            state_slots: StateSlots::EMPTY,
+        };
+        let ops = &[
+            asm::Stack::Push(0).into(), // Slot index.
+            asm::Access::DecisionVar.into(),
+        ];
+        let res = exec_ops(ops.iter().copied(), access);
+        match res {
+            Err(ConstraintError::Op(
+                _,
+                OpError::Access(AccessError::TransientDecisionVariableCycle),
+            )) => (),
+            _ => panic!("expected transient decision variable cycle error, got {res:?}"),
+        }
+    }
+
+    #[test]
+    fn decision_var_slot_oob() {
+        let access = Access {
+            solution: SolutionAccess {
+                data: &[SolutionData {
+                    intent_to_solve: TEST_INTENT_ADDR,
+                    decision_variables: vec![DecisionVariable::Inline(42)],
+                }],
+                index: 0,
+            },
+            state_slots: StateSlots::EMPTY,
+        };
+        let ops = &[
+            asm::Stack::Push(1).into(), // Slot index.
+            asm::Access::DecisionVar.into(),
+        ];
+        let res = exec_ops(ops.iter().copied(), access);
+        match res {
+            Err(ConstraintError::Op(_, OpError::Access(AccessError::DecisionSlotOutOfBounds))) => {
+                ()
+            }
+            _ => panic!("expected transient decision variable cycle error, got {res:?}"),
+        }
+    }
+}

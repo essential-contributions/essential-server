@@ -116,7 +116,7 @@ pub fn exec_bytecode(
     for (ix, res) in asm::from_bytes(bytes.into_iter()).enumerate() {
         let op = res.map_err(|err| ConstraintError::Op(ix, err.into()))?;
         step_op(access, op, &mut stack).map_err(|err| ConstraintError::Op(ix, err))?;
-        println!("{ix:02X}: {:016?} - {:016X?}", op, &stack);
+        println!("{ix:02X}: {:016?} -> {:016X?}", op, &stack);
     }
     Ok(stack)
 }
@@ -126,7 +126,7 @@ pub fn exec_ops(ops: impl IntoIterator<Item = Op>, access: Access) -> Constraint
     let mut stack = Stack::default();
     for (ix, op) in ops.into_iter().enumerate() {
         step_op(access, op, &mut stack).map_err(|err| ConstraintError::Op(ix, err))?;
-        println!("{ix:02X}: {:016X?} - {:016X?}", op, &stack);
+        println!("{ix:02X}: {:016X?} -> {:016X?}", op, &stack);
     }
     Ok(stack)
 }
