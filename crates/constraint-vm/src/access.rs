@@ -1,14 +1,63 @@
 //! Access operation implementations.
 
-use crate::{
-    bool_from_word, error::AccessError, ConstraintResult, SolutionAccess, Stack, StateSlotSlice,
-    StateSlots,
-};
+use crate::{bool_from_word, error::AccessError, ConstraintResult, Stack};
 use essential_constraint_asm::Word;
 use essential_types::{
     convert::word_4_from_u8_32,
     solution::{DecisionVariable, SolutionData},
 };
+
+/// All necessary solution data and state access required to check an individual intent.
+#[derive(Clone, Copy, Debug)]
+pub struct Access<'a> {
+    pub solution: SolutionAccess<'a>,
+    pub state_slots: StateSlots<'a>,
+}
+
+/// All necessary solution data access required to check an individual intent.
+#[derive(Clone, Copy, Debug)]
+pub struct SolutionAccess<'a> {
+    /// The input data for each intent being solved within the solution.
+    ///
+    /// We require *all* intent solution data in order to handle transient
+    /// decision variable access.
+    pub data: &'a [SolutionData],
+    /// Checking is performed for one intent at a time. This index refers to
+    /// the checked intent's associated solution data within `data`.
+    pub index: usize,
+}
+
+/// The pre and post mutation state slot values for the intent being solved.
+#[derive(Clone, Copy, Debug)]
+pub struct StateSlots<'a> {
+    /// Intent state slot values before the solution's mutations are applied.
+    pub pre: &'a StateSlotSlice,
+    /// Intent state slot values after the solution's mutations are applied.
+    pub post: &'a StateSlotSlice,
+}
+
+/// The state slots declared within the intent.
+pub type StateSlotSlice = [Option<Word>];
+
+impl<'a> SolutionAccess<'a> {
+    /// The solution data associated with the intent currently being checked.
+    ///
+    /// **Panics** in the case that `self.intent_index` is out of range of the
+    /// `self.solution_data` slice.
+    pub fn this_data(&self) -> &SolutionData {
+        self.data
+            .get(self.index)
+            .expect("intent index out of range of solution data")
+    }
+}
+
+impl<'a> StateSlots<'a> {
+    /// Empty state slots.
+    pub const EMPTY: Self = Self {
+        pre: &[],
+        post: &[],
+    };
+}
 
 /// `Access::DecisionVar` implementation.
 pub(crate) fn decision_var(solution: SolutionAccess, stack: &mut Stack) -> ConstraintResult<()> {
