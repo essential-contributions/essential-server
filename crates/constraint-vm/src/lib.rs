@@ -1,26 +1,65 @@
 //! The essential constraint checking implementation.
+//!
+//! ## Checking Intents
+//!
+//! The primary entrypoint for this crate is the [`check_intent`] function
+//! which allows for checking a set of constraints associated with a single
+//! intent against some provided solution data and state slot mutations in
+//! parallel.
+//!
+//! ## Checking Individual Constraints
+//!
+//! Functions are also exposed for checking constraints individually.
+//!
+//! - The [`exec_bytecode`] and [`exec_ops`] functions allow for executing the
+//!   constraint and returning the resulting `Stack`.
+//! - The [`eval_bytecode`] and [`eval_ops`] functions are similar to their
+//!   `exec_*` counterparts, but expect the top of the `Stack` to contain a
+//!   single boolean value indicating whether the constraint was satisfied (`0`
+//!   for `false`, `1` for `true`) and returns this value.
+//!
+//! ## Performing a Single Operation
+//!
+//! The [`step_op`] function (and related `step_op_*` functions) are exposed to
+//! allow for applying a single operation to the given stack. This can be useful
+//! in the case of integrating constraint operations in a downstream VM (e.g.
+//! the essential state read VM).
+//!
+//! ## Understanding the Assembly
+//!
+//! The `essential-constraint-asm` crate is re-exported as the [`asm`] module.
+//! See [this module's documentation][asm] for information about the expected
+//! behaviour of individual operations.
+#![deny(missing_docs)]
 
 pub use access::{Access, SolutionAccess, StateSlotSlice, StateSlots};
-pub use error::{CheckError, ConstraintError, ConstraintResult, OpResult};
-use error::{ConstraintErrors, ConstraintsUnsatisfied};
+#[doc(inline)]
+pub use error::{CheckResult, ConstraintResult, OpResult};
+use error::{ConstraintError, ConstraintErrors, ConstraintsUnsatisfied};
 #[doc(inline)]
 pub use essential_constraint_asm as asm;
 use essential_constraint_asm::{Op, Word};
 pub use essential_types as types;
 use essential_types::ConstraintBytecode;
+#[doc(inline)]
 pub use stack::Stack;
 
 mod access;
 mod alu;
 mod crypto;
 pub mod error;
-pub mod stack;
+mod stack;
 
 /// Check whether the constraints of a single intent are met for the given
-/// solution data and state.
+/// solution data and state slot mutations. All constraints are checked in
+/// parallel.
+///
+/// In the case that one or more constraints fail or are unsatisfied, the
+/// whole set of failed/unsatisfied constraint indices are returned within the
+/// `CheckError` type.
 ///
 /// The intent is considered to be satisfied if this function returns `Ok(())`.
-pub fn check_intent(intent: &[ConstraintBytecode], access: Access) -> Result<(), CheckError> {
+pub fn check_intent(intent: &[ConstraintBytecode], access: Access) -> CheckResult<()> {
     use rayon::{iter::Either, prelude::*};
     let (failed, unsatisfied): (Vec<_>, Vec<_>) = intent
         .par_iter()

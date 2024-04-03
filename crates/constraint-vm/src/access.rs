@@ -10,7 +10,9 @@ use essential_types::{
 /// All necessary solution data and state access required to check an individual intent.
 #[derive(Clone, Copy, Debug)]
 pub struct Access<'a> {
+    /// All necessary solution data access required to check an individual intent.
     pub solution: SolutionAccess<'a>,
+    /// The pre and post mutation state slot values for the intent being solved.
     pub state_slots: StateSlots<'a>,
 }
 
@@ -42,8 +44,7 @@ pub type StateSlotSlice = [Option<Word>];
 impl<'a> SolutionAccess<'a> {
     /// The solution data associated with the intent currently being checked.
     ///
-    /// **Panics** in the case that `self.intent_index` is out of range of the
-    /// `self.solution_data` slice.
+    /// **Panics** in the case that `self.index` is out of range of the `self.data` slice.
     pub fn this_data(&self) -> &SolutionData {
         self.data
             .get(self.index)
