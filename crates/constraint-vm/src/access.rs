@@ -1,6 +1,6 @@
 //! Access operation implementations.
 
-use crate::{bool_from_word, error::AccessError, ConstraintResult, Stack};
+use crate::{bool_from_word, error::AccessError, OpResult, Stack};
 use essential_constraint_asm::Word;
 use essential_types::{
     convert::word_4_from_u8_32,
@@ -60,7 +60,7 @@ impl<'a> StateSlots<'a> {
 }
 
 /// `Access::DecisionVar` implementation.
-pub(crate) fn decision_var(solution: SolutionAccess, stack: &mut Stack) -> ConstraintResult<()> {
+pub(crate) fn decision_var(solution: SolutionAccess, stack: &mut Stack) -> OpResult<()> {
     stack.pop1_push1(|slot| {
         let ix = usize::try_from(slot).map_err(|_| AccessError::DecisionSlotOutOfBounds)?;
         let w = resolve_decision_var(solution.data, solution.index, ix)?;
@@ -69,10 +69,7 @@ pub(crate) fn decision_var(solution: SolutionAccess, stack: &mut Stack) -> Const
 }
 
 /// `Access::DecisionVarRange` implementation.
-pub(crate) fn decision_var_range(
-    solution: SolutionAccess,
-    stack: &mut Stack,
-) -> ConstraintResult<()> {
+pub(crate) fn decision_var_range(solution: SolutionAccess, stack: &mut Stack) -> OpResult<()> {
     let [slot, len] = stack.pop2()?;
     let range = range_from_start_len(slot, len).ok_or(AccessError::DecisionSlotOutOfBounds)?;
     for dec_var_ix in range {
@@ -83,7 +80,7 @@ pub(crate) fn decision_var_range(
 }
 
 /// `Access::State` implementation.
-pub(crate) fn state(slots: StateSlots, stack: &mut Stack) -> ConstraintResult<()> {
+pub(crate) fn state(slots: StateSlots, stack: &mut Stack) -> OpResult<()> {
     stack.pop2_push1(|slot, delta| {
         let slot = state_slot(slots, slot, delta)?;
         let word = slot.ok_or(AccessError::StateSlotWasNone)?;
@@ -92,7 +89,7 @@ pub(crate) fn state(slots: StateSlots, stack: &mut Stack) -> ConstraintResult<()
 }
 
 /// `Access::StateRange` implementation.
-pub(crate) fn state_range(slots: StateSlots, stack: &mut Stack) -> ConstraintResult<()> {
+pub(crate) fn state_range(slots: StateSlots, stack: &mut Stack) -> OpResult<()> {
     let [slot, len, delta] = stack.pop3()?;
     let slice = state_slot_range(slots, slot, len, delta)?;
     for slot in slice {
@@ -103,7 +100,7 @@ pub(crate) fn state_range(slots: StateSlots, stack: &mut Stack) -> ConstraintRes
 }
 
 /// `Access::StateIsSome` implementation.
-pub(crate) fn state_is_some(slots: StateSlots, stack: &mut Stack) -> ConstraintResult<()> {
+pub(crate) fn state_is_some(slots: StateSlots, stack: &mut Stack) -> OpResult<()> {
     stack.pop2_push1(|slot, delta| {
         let slot = state_slot(slots, slot, delta)?;
         let is_some = Word::from(slot.is_some());
@@ -112,7 +109,7 @@ pub(crate) fn state_is_some(slots: StateSlots, stack: &mut Stack) -> ConstraintR
 }
 
 /// `Access::StateIsSomeRange` implementation.
-pub(crate) fn state_is_some_range(slots: StateSlots, stack: &mut Stack) -> ConstraintResult<()> {
+pub(crate) fn state_is_some_range(slots: StateSlots, stack: &mut Stack) -> OpResult<()> {
     let [slot, len, delta] = stack.pop3()?;
     let slice = state_slot_range(slots, slot, len, delta)?;
     for slot in slice {
@@ -168,8 +165,8 @@ fn resolve_decision_var(
     }
 }
 
-fn state_slot(slots: StateSlots, slot: Word, delta: Word) -> ConstraintResult<&Option<Word>> {
-    let delta = bool_from_word(delta).map_err(AccessError::InvalidStateSlotDelta)?;
+fn state_slot(slots: StateSlots, slot: Word, delta: Word) -> OpResult<&Option<Word>> {
+    let delta = bool_from_word(delta).ok_or(AccessError::InvalidStateSlotDelta(delta))?;
     let slots = state_slots_from_delta(slots, delta);
     let ix = usize::try_from(slot).map_err(|_| AccessError::StateSlotOutOfBounds)?;
     let slot = slots.get(ix).ok_or(AccessError::StateSlotOutOfBounds)?;
@@ -181,8 +178,8 @@ fn state_slot_range(
     slot: Word,
     len: Word,
     delta: Word,
-) -> ConstraintResult<&StateSlotSlice> {
-    let delta = bool_from_word(delta).map_err(AccessError::InvalidStateSlotDelta)?;
+) -> OpResult<&StateSlotSlice> {
+    let delta = bool_from_word(delta).ok_or(AccessError::InvalidStateSlotDelta(slot))?;
     let slots = state_slots_from_delta(slots, delta);
     let range = range_from_start_len(slot, len).ok_or(AccessError::StateSlotOutOfBounds)?;
     let subslice = slots

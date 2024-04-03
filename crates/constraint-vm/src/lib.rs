@@ -1,7 +1,7 @@
 //! The essential constraint checking implementation.
 
 pub use access::{Access, SolutionAccess, StateSlotSlice, StateSlots};
-pub use error::{CheckError, ConstraintError, ConstraintResult};
+pub use error::{CheckError, ConstraintError, ConstraintResult, OpResult};
 use error::{ConstraintErrors, ConstraintsUnsatisfied};
 #[doc(inline)]
 pub use essential_constraint_asm as asm;
@@ -48,18 +48,24 @@ pub fn eval_bytecode(
     bytes: impl IntoIterator<Item = u8>,
     access: Access,
 ) -> ConstraintResult<bool> {
-    let mut stack = exec_bytecode(bytes, access)?;
-    let word = stack.pop1()?;
-    bool_from_word(word).map_err(ConstraintError::InvalidConstraintValue)
+    let stack = exec_bytecode(bytes, access)?;
+    let word = match stack.last() {
+        Some(&w) => w,
+        None => return Err(ConstraintError::InvalidEvaluation(stack)),
+    };
+    bool_from_word(word).ok_or_else(|| ConstraintError::InvalidEvaluation(stack))
 }
 
 /// Evaluate the operations of a single constraint and return its boolean result.
 ///
 /// This is the same as `exec_ops`, but retrieves the boolean result from the resulting stack.
 pub fn eval_ops(ops: impl IntoIterator<Item = Op>, access: Access) -> ConstraintResult<bool> {
-    let mut stack = exec_ops(ops, access)?;
-    let word = stack.pop1()?;
-    bool_from_word(word).map_err(ConstraintError::InvalidConstraintValue)
+    let stack = exec_ops(ops, access)?;
+    let word = match stack.last() {
+        Some(&w) => w,
+        None => return Err(ConstraintError::InvalidEvaluation(stack)),
+    };
+    bool_from_word(word).ok_or_else(|| ConstraintError::InvalidEvaluation(stack))
 }
 
 /// Execute the bytecode of a constraint and return the resulting stack.
@@ -68,10 +74,10 @@ pub fn exec_bytecode(
     access: Access,
 ) -> ConstraintResult<Stack> {
     let mut stack = Stack::default();
-    for res in asm::from_bytes(bytes.into_iter()) {
-        let op = res?;
-        step_op(access, op, &mut stack)?;
-        println!("{:016?}: {:016X?}", op, &stack);
+    for (ix, res) in asm::from_bytes(bytes.into_iter()).enumerate() {
+        let op = res.map_err(|err| ConstraintError::Op(ix, err.into()))?;
+        step_op(access, op, &mut stack).map_err(|err| ConstraintError::Op(ix, err))?;
+        println!("{ix:02X}: {:016?} - {:016X?}", op, &stack);
     }
     Ok(stack)
 }
@@ -79,15 +85,15 @@ pub fn exec_bytecode(
 /// Execute the operations of a constraint and return the resulting stack.
 pub fn exec_ops(ops: impl IntoIterator<Item = Op>, access: Access) -> ConstraintResult<Stack> {
     let mut stack = Stack::default();
-    for op in ops {
-        step_op(access, op, &mut stack)?;
-        println!("{:016X?}: {:016X?}", op, &stack);
+    for (ix, op) in ops.into_iter().enumerate() {
+        step_op(access, op, &mut stack).map_err(|err| ConstraintError::Op(ix, err))?;
+        println!("{ix:02X}: {:016X?} - {:016X?}", op, &stack);
     }
     Ok(stack)
 }
 
 /// Step forward constraint checking by the given operation.
-pub fn step_op(access: Access, op: Op, stack: &mut Stack) -> ConstraintResult<()> {
+pub fn step_op(access: Access, op: Op, stack: &mut Stack) -> OpResult<()> {
     match op {
         Op::Access(op) => step_op_access(access, op, stack),
         Op::Alu(op) => step_op_alu(op, stack),
@@ -98,7 +104,7 @@ pub fn step_op(access: Access, op: Op, stack: &mut Stack) -> ConstraintResult<()
 }
 
 /// Step forward constraint checking by the given access operation.
-pub fn step_op_access(access: Access, op: asm::Access, stack: &mut Stack) -> ConstraintResult<()> {
+pub fn step_op_access(access: Access, op: asm::Access, stack: &mut Stack) -> OpResult<()> {
     match op {
         asm::Access::DecisionVar => access::decision_var(access.solution, stack),
         asm::Access::DecisionVarRange => access::decision_var_range(access.solution, stack),
@@ -119,7 +125,7 @@ pub fn step_op_access(access: Access, op: asm::Access, stack: &mut Stack) -> Con
 }
 
 /// Step forward constraint checking by the given ALU operation.
-pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> ConstraintResult<()> {
+pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> OpResult<()> {
     match op {
         asm::Alu::Add => stack.pop2_push1(alu::add),
         asm::Alu::Sub => stack.pop2_push1(alu::sub),
@@ -130,7 +136,7 @@ pub fn step_op_alu(op: asm::Alu, stack: &mut Stack) -> ConstraintResult<()> {
 }
 
 /// Step forward constraint checking by the given crypto operation.
-pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> ConstraintResult<()> {
+pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> OpResult<()> {
     match op {
         asm::Crypto::Sha256 => crypto::sha256(stack),
         asm::Crypto::VerifyEd25519 => crypto::verify_ed25519(stack),
@@ -138,7 +144,7 @@ pub fn step_op_crypto(op: asm::Crypto, stack: &mut Stack) -> ConstraintResult<()
 }
 
 /// Step forward constraint checking by the given predicate operation.
-pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> ConstraintResult<()> {
+pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> OpResult<()> {
     match op {
         asm::Pred::Eq => stack.pop2_push1(|a, b| Ok((a == b).into())),
         asm::Pred::Eq4 => stack.pop8_push1(|ws| Ok((ws[0..4] == ws[4..8]).into())),
@@ -153,7 +159,7 @@ pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> ConstraintResult<()> {
 }
 
 /// Step forward constraint checking by the given stack operation.
-pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> ConstraintResult<()> {
+pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> OpResult<()> {
     match op {
         asm::Stack::Dup => stack.pop1_push2(|w| Ok([w, w])),
         asm::Stack::DupFrom => stack.dup_from(),
@@ -167,18 +173,17 @@ pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> ConstraintResult<()> 
 }
 
 /// Parse a `bool` from a word, where 0 is false, 1 is true and any other value is invalid.
-fn bool_from_word(word: Word) -> Result<bool, Word> {
+fn bool_from_word(word: Word) -> Option<bool> {
     match word {
-        0 => Ok(false),
-        1 => Ok(true),
-        _ => Err(word),
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
     }
 }
 
 #[cfg(test)]
 pub(crate) mod test_util {
     use crate::{
-        asm,
         types::{solution::SolutionData, ContentAddress, IntentAddress},
         *,
     };
@@ -201,16 +206,4 @@ pub(crate) mod test_util {
         solution: TEST_SOLUTION_ACCESS,
         state_slots: StateSlots::EMPTY,
     };
-
-    // Similar to `eval_ops` but tests roundtrip convert to/from bytecode and checks results match.
-    pub(crate) fn eval(ops: &[Op], access: Access) -> ConstraintResult<bool> {
-        let ops_res = eval_ops(ops.iter().cloned(), access);
-        // Ensure eval_bytecode produces the same result as eval_ops.
-        let bytecode: Vec<u8> = asm::to_bytes(ops.iter().cloned()).collect();
-        let bytecode_res = eval_bytecode(bytecode.iter().cloned(), access);
-        if let (Ok(a), Ok(b)) = (&ops_res, &bytecode_res) {
-            assert_eq!(a, b);
-        }
-        ops_res
-    }
 }

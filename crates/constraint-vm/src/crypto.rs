@@ -1,12 +1,12 @@
 //! Crypto operation implementations.
 
-use crate::{asm::Word, error::CryptoError, ConstraintResult, Stack};
+use crate::{asm::Word, error::CryptoError, OpResult, Stack};
 use essential_types::convert::{
     bytes_from_word, u8_32_from_word_4, u8_64_from_word_8, word_4_from_u8_32,
 };
 
 /// `Crypto::Sha256` implementation.
-pub(crate) fn sha256(stack: &mut Stack) -> ConstraintResult<()> {
+pub(crate) fn sha256(stack: &mut Stack) -> OpResult<()> {
     use sha2::Digest;
     let data: Vec<_> =
         stack.pop_len_words(|words| Ok(bytes_from_words(words.iter().copied()).collect()))?;
@@ -19,7 +19,7 @@ pub(crate) fn sha256(stack: &mut Stack) -> ConstraintResult<()> {
 }
 
 /// `Crypto::VerifyEd25519` implementation.
-pub(crate) fn verify_ed25519(stack: &mut Stack) -> ConstraintResult<()> {
+pub(crate) fn verify_ed25519(stack: &mut Stack) -> OpResult<()> {
     use ed25519_dalek::{Signature, Verifier, VerifyingKey};
     let pubkey_words = stack.pop4()?;
     let signature_words = stack.pop8()?;

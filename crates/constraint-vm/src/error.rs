@@ -1,6 +1,9 @@
 //! The types of errors that might occur throughout constraint checking.
 
-use crate::asm::{self, Word};
+use crate::{
+    asm::{self, Word},
+    Stack,
+};
 use core::fmt;
 use thiserror::Error;
 
@@ -27,7 +30,23 @@ pub type ConstraintResult<T> = Result<T, ConstraintError>;
 /// Constraint checking error.
 #[derive(Debug, Error)]
 pub enum ConstraintError {
-    #[error("access error: {0}")]
+    #[error(
+        "invalid constraint evaluation result\n  \
+        expected: [0] (false) or [1] (true)\n  \
+        found:    {0:?}"
+    )]
+    InvalidEvaluation(Stack),
+    #[error("operation at index {0} failed: {1}")]
+    Op(usize, OpError),
+}
+
+/// Shorthand for a `Result` where the error type is an `OpError`.
+pub type OpResult<T> = Result<T, OpError>;
+
+/// An individual operation failed during constraint checking error.
+#[derive(Debug, Error)]
+pub enum OpError {
+    #[error("access operation error: {0}")]
     Access(#[from] AccessError),
     #[error("ALU operation error: {0}")]
     Alu(#[from] AluError),
@@ -37,8 +56,6 @@ pub enum ConstraintError {
     Stack(#[from] StackError),
     #[error("bytecode error: {0}")]
     FromBytes(#[from] asm::FromBytesError),
-    #[error("invalid constraint evaluation result {0}, exepcted `0` (false) or `1` (true)")]
-    InvalidConstraintValue(Word),
 }
 
 /// Access operation error.

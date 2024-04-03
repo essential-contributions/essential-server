@@ -1,6 +1,6 @@
 //! Stack operation and related stack manipulation implementations.
 
-use crate::{asm::Word, error::StackError, ConstraintResult};
+use crate::{asm::Word, error::StackError, OpResult};
 
 /// The VM's `Stack`, i.e. a `Vec` of `Word`s updated during each step of execution.
 ///
@@ -11,7 +11,7 @@ pub struct Stack(Vec<Word>);
 
 impl Stack {
     /// The DupFrom op implementation.
-    pub(crate) fn dup_from(&mut self) -> ConstraintResult<()> {
+    pub(crate) fn dup_from(&mut self) -> OpResult<()> {
         let rev_ix_w = self.pop1()?;
         let rev_ix = usize::try_from(rev_ix_w).map_err(|_| StackError::IndexOutOfBounds)?;
         let ix = self
@@ -25,14 +25,14 @@ impl Stack {
     }
 
     /// A wrapper around `Vec::pop`, producing an error in the case that the stack is empty.
-    pub fn pop1(&mut self) -> ConstraintResult<Word> {
+    pub fn pop1(&mut self) -> OpResult<Word> {
         Ok(self.pop().ok_or(StackError::Empty)?)
     }
 
     /// Pop the top 2 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop2(&mut self) -> ConstraintResult<[Word; 2]> {
+    pub fn pop2(&mut self) -> OpResult<[Word; 2]> {
         let w1 = self.pop1()?;
         let w0 = self.pop1()?;
         Ok([w0, w1])
@@ -41,7 +41,7 @@ impl Stack {
     /// Pop the top 3 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop3(&mut self) -> ConstraintResult<[Word; 3]> {
+    pub fn pop3(&mut self) -> OpResult<[Word; 3]> {
         let w2 = self.pop1()?;
         let [w0, w1] = self.pop2()?;
         Ok([w0, w1, w2])
@@ -50,7 +50,7 @@ impl Stack {
     /// Pop the top 4 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop4(&mut self) -> ConstraintResult<[Word; 4]> {
+    pub fn pop4(&mut self) -> OpResult<[Word; 4]> {
         let w3 = self.pop1()?;
         let [w0, w1, w2] = self.pop3()?;
         Ok([w0, w1, w2, w3])
@@ -59,16 +59,16 @@ impl Stack {
     /// Pop the top 8 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop8(&mut self) -> ConstraintResult<[Word; 8]> {
+    pub fn pop8(&mut self) -> OpResult<[Word; 8]> {
         let [w4, w5, w6, w7] = self.pop4()?;
         let [w0, w1, w2, w3] = self.pop4()?;
         Ok([w0, w1, w2, w3, w4, w5, w6, w7])
     }
 
     /// Pop 1 word from the stack, apply the given function and push the returned word.
-    pub fn pop1_push1<F>(&mut self, f: F) -> ConstraintResult<()>
+    pub fn pop1_push1<F>(&mut self, f: F) -> OpResult<()>
     where
-        F: FnOnce(Word) -> ConstraintResult<Word>,
+        F: FnOnce(Word) -> OpResult<Word>,
     {
         let w = self.pop1()?;
         let x = f(w)?;
@@ -77,9 +77,9 @@ impl Stack {
     }
 
     /// Pop 2 words from the stack, apply the given function and push the returned word.
-    pub fn pop2_push1<F>(&mut self, f: F) -> ConstraintResult<()>
+    pub fn pop2_push1<F>(&mut self, f: F) -> OpResult<()>
     where
-        F: FnOnce(Word, Word) -> ConstraintResult<Word>,
+        F: FnOnce(Word, Word) -> OpResult<Word>,
     {
         let [w0, w1] = self.pop2()?;
         let x = f(w0, w1)?;
@@ -88,9 +88,9 @@ impl Stack {
     }
 
     /// Pop 8 words from the stack, apply the given function and push the returned word.
-    pub fn pop8_push1<F>(&mut self, f: F) -> ConstraintResult<()>
+    pub fn pop8_push1<F>(&mut self, f: F) -> OpResult<()>
     where
-        F: FnOnce([Word; 8]) -> ConstraintResult<Word>,
+        F: FnOnce([Word; 8]) -> OpResult<Word>,
     {
         let ws = self.pop8()?;
         let x = f(ws)?;
@@ -99,9 +99,9 @@ impl Stack {
     }
 
     /// Pop 1 word from the stack, apply the given function and push the 2 returned words.
-    pub fn pop1_push2<F>(&mut self, f: F) -> ConstraintResult<()>
+    pub fn pop1_push2<F>(&mut self, f: F) -> OpResult<()>
     where
-        F: FnOnce(Word) -> ConstraintResult<[Word; 2]>,
+        F: FnOnce(Word) -> OpResult<[Word; 2]>,
     {
         let w = self.pop1()?;
         let xs = f(w)?;
@@ -110,9 +110,9 @@ impl Stack {
     }
 
     /// Pop 2 words from the stack, apply the given function and push the 2 returned words.
-    pub fn pop2_push2<F>(&mut self, f: F) -> ConstraintResult<()>
+    pub fn pop2_push2<F>(&mut self, f: F) -> OpResult<()>
     where
-        F: FnOnce(Word, Word) -> ConstraintResult<[Word; 2]>,
+        F: FnOnce(Word, Word) -> OpResult<[Word; 2]>,
     {
         let [w0, w1] = self.pop2()?;
         let xs = f(w0, w1)?;
@@ -121,9 +121,9 @@ impl Stack {
     }
 
     /// Pop 2 words from the stack, apply the given function and push the 4 returned words.
-    pub fn pop2_push4<F>(&mut self, f: F) -> ConstraintResult<()>
+    pub fn pop2_push4<F>(&mut self, f: F) -> OpResult<()>
     where
-        F: FnOnce(Word, Word) -> ConstraintResult<[Word; 4]>,
+        F: FnOnce(Word, Word) -> OpResult<[Word; 4]>,
     {
         let [w0, w1] = self.pop2()?;
         let xs = f(w0, w1)?;
@@ -132,7 +132,7 @@ impl Stack {
     }
 
     /// Pop a length value from the top of the stack and return it.
-    pub fn pop_len(&mut self) -> ConstraintResult<usize> {
+    pub fn pop_len(&mut self) -> OpResult<usize> {
         let len_word = self.pop1()?;
         let len = usize::try_from(len_word).map_err(|_| StackError::IndexOutOfBounds)?;
         Ok(len)
@@ -140,9 +140,9 @@ impl Stack {
 
     /// Pop the length from the top of the stack, then pop and provide that many
     /// words to the given function.
-    pub fn pop_len_words<F, O>(&mut self, f: F) -> ConstraintResult<O>
+    pub fn pop_len_words<F, O>(&mut self, f: F) -> OpResult<O>
     where
-        F: FnOnce(&[Word]) -> ConstraintResult<O>,
+        F: FnOnce(&[Word]) -> OpResult<O>,
     {
         let len = self.pop_len()?;
         let ix = self
@@ -184,7 +184,7 @@ impl core::ops::DerefMut for Stack {
 mod tests {
     use crate::{
         asm::Stack,
-        error::{ConstraintError, StackError},
+        error::{ConstraintError, OpError, StackError},
         eval_ops, exec_ops,
         test_util::*,
     };
@@ -240,7 +240,7 @@ mod tests {
     fn pop_empty() {
         let ops = &[Stack::Pop.into()];
         match eval_ops(ops.iter().copied(), TEST_ACCESS) {
-            Err(ConstraintError::Stack(StackError::Empty)) => (),
+            Err(ConstraintError::Op(0, OpError::Stack(StackError::Empty))) => (),
             _ => panic!("expected empty stack error"),
         }
     }
@@ -249,7 +249,7 @@ mod tests {
     fn index_oob() {
         let ops = &[Stack::Push(0).into(), Stack::DupFrom.into()];
         match eval_ops(ops.iter().copied(), TEST_ACCESS) {
-            Err(ConstraintError::Stack(StackError::IndexOutOfBounds)) => (),
+            Err(ConstraintError::Op(1, OpError::Stack(StackError::IndexOutOfBounds))) => (),
             _ => panic!("expected index out-of-bounds stack error"),
         }
     }
