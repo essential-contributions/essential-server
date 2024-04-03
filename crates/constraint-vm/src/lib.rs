@@ -223,6 +223,7 @@ fn bool_from_word(word: Word) -> Option<bool> {
 #[cfg(test)]
 pub(crate) mod test_util {
     use crate::{
+        asm::{Pred, Stack},
         types::{solution::SolutionData, ContentAddress, IntentAddress},
         *,
     };
@@ -245,4 +246,218 @@ pub(crate) mod test_util {
         solution: TEST_SOLUTION_ACCESS,
         state_slots: StateSlots::EMPTY,
     };
+
+    #[test]
+    fn pred_eq_false() {
+        let ops = &[
+            Stack::Push(6).into(),
+            Stack::Push(7).into(),
+            Pred::Eq.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_eq_true() {
+        let ops = &[
+            Stack::Push(42).into(),
+            Stack::Push(42).into(),
+            Pred::Eq.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_eq4_false() {
+        let ops = &[
+            Stack::Push(1).into(),
+            Stack::Push(2).into(),
+            Stack::Push(3).into(),
+            Stack::Push(4).into(),
+            Stack::Push(0).into(),
+            Stack::Push(0).into(),
+            Stack::Push(0).into(),
+            Stack::Push(0).into(),
+            Pred::Eq4.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_eq4_true() {
+        let ops = &[
+            Stack::Push(1).into(),
+            Stack::Push(2).into(),
+            Stack::Push(3).into(),
+            Stack::Push(4).into(),
+            Stack::Push(1).into(),
+            Stack::Push(2).into(),
+            Stack::Push(3).into(),
+            Stack::Push(4).into(),
+            Pred::Eq4.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_gt_false() {
+        let ops = &[
+            Stack::Push(7).into(),
+            Stack::Push(7).into(),
+            Pred::Gt.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_gt_true() {
+        let ops = &[
+            Stack::Push(7).into(),
+            Stack::Push(6).into(),
+            Pred::Gt.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_lt_false() {
+        let ops = &[
+            Stack::Push(7).into(),
+            Stack::Push(7).into(),
+            Pred::Lt.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_lt_true() {
+        let ops = &[
+            Stack::Push(6).into(),
+            Stack::Push(7).into(),
+            Pred::Lt.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_gte_false() {
+        let ops = &[
+            Stack::Push(6).into(),
+            Stack::Push(7).into(),
+            Pred::Gte.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_gte_true() {
+        let ops = &[
+            Stack::Push(7).into(),
+            Stack::Push(7).into(),
+            Pred::Gte.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+        let ops = &[
+            Stack::Push(8).into(),
+            Stack::Push(7).into(),
+            Pred::Gte.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_lte_false() {
+        let ops = &[
+            Stack::Push(7).into(),
+            Stack::Push(6).into(),
+            Pred::Lte.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_lte_true() {
+        let ops = &[
+            Stack::Push(7).into(),
+            Stack::Push(7).into(),
+            Pred::Lte.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+        let ops = &[
+            Stack::Push(7).into(),
+            Stack::Push(8).into(),
+            Pred::Lte.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_and_true() {
+        let ops = &[
+            Stack::Push(42).into(),
+            Stack::Push(42).into(),
+            Pred::And.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_and_false() {
+        let ops = &[
+            Stack::Push(42).into(),
+            Stack::Push(0).into(),
+            Pred::And.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+        let ops = &[
+            Stack::Push(0).into(),
+            Stack::Push(0).into(),
+            Pred::And.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_or_true() {
+        let ops = &[
+            Stack::Push(42).into(),
+            Stack::Push(42).into(),
+            Pred::Or.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+        let ops = &[
+            Stack::Push(0).into(),
+            Stack::Push(42).into(),
+            Pred::Or.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+        let ops = &[
+            Stack::Push(42).into(),
+            Stack::Push(0).into(),
+            Pred::Or.into(),
+        ];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_or_false() {
+        let ops = &[
+            Stack::Push(0).into(),
+            Stack::Push(0).into(),
+            Pred::Or.into(),
+        ];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_not_true() {
+        let ops = &[Stack::Push(0).into(), Pred::Not.into()];
+        assert!(eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
+
+    #[test]
+    fn pred_not_false() {
+        let ops = &[Stack::Push(42).into(), Pred::Not.into()];
+        assert!(!eval_ops(ops.iter().copied(), TEST_ACCESS).unwrap());
+    }
 }

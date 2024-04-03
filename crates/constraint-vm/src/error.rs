@@ -60,10 +60,10 @@ pub enum OpError {
     /// An error occurred during an `Alu` operation.
     #[error("ALU operation error: {0}")]
     Alu(#[from] AluError),
-    /// An error occurred during an `Crypto` operation.
+    /// An error occurred during a `Crypto` operation.
     #[error("crypto operation error: {0}")]
     Crypto(#[from] CryptoError),
-    /// An error occurred during an `Stack` operation.
+    /// An error occurred during a `Stack` operation.
     #[error("stack operation error: {0}")]
     Stack(#[from] StackError),
     /// An error occurred while parsing an operation from bytes.
