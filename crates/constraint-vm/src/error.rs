@@ -125,6 +125,9 @@ pub enum StackError {
     /// An index into the stack was out of bounds.
     #[error("indexed stack out of bounds")]
     IndexOutOfBounds,
+    /// The stack size exceeded the size limit.
+    #[error("the {}-word stack size limit was exceeded", crate::Stack::SIZE_LIMIT)]
+    Overflow,
 }
 
 impl fmt::Display for ConstraintErrors {

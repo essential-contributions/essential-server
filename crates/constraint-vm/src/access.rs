@@ -75,7 +75,7 @@ pub(crate) fn decision_var_range(solution: SolutionAccess, stack: &mut Stack) ->
     let range = range_from_start_len(slot, len).ok_or(AccessError::DecisionSlotOutOfBounds)?;
     for dec_var_ix in range {
         let w = resolve_decision_var(solution.data, solution.index, dec_var_ix)?;
-        stack.push(w);
+        stack.push(w)?;
     }
     Ok(())
 }
@@ -95,7 +95,7 @@ pub(crate) fn state_range(slots: StateSlots, stack: &mut Stack) -> OpResult<()> 
     let slice = state_slot_range(slots, slot, len, delta)?;
     for slot in slice {
         let word = slot.ok_or(AccessError::StateSlotWasNone)?;
-        stack.push(word);
+        stack.push(word)?;
     }
     Ok(())
 }
@@ -115,21 +115,23 @@ pub(crate) fn state_is_some_range(slots: StateSlots, stack: &mut Stack) -> OpRes
     let slice = state_slot_range(slots, slot, len, delta)?;
     for slot in slice {
         let is_some = Word::from(slot.is_some());
-        stack.push(is_some);
+        stack.push(is_some)?;
     }
     Ok(())
 }
 
 /// `Access::ThisAddress` implementation.
-pub(crate) fn this_address(data: &SolutionData, stack: &mut Stack) {
+pub(crate) fn this_address(data: &SolutionData, stack: &mut Stack) -> OpResult<()> {
     let words = word_4_from_u8_32(data.intent_to_solve.intent.0);
-    stack.extend(words);
+    stack.extend(words)?;
+    Ok(())
 }
 
 /// `Access::ThisSetAddress` implementation.
-pub(crate) fn this_set_address(data: &SolutionData, stack: &mut Stack) {
+pub(crate) fn this_set_address(data: &SolutionData, stack: &mut Stack) -> OpResult<()> {
     let words = word_4_from_u8_32(data.intent_to_solve.set.0);
-    stack.extend(words);
+    stack.extend(words)?;
+    Ok(())
 }
 
 /// Resolve the decision variable by traversing any necessary transient data.

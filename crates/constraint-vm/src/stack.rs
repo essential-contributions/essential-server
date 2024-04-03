@@ -10,9 +10,33 @@ use crate::{asm::Word, error::StackError, OpResult};
 pub struct Stack(Vec<Word>);
 
 impl Stack {
+    /// Limit the stack size to 32KB to avoid memory bloat during parallel constraint checking.
+    pub const SIZE_LIMIT: usize = 4096;
+
+    /// Push a word to the stack.
+    ///
+    /// Errors in the case that pushing an element would cause the stack to overflow.
+    pub fn push(&mut self, word: Word) -> OpResult<()> {
+        if self.len() >= Self::SIZE_LIMIT {
+            return Err(StackError::Overflow.into());
+        }
+        self.0.push(word);
+        Ok(())
+    }
+
+    /// Extend the stack by with the given iterator yielding words.
+    ///
+    /// Errors in the case that pushing an element would cause the stack to overflow.
+    pub fn extend(&mut self, words: impl IntoIterator<Item = Word>) -> OpResult<()> {
+        for word in words {
+            self.push(word)?;
+        }
+        Ok(())
+    }
+
     /// The DupFrom op implementation.
     pub(crate) fn dup_from(&mut self) -> OpResult<()> {
-        let rev_ix_w = self.pop1()?;
+        let rev_ix_w = self.pop()?;
         let rev_ix = usize::try_from(rev_ix_w).map_err(|_| StackError::IndexOutOfBounds)?;
         let ix = self
             .len()
@@ -20,21 +44,21 @@ impl Stack {
             .and_then(|i| i.checked_sub(1))
             .ok_or(StackError::IndexOutOfBounds)?;
         let w = *self.get(ix).ok_or(StackError::IndexOutOfBounds)?;
-        self.push(w);
+        self.push(w)?;
         Ok(())
     }
 
     /// A wrapper around `Vec::pop`, producing an error in the case that the stack is empty.
-    pub fn pop1(&mut self) -> OpResult<Word> {
-        Ok(self.pop().ok_or(StackError::Empty)?)
+    pub fn pop(&mut self) -> OpResult<Word> {
+        Ok(self.0.pop().ok_or(StackError::Empty)?)
     }
 
     /// Pop the top 2 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
     pub fn pop2(&mut self) -> OpResult<[Word; 2]> {
-        let w1 = self.pop1()?;
-        let w0 = self.pop1()?;
+        let w1 = self.pop()?;
+        let w0 = self.pop()?;
         Ok([w0, w1])
     }
 
@@ -42,7 +66,7 @@ impl Stack {
     ///
     /// The last values popped appear first in the returned fixed-size array.
     pub fn pop3(&mut self) -> OpResult<[Word; 3]> {
-        let w2 = self.pop1()?;
+        let w2 = self.pop()?;
         let [w0, w1] = self.pop2()?;
         Ok([w0, w1, w2])
     }
@@ -51,7 +75,7 @@ impl Stack {
     ///
     /// The last values popped appear first in the returned fixed-size array.
     pub fn pop4(&mut self) -> OpResult<[Word; 4]> {
-        let w3 = self.pop1()?;
+        let w3 = self.pop()?;
         let [w0, w1, w2] = self.pop3()?;
         Ok([w0, w1, w2, w3])
     }
@@ -70,9 +94,9 @@ impl Stack {
     where
         F: FnOnce(Word) -> OpResult<Word>,
     {
-        let w = self.pop1()?;
+        let w = self.pop()?;
         let x = f(w)?;
-        self.push(x);
+        self.push(x)?;
         Ok(())
     }
 
@@ -83,7 +107,7 @@ impl Stack {
     {
         let [w0, w1] = self.pop2()?;
         let x = f(w0, w1)?;
-        self.push(x);
+        self.push(x)?;
         Ok(())
     }
 
@@ -94,7 +118,7 @@ impl Stack {
     {
         let ws = self.pop8()?;
         let x = f(ws)?;
-        self.push(x);
+        self.push(x)?;
         Ok(())
     }
 
@@ -103,9 +127,9 @@ impl Stack {
     where
         F: FnOnce(Word) -> OpResult<[Word; 2]>,
     {
-        let w = self.pop1()?;
+        let w = self.pop()?;
         let xs = f(w)?;
-        self.extend(xs);
+        self.extend(xs)?;
         Ok(())
     }
 
@@ -116,7 +140,7 @@ impl Stack {
     {
         let [w0, w1] = self.pop2()?;
         let xs = f(w0, w1)?;
-        self.extend(xs);
+        self.extend(xs)?;
         Ok(())
     }
 
@@ -127,13 +151,13 @@ impl Stack {
     {
         let [w0, w1] = self.pop2()?;
         let xs = f(w0, w1)?;
-        self.extend(xs);
+        self.extend(xs)?;
         Ok(())
     }
 
     /// Pop a length value from the top of the stack and return it.
     pub fn pop_len(&mut self) -> OpResult<usize> {
-        let len_word = self.pop1()?;
+        let len_word = self.pop()?;
         let len = usize::try_from(len_word).map_err(|_| StackError::IndexOutOfBounds)?;
         Ok(len)
     }
@@ -150,7 +174,7 @@ impl Stack {
             .checked_sub(len)
             .ok_or(StackError::IndexOutOfBounds)?;
         let out = f(&self[ix..])?;
-        self.truncate(ix);
+        self.0.truncate(ix);
         Ok(out)
     }
 }
@@ -171,12 +195,6 @@ impl core::ops::Deref for Stack {
     type Target = Vec<Word>;
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl core::ops::DerefMut for Stack {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 

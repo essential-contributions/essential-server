@@ -14,7 +14,7 @@ pub(crate) fn sha256(stack: &mut Stack) -> OpResult<()> {
     hasher.update(&data);
     let hash_bytes: [u8; 32] = hasher.finalize().into();
     let hash_words = word_4_from_u8_32(hash_bytes);
-    stack.extend(hash_words);
+    stack.extend(hash_words)?;
     Ok(())
 }
 
@@ -31,7 +31,7 @@ pub(crate) fn verify_ed25519(stack: &mut Stack) -> OpResult<()> {
     let signature = Signature::from_bytes(&signature_bytes);
     let valid = pubkey.verify(&data, &signature).is_ok();
     let word = Word::from(valid);
-    stack.push(word);
+    stack.push(word)?;
     Ok(())
 }
 

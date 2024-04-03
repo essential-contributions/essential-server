@@ -152,14 +152,8 @@ pub fn step_op_access(access: Access, op: asm::Access, stack: &mut Stack) -> OpR
         asm::Access::StateRange => access::state_range(access.state_slots, stack),
         asm::Access::StateIsSome => access::state_is_some(access.state_slots, stack),
         asm::Access::StateIsSomeRange => access::state_is_some_range(access.state_slots, stack),
-        asm::Access::ThisAddress => {
-            access::this_address(access.solution.this_data(), stack);
-            Ok(())
-        }
-        asm::Access::ThisSetAddress => {
-            access::this_set_address(access.solution.this_data(), stack);
-            Ok(())
-        }
+        asm::Access::ThisAddress => access::this_address(access.solution.this_data(), stack),
+        asm::Access::ThisSetAddress => access::this_set_address(access.solution.this_data(), stack),
     }
 }
 
@@ -202,11 +196,8 @@ pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> OpResult<()> {
     match op {
         asm::Stack::Dup => stack.pop1_push2(|w| Ok([w, w])),
         asm::Stack::DupFrom => stack.dup_from(),
-        asm::Stack::Push(word) => {
-            stack.push(word);
-            Ok(())
-        }
-        asm::Stack::Pop => Ok(stack.pop1().map(|_| ())?),
+        asm::Stack::Push(word) => stack.push(word),
+        asm::Stack::Pop => Ok(stack.pop().map(|_| ())?),
         asm::Stack::Swap => stack.pop2_push2(|a, b| Ok([b, a])),
     }
 }
