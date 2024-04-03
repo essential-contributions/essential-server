@@ -30,7 +30,7 @@
 //! The `essential-constraint-asm` crate is re-exported as the [`asm`] module.
 //! See [this module's documentation][asm] for information about the expected
 //! behaviour of individual operations.
-#![deny(missing_docs)]
+#![deny(missing_docs, unsafe_code)]
 
 pub use access::{Access, SolutionAccess, StateSlotSlice, StateSlots};
 #[doc(inline)]
