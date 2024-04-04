@@ -1,6 +1,6 @@
 //! Stack operation and related stack manipulation implementations.
 
-use crate::{asm::Word, error::StackError, OpResult};
+use crate::{asm::Word, error::StackError, StackResult};
 
 /// The VM's `Stack`, i.e. a `Vec` of `Word`s updated during each step of execution.
 ///
@@ -16,9 +16,9 @@ impl Stack {
     /// Push a word to the stack.
     ///
     /// Errors in the case that pushing an element would cause the stack to overflow.
-    pub fn push(&mut self, word: Word) -> OpResult<()> {
+    pub fn push(&mut self, word: Word) -> StackResult<()> {
         if self.len() >= Self::SIZE_LIMIT {
-            return Err(StackError::Overflow.into());
+            return Err(StackError::Overflow);
         }
         self.0.push(word);
         Ok(())
@@ -27,7 +27,7 @@ impl Stack {
     /// Extend the stack by with the given iterator yielding words.
     ///
     /// Errors in the case that pushing an element would cause the stack to overflow.
-    pub fn extend(&mut self, words: impl IntoIterator<Item = Word>) -> OpResult<()> {
+    pub fn extend(&mut self, words: impl IntoIterator<Item = Word>) -> StackResult<()> {
         for word in words {
             self.push(word)?;
         }
@@ -35,7 +35,7 @@ impl Stack {
     }
 
     /// The DupFrom op implementation.
-    pub(crate) fn dup_from(&mut self) -> OpResult<()> {
+    pub(crate) fn dup_from(&mut self) -> StackResult<()> {
         let rev_ix_w = self.pop()?;
         let rev_ix = usize::try_from(rev_ix_w).map_err(|_| StackError::IndexOutOfBounds)?;
         let ix = self
@@ -49,14 +49,14 @@ impl Stack {
     }
 
     /// A wrapper around `Vec::pop`, producing an error in the case that the stack is empty.
-    pub fn pop(&mut self) -> OpResult<Word> {
-        Ok(self.0.pop().ok_or(StackError::Empty)?)
+    pub fn pop(&mut self) -> StackResult<Word> {
+        self.0.pop().ok_or(StackError::Empty)
     }
 
     /// Pop the top 2 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop2(&mut self) -> OpResult<[Word; 2]> {
+    pub fn pop2(&mut self) -> StackResult<[Word; 2]> {
         let w1 = self.pop()?;
         let w0 = self.pop()?;
         Ok([w0, w1])
@@ -65,7 +65,7 @@ impl Stack {
     /// Pop the top 3 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop3(&mut self) -> OpResult<[Word; 3]> {
+    pub fn pop3(&mut self) -> StackResult<[Word; 3]> {
         let w2 = self.pop()?;
         let [w0, w1] = self.pop2()?;
         Ok([w0, w1, w2])
@@ -74,7 +74,7 @@ impl Stack {
     /// Pop the top 4 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop4(&mut self) -> OpResult<[Word; 4]> {
+    pub fn pop4(&mut self) -> StackResult<[Word; 4]> {
         let w3 = self.pop()?;
         let [w0, w1, w2] = self.pop3()?;
         Ok([w0, w1, w2, w3])
@@ -83,16 +83,17 @@ impl Stack {
     /// Pop the top 8 values from the stack.
     ///
     /// The last values popped appear first in the returned fixed-size array.
-    pub fn pop8(&mut self) -> OpResult<[Word; 8]> {
+    pub fn pop8(&mut self) -> StackResult<[Word; 8]> {
         let [w4, w5, w6, w7] = self.pop4()?;
         let [w0, w1, w2, w3] = self.pop4()?;
         Ok([w0, w1, w2, w3, w4, w5, w6, w7])
     }
 
     /// Pop 1 word from the stack, apply the given function and push the returned word.
-    pub fn pop1_push1<F>(&mut self, f: F) -> OpResult<()>
+    pub fn pop1_push1<F, E>(&mut self, f: F) -> Result<(), E>
     where
-        F: FnOnce(Word) -> OpResult<Word>,
+        F: FnOnce(Word) -> Result<Word, E>,
+        E: From<StackError>,
     {
         let w = self.pop()?;
         let x = f(w)?;
@@ -101,9 +102,10 @@ impl Stack {
     }
 
     /// Pop 2 words from the stack, apply the given function and push the returned word.
-    pub fn pop2_push1<F>(&mut self, f: F) -> OpResult<()>
+    pub fn pop2_push1<F, E>(&mut self, f: F) -> Result<(), E>
     where
-        F: FnOnce(Word, Word) -> OpResult<Word>,
+        F: FnOnce(Word, Word) -> Result<Word, E>,
+        E: From<StackError>,
     {
         let [w0, w1] = self.pop2()?;
         let x = f(w0, w1)?;
@@ -112,9 +114,10 @@ impl Stack {
     }
 
     /// Pop 8 words from the stack, apply the given function and push the returned word.
-    pub fn pop8_push1<F>(&mut self, f: F) -> OpResult<()>
+    pub fn pop8_push1<F, E>(&mut self, f: F) -> Result<(), E>
     where
-        F: FnOnce([Word; 8]) -> OpResult<Word>,
+        F: FnOnce([Word; 8]) -> Result<Word, E>,
+        E: From<StackError>,
     {
         let ws = self.pop8()?;
         let x = f(ws)?;
@@ -123,9 +126,10 @@ impl Stack {
     }
 
     /// Pop 1 word from the stack, apply the given function and push the 2 returned words.
-    pub fn pop1_push2<F>(&mut self, f: F) -> OpResult<()>
+    pub fn pop1_push2<F, E>(&mut self, f: F) -> Result<(), E>
     where
-        F: FnOnce(Word) -> OpResult<[Word; 2]>,
+        F: FnOnce(Word) -> Result<[Word; 2], E>,
+        E: From<StackError>,
     {
         let w = self.pop()?;
         let xs = f(w)?;
@@ -134,9 +138,10 @@ impl Stack {
     }
 
     /// Pop 2 words from the stack, apply the given function and push the 2 returned words.
-    pub fn pop2_push2<F>(&mut self, f: F) -> OpResult<()>
+    pub fn pop2_push2<F, E>(&mut self, f: F) -> Result<(), E>
     where
-        F: FnOnce(Word, Word) -> OpResult<[Word; 2]>,
+        F: FnOnce(Word, Word) -> Result<[Word; 2], E>,
+        E: From<StackError>,
     {
         let [w0, w1] = self.pop2()?;
         let xs = f(w0, w1)?;
@@ -145,9 +150,10 @@ impl Stack {
     }
 
     /// Pop 2 words from the stack, apply the given function and push the 4 returned words.
-    pub fn pop2_push4<F>(&mut self, f: F) -> OpResult<()>
+    pub fn pop2_push4<F, E>(&mut self, f: F) -> Result<(), E>
     where
-        F: FnOnce(Word, Word) -> OpResult<[Word; 4]>,
+        F: FnOnce(Word, Word) -> Result<[Word; 4], E>,
+        E: From<StackError>,
     {
         let [w0, w1] = self.pop2()?;
         let xs = f(w0, w1)?;
@@ -156,7 +162,7 @@ impl Stack {
     }
 
     /// Pop a length value from the top of the stack and return it.
-    pub fn pop_len(&mut self) -> OpResult<usize> {
+    pub fn pop_len(&mut self) -> StackResult<usize> {
         let len_word = self.pop()?;
         let len = usize::try_from(len_word).map_err(|_| StackError::IndexOutOfBounds)?;
         Ok(len)
@@ -164,9 +170,10 @@ impl Stack {
 
     /// Pop the length from the top of the stack, then pop and provide that many
     /// words to the given function.
-    pub fn pop_len_words<F, O>(&mut self, f: F) -> OpResult<O>
+    pub fn pop_len_words<F, O, E>(&mut self, f: F) -> Result<O, E>
     where
-        F: FnOnce(&[Word]) -> OpResult<O>,
+        F: FnOnce(&[Word]) -> Result<O, E>,
+        E: From<StackError>,
     {
         let len = self.pop_len()?;
         let ix = self

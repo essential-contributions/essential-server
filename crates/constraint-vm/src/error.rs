@@ -116,6 +116,9 @@ pub enum CryptoError {
     Ed25519(#[from] ed25519_dalek::ed25519::Error),
 }
 
+/// Shorthand for a `Result` where the error type is a `StackError`.
+pub type StackResult<T> = Result<T, StackError>;
+
 /// Stack operation error.
 #[derive(Debug, Error)]
 pub enum StackError {

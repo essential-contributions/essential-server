@@ -34,7 +34,7 @@
 
 pub use access::{Access, SolutionAccess, StateSlotSlice, StateSlots};
 #[doc(inline)]
-pub use error::{CheckResult, ConstraintResult, OpResult};
+pub use error::{CheckResult, ConstraintResult, OpResult, StackResult};
 use error::{ConstraintError, ConstraintErrors, ConstraintsUnsatisfied};
 #[doc(inline)]
 pub use essential_constraint_asm as asm;
@@ -193,9 +193,9 @@ pub fn step_op_pred(op: asm::Pred, stack: &mut Stack) -> OpResult<()> {
 pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> OpResult<()> {
     match op {
         asm::Stack::Dup => stack.pop1_push2(|w| Ok([w, w])),
-        asm::Stack::DupFrom => stack.dup_from(),
-        asm::Stack::Push(word) => stack.push(word),
-        asm::Stack::Pop => Ok(stack.pop().map(|_| ())?),
+        asm::Stack::DupFrom => stack.dup_from().map_err(From::from),
+        asm::Stack::Push(word) => stack.push(word).map_err(From::from),
+        asm::Stack::Pop => stack.pop().map(|_| ()).map_err(From::from),
         asm::Stack::Swap => stack.pop2_push2(|a, b| Ok([b, a])),
     }
 }
