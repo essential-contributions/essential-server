@@ -212,7 +212,6 @@ fn bool_from_word(word: Word) -> Option<bool> {
 #[cfg(test)]
 pub(crate) mod test_util {
     use crate::{
-        asm::{Pred, Stack},
         types::{solution::SolutionData, ContentAddress, IntentAddress},
         *,
     };
@@ -234,6 +233,15 @@ pub(crate) mod test_util {
     pub(crate) const TEST_ACCESS: Access = Access {
         solution: TEST_SOLUTION_ACCESS,
         state_slots: StateSlots::EMPTY,
+    };
+}
+
+#[cfg(test)]
+mod pred_tests {
+    use crate::{
+        asm::{Pred, Stack},
+        test_util::*,
+        *,
     };
 
     #[test]

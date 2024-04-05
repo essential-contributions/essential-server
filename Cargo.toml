@@ -24,6 +24,7 @@ tokio = { version = "1.36.0", features = ["full"] }
 
 constraint-vm = { path = "crates/constraint-vm", package = "essential-constraint-vm" }
 memory-storage = { path = "crates/memory-storage" }
+state-read-vm = { path = "crates/state-read-vm", package = "essential-state-read-vm" }
 storage = { path = "crates/storage" }
 test-utils = { path = "crates/test_utils" }
 utils = { path = "crates/utils" }

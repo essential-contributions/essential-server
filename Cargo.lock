@@ -411,6 +411,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "essential-state-read-vm"
+version = "0.1.0"
+dependencies = [
+ "essential-constraint-vm",
+ "essential-state-asm",
+ "essential-types",
+ "thiserror",
+]
+
+[[package]]
 name = "essential-types"
 version = "0.1.0"
 source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d82a6852ab5fc26cb208ff96dfd6a12019fa5eb0"
@@ -1418,16 +1428,6 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
-
-[[package]]
-name = "state-read-vm"
-version = "0.1.0"
-dependencies = [
- "essential-constraint-vm",
- "essential-state-asm",
- "essential-types",
- "thiserror",
-]
 
 [[package]]
 name = "storage"

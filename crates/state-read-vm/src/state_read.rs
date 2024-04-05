@@ -1,6 +1,9 @@
 //! State read operation implementations.
 
-use crate::{error::StackError, OpResult, Vm};
+use crate::{
+    error::{OpError, StackError},
+    OpResult, Vm,
+};
 use essential_types::{convert::u8_32_from_word_4, ContentAddress, Key, Word};
 
 /// Access to state required by the state read VM.
@@ -8,10 +11,14 @@ use essential_types::{convert::u8_32_from_word_4, ContentAddress, Key, Word};
 #[allow(async_fn_in_trait)]
 pub trait StateRead {
     /// An error type describing any cases that might occur during state reading.
-    type Error: core::fmt::Debug + std::error::Error;
+    type Error: std::error::Error;
 
     /// Read the given number of words from state at the given key.
-    async fn word_range(&self, key: Key, num_words: usize) -> Result<Vec<Word>, Self::Error>;
+    async fn word_range(
+        &self,
+        key: Key,
+        num_words: usize,
+    ) -> Result<Vec<Option<Word>>, Self::Error>;
 
     /// Read the given number of words from state at the given external key.
     async fn word_range_ext(
@@ -19,7 +26,7 @@ pub trait StateRead {
         set_addr: ContentAddress,
         key: Key,
         num_words: usize,
-    ) -> Result<Vec<Word>, Self::Error>;
+    ) -> Result<Vec<Option<Word>>, Self::Error>;
 }
 
 /// `StateRead::WordRange` operation.
@@ -28,11 +35,13 @@ where
     S: StateRead,
 {
     let len_word = vm.stack.pop()?;
-    let key_words = vm.stack.pop4()?;
     let len = usize::try_from(len_word).map_err(|_| StackError::IndexOutOfBounds)?;
-    let key = u8_32_from_word_4(key_words);
-    let words = state_read.word_range(key, len).await?;
-    todo!()
+    let key = vm.stack.pop4()?;
+    let words = state_read
+        .word_range(key, len)
+        .await
+        .map_err(OpError::StateRead)?;
+    write_words_to_memory(vm, words)
 }
 
 /// `StateRead::WordRangeExtern` operation.
@@ -41,7 +50,20 @@ where
     S: StateRead,
 {
     let len_word = vm.stack.pop()?;
-    let key_words = vm.stack.pop4()?;
-    let set_addr_words = vm.stack.pop4()?;
-    todo!()
+    let len = usize::try_from(len_word).map_err(|_| StackError::IndexOutOfBounds)?;
+    let key = vm.stack.pop4()?;
+    let set_addr = ContentAddress(u8_32_from_word_4(vm.stack.pop4()?));
+    let words = state_read
+        .word_range_ext(set_addr, key, len)
+        .await
+        .map_err(OpError::StateRead)?;
+    write_words_to_memory(vm, words)
+}
+
+/// Write the given words to the end of memory and push the starting memory address to the stack.
+fn write_words_to_memory<E>(vm: &mut Vm, words: Vec<Option<Word>>) -> OpResult<(), E> {
+    let start = Word::try_from(vm.memory.len()).map_err(|_| StackError::IndexOutOfBounds)?;
+    vm.memory.extend(words)?;
+    vm.stack.push(start)?;
+    Ok(())
 }
