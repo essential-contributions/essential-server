@@ -27,9 +27,6 @@ pub struct Vm {
     pub memory: Memory,
 }
 
-// Whether or not to continue execution after successfully processing an operation.
-pub type Continue = bool;
-
 /// Execute the given bytecode starting from the first operation.
 ///
 /// Upon reaching a `Halt` operation or reaching the end of the operation
