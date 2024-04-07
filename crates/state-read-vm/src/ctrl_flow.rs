@@ -2,18 +2,18 @@
 
 use crate::{
     bool_from_word,
-    error::{ControlFlowError, OpResult, StackError},
-    Vm,
+    error::{ControlFlowError, OpSyncResult, StackError},
+    OpVm,
 };
 
 /// `ControlFlow::Jump` operation.
-pub fn jump(vm: &mut Vm) -> Result<usize, StackError> {
+pub fn jump(vm: &mut OpVm) -> Result<usize, StackError> {
     let new_pc = vm.stack.pop()?;
     usize::try_from(new_pc).map_err(|_| StackError::IndexOutOfBounds)
 }
 
 /// `ControlFlow::JumpIf` operation.
-pub fn jump_if<E>(vm: &mut Vm) -> OpResult<usize, E> {
+pub fn jump_if(vm: &mut OpVm) -> OpSyncResult<usize> {
     let [new_pc, cond] = vm.stack.pop2()?;
     let cond = bool_from_word(cond).ok_or(ControlFlowError::InvalidJumpIfCondition(cond))?;
     let new_pc = match cond {
