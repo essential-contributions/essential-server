@@ -6,6 +6,7 @@ version = "0.1.0"
 [dependencies]
 anyhow = { workspace = true }
 essential-types = { workspace = true }
+serde = { workspace = true }
 storage = { workspace = true }
 tokio = { workspace = true }
 utils = { workspace = true }

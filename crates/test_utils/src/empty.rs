@@ -1,8 +1,8 @@
 use essential_types::{
     intent::{Directive, Intent},
     slots::StateSlot,
-    solution::{PartialSolution, Solution},
-    ContentAddress, IntentAddress,
+    solution::{DecisionVariable, PartialSolution, Solution, SolutionData, StateMutation},
+    ContentAddress, IntentAddress, Word,
 };
 
 /// Utility trait to provide empty Instantiaters for essential types
@@ -52,6 +52,30 @@ impl Empty<Solution> for Solution {
             data: Default::default(),
             state_mutations: Default::default(),
             partial_solutions: Default::default(),
+        }
+    }
+}
+
+impl Empty<SolutionData> for SolutionData {
+    fn empty() -> SolutionData {
+        SolutionData {
+            intent_to_solve: IntentAddress::empty(),
+            decision_variables: Default::default(),
+        }
+    }
+}
+
+impl Empty<DecisionVariable> for DecisionVariable {
+    fn empty() -> DecisionVariable {
+        DecisionVariable::Inline(0 as Word)
+    }
+}
+
+impl Empty<StateMutation> for StateMutation {
+    fn empty() -> StateMutation {
+        StateMutation {
+            pathway: Default::default(),
+            mutations: Default::default(),
         }
     }
 }

@@ -394,6 +394,7 @@ dependencies = [
  "anyhow",
  "essential-types",
  "memory-storage",
+ "serde",
  "storage",
  "test-utils",
  "tokio",
