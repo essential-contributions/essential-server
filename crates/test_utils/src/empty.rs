@@ -1,5 +1,6 @@
 use essential_types::{
     intent::{Directive, Intent},
+    slots::StateSlot,
     solution::{PartialSolution, Solution},
     ContentAddress, IntentAddress,
 };
@@ -16,6 +17,16 @@ impl Empty<Intent> for Intent {
             state_read: Default::default(),
             constraints: Default::default(),
             directive: Directive::Satisfy,
+        }
+    }
+}
+
+impl Empty<StateSlot> for StateSlot {
+    fn empty() -> StateSlot {
+        StateSlot {
+            amount: Default::default(),
+            index: Default::default(),
+            program_index: Default::default(),
         }
     }
 }

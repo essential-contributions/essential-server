@@ -6,7 +6,6 @@ use essential_types::{
     IntentAddress, Word,
 };
 
-// TODO: consider builder pattern
 /// Utility trait to provide common Instantiaters for essential types
 pub trait Instantiate<T>: Empty<T> {
     fn with_decision_variables(decision_variables: usize) -> T;
