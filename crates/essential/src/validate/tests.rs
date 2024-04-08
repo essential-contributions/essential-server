@@ -133,7 +133,7 @@ mod test_intent {
 
 mod test_solution {
     use crate::{
-        deploy::deploy,
+        tests::deploy_intent,
         validate::{
             slots::MAX_DECISION_VARIABLES,
             solution::{MAX_SOLUTION_DATA, MAX_STATE_MUTATIONS},
@@ -151,16 +151,6 @@ mod test_solution {
     use memory_storage::MemoryStorage;
     use storage::Storage;
     use test_utils::{empty::Empty, sign_corrupted, sign_with_random_keypair};
-
-    async fn deploy_intent<S: Storage>(storage: &S, intent: Intent) -> IntentAddress {
-        let intent_hash = ContentAddress(utils::hash(&intent));
-        let intent = sign_with_random_keypair(vec![intent]);
-        let result = deploy(storage, intent.clone()).await.unwrap();
-        IntentAddress {
-            set: result,
-            intent: intent_hash,
-        }
-    }
 
     async fn deploy_partial_solution<S: Storage>(
         storage: &S,

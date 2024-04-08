@@ -11,6 +11,9 @@ mod run;
 mod solution;
 mod validate;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone)]
 pub struct Essential<S>
 where
