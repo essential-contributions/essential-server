@@ -9,19 +9,21 @@ use storage::Storage;
 #[cfg(test)]
 mod tests;
 
+/// Validates a solution and submits it to storage.
 pub async fn submit_solution<S>(storage: &S, solution: Signed<Solution>) -> anyhow::Result<Hash>
 where
     S: Storage,
 {
+    // Validations that do not require storage access
     solution.validate()?;
 
+    // Validations that require storage access
     solution
         .clone()
         .data
         .data
         .validate_with_storage(storage, solution.data.clone())
         .await?;
-
     solution
         .clone()
         .data

@@ -5,6 +5,7 @@ use storage::Storage;
 #[cfg(test)]
 mod tests;
 
+/// Validates an intent and deploys it to storage.
 pub async fn deploy<S>(storage: &S, intent: Signed<Vec<Intent>>) -> anyhow::Result<ContentAddress>
 where
     S: Storage,

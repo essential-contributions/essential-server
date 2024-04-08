@@ -22,6 +22,7 @@ impl<T: Clone + Validate + Serialize> Validate for Signed<T> {
     }
 }
 
+/// Trait for solution validation that requires reading from storage.
 pub trait ValidateWithStorage<S: Storage> {
     async fn validate_with_storage(&self, storage: &S, solution: Solution) -> anyhow::Result<()>;
 }
@@ -40,7 +41,7 @@ pub mod slots {
     /// Maximum length of state slots of an intent.
     pub const MAX_STATE_LEN: u32 = 101;
 
-    /// Validaton for slots.
+    /// Validation for slots.
     impl Validate for Slots {
         fn validate(&self) -> anyhow::Result<()> {
             ensure!(
@@ -63,6 +64,7 @@ pub mod slots {
         }
     }
 
+    /// Validation for slots against solution data.
     impl Validate for (SolutionData, Slots) {
         fn validate(&self) -> anyhow::Result<()> {
             let (data, slots) = self;
@@ -162,10 +164,15 @@ pub mod solution {
     use solution::slots::MAX_DECISION_VARIABLES;
     use std::collections::{HashMap, HashSet};
 
+    /// Maximum number of solution data of a solution.
     pub const MAX_SOLUTION_DATA: usize = 103;
+    /// Maximum number of state mutations of a solution.
     pub const MAX_STATE_MUTATIONS: usize = 998;
+    /// Maximum number of partial solutions of a solution.
     pub const MAX_PARTIAL_SOLUTIONS: usize = 97;
 
+    /// Validation for solution.
+    /// Validates the data, state mutations, and partial solutions.
     impl Validate for Solution {
         fn validate(&self) -> anyhow::Result<()> {
             self.data.validate()?;
@@ -176,6 +183,7 @@ pub mod solution {
         }
     }
 
+    /// Validation for solution.data.
     impl Validate for Vec<SolutionData> {
         fn validate(&self) -> anyhow::Result<()> {
             ensure!(self.len() <= MAX_SOLUTION_DATA, "Too many solution data");
@@ -191,6 +199,40 @@ pub mod solution {
         }
     }
 
+    /// Validation for solution.state_mutations.
+    impl Validate for Vec<StateMutation> {
+        fn validate(&self) -> anyhow::Result<()> {
+            ensure!(
+                self.len() <= MAX_STATE_MUTATIONS,
+                "Too many state mutations"
+            );
+            Ok(())
+        }
+    }
+
+    /// Validation for solution.partial_solutions.
+    impl Validate for Vec<Signed<ContentAddress>> {
+        fn validate(&self) -> anyhow::Result<()> {
+            ensure!(
+                self.len() <= MAX_PARTIAL_SOLUTIONS,
+                "Too many partial solutions"
+            );
+            for ps in self {
+                ValidateSignature::validate(ps)?;
+            }
+            Ok(())
+        }
+    }
+
+    /// Validation for solution data.
+    impl Validate for ContentAddress {
+        fn validate(&self) -> anyhow::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Validation with read from storage for solution.data.
+    /// Called externally after non-storage validations.
     impl<S: Storage> ValidateWithStorage<S> for Vec<SolutionData> {
         async fn validate_with_storage(
             &self,
@@ -211,6 +253,8 @@ pub mod solution {
         }
     }
 
+    /// Validation with read from storage for solution.partial_solutions.
+    /// Called externally after non-storage validations.
     impl<S: Storage> ValidateWithStorage<S> for Vec<Signed<ContentAddress>> {
         async fn validate_with_storage(
             &self,
@@ -231,35 +275,7 @@ pub mod solution {
         }
     }
 
-    impl Validate for Vec<StateMutation> {
-        fn validate(&self) -> anyhow::Result<()> {
-            ensure!(
-                self.len() <= MAX_STATE_MUTATIONS,
-                "Too many state mutations"
-            );
-            Ok(())
-        }
-    }
-
-    impl Validate for Vec<Signed<ContentAddress>> {
-        fn validate(&self) -> anyhow::Result<()> {
-            ensure!(
-                self.len() <= MAX_PARTIAL_SOLUTIONS,
-                "Too many partial solutions"
-            );
-            for ps in self {
-                ValidateSignature::validate(ps)?;
-            }
-            Ok(())
-        }
-    }
-
-    impl Validate for ContentAddress {
-        fn validate(&self) -> anyhow::Result<()> {
-            Ok(())
-        }
-    }
-
+    /// Validation for intents retrieved from storage against solution.
     impl Validate for (Solution, HashMap<IntentAddress, Intent>) {
         fn validate(&self) -> anyhow::Result<()> {
             let (
@@ -318,6 +334,7 @@ pub mod solution {
         }
     }
 
+    /// Validation for partial solutions retrieved from storage against solution.
     impl Validate for (Solution, HashMap<ContentAddress, PartialSolution>) {
         fn validate(&self) -> anyhow::Result<()> {
             let (
