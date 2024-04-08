@@ -1,17 +1,21 @@
 //! The essential state read VM implementation.
 
 #[doc(inline)]
-pub use constraint_vm::{self as constraint, Access, Stack};
-use core::iter::Enumerate;
-use error::{MemoryError, StateReadError};
+pub use bytecode::{BytecodeMapped, BytecodeMappedSlice};
+#[doc(inline)]
+pub use constraint_vm::{
+    self as constraint, Access, SolutionAccess, Stack, StateSlotSlice, StateSlots,
+};
+use error::{MemoryError, OpError, StateReadError};
 pub use error::{MemoryResult, OpAsyncResult, OpResult, OpSyncResult, StateReadResult};
 #[doc(inline)]
 pub use essential_state_asm as asm;
-use essential_state_asm::{FromBytesError, Op, Word};
-pub use essential_types as types;
+use essential_state_asm::{Op, Word};
+pub use essential_types::{self as types, ContentAddress};
 pub use memory::Memory;
 pub use state_read::StateRead;
 
+mod bytecode;
 mod ctrl_flow;
 pub mod error;
 pub mod future;
@@ -20,36 +24,13 @@ mod state_read;
 
 /// The operation execution state of the State Read VM.
 #[derive(Debug, Default)]
-pub struct OpVm {
+pub struct Vm {
     /// The "program counter", i.e. index of the current operation within the program.
     pub pc: usize,
     /// The stack machine.
     pub stack: Stack,
     /// The program memory, primarily used for collecting the state being read.
     pub memory: Memory,
-}
-
-/// A wrapper around the `OpVm` dedicated to lazily parsing and executing from bytecode.
-#[derive(Debug, Default)]
-pub struct BytecodeVm<I> {
-    /// The iterator producing ops by parsing bytes.
-    from_bytes: I,
-    /// The Vec used to lazily collect ops in case control flow would require jumping back.
-    pub ops: Vec<Op>,
-    /// The main VM execution state.
-    pub op_vm: OpVm,
-}
-
-/// Returned by gas-bounded execution, describes the reason for yielding.
-#[derive(Debug, Eq, Hash, PartialEq)]
-pub enum Yield {
-    /// Reached the end of the sequence of operations.
-    Complete,
-    /// Not enough gas to execute the operation at the current program counter.
-    OutOfGas {
-        /// The amount of remaining gas that was insufficient to execute the op.
-        remaining_gas: Gas,
-    },
 }
 
 /// Unit used to measure gas.
@@ -88,6 +69,26 @@ pub enum OpAsync {
     StateReadWordRangeExt,
 }
 
+/// Types that provide access to operations.
+///
+/// Implementations are included for `&[Op]`, `BytecodeMapped` and more.
+pub trait OpAccess {
+    /// Any error that might occur during access.
+    type Error: std::error::Error;
+    /// Access the operation at the given index.
+    ///
+    /// Mutable access to self is required in case operations are lazily parsed.
+    ///
+    /// Any implementation should ensure the same index always returns the same operation.
+    fn op_access(&mut self, index: usize) -> Option<Result<Op, Self::Error>>;
+}
+
+/// A mapping from an operation to its gas cost.
+pub trait OpGasCost {
+    /// The gas cost associated with the given op.
+    fn op_gas_cost(&self, op: &Op) -> Gas;
+}
+
 impl GasLimit {
     /// Adjust this to match recommended poll time limit on supported validator
     /// hardware.
@@ -100,79 +101,64 @@ impl GasLimit {
     };
 }
 
-impl OpVm {
-    /// Execute the given operations from the current state of the VM.
+impl Vm {
+    /// Execute over the given operation access from the current state of the VM.
     ///
     /// Upon reaching a `Halt` operation or reaching the end of the operation
     /// sequence, returns the gas spent and the `Vm` will be left in the
     /// resulting state.
-    pub async fn exec<S, F>(
-        &mut self,
-        ops: Vec<Op>,
-        access: Access<'static>,
-        state_read: S,
-        op_gas_cost: F,
-        gas_limit: GasLimit,
-    ) -> Result<Gas, StateReadError<S::Error>>
-    where
-        S: 'static + Clone + StateRead,
-        F: Fn(&Op) -> Gas,
-    {
-        (async {
-            let vm = std::mem::replace(self, Self::default());
-            let (vm, res) =
-                future::ExecFuture::boxed(vm, ops, access, op_gas_cost, state_read, gas_limit)
-                    .await;
-            *self = vm;
-            res
-        })
-        .await
-    }
-}
-
-impl<I> BytecodeVm<I> {
-    /// Execute the given bytecode from the current state of the given VM until
-    /// either the given `remaining_gas` limit is spent, a `Halt` instruction is
-    /// reached, or there are no more ops.
-    pub async fn exec_bounded<'a, S>(
+    pub async fn exec<'a, S, OA>(
         &mut self,
         access: Access<'a>,
         state_read: &S,
-        op_gas_cost: impl Fn(&Op) -> Gas,
-        mut remaining_gas: Gas,
-    ) -> StateReadResult<Yield, S::Error>
+        op_access: OA,
+        op_gas_cost: &impl OpGasCost,
+        gas_limit: GasLimit,
+    ) -> Result<Gas, StateReadError<S::Error>>
     where
         S: StateRead,
-        I: Iterator<Item = (usize, Result<Op, asm::FromBytesError>)>,
+        OA: OpAccess,
+        OA::Error: Into<OpError<S::Error>>,
     {
-        loop {
-            // Lazily collect enough ops to continue execution.
-            while self.ops.len() <= self.op_vm.pc {
-                let Some((ix, res)) = self.from_bytes.next() else {
-                    break;
-                };
-                let op = res.map_err(|err| StateReadError::Op(ix, err.into()))?;
-                self.ops.push(op);
-            }
+        future::exec_boxed(self, access, state_read, op_access, op_gas_cost, gas_limit).await
+    }
 
-            // Retrieve the current operation.
-            let op = self.ops[self.op_vm.pc];
+    /// Execute the given operations from the current state of the VM.
+    ///
+    /// This is a wrapper around `exec` that expects operation access in the form
+    /// of a `&[Op]`.
+    pub async fn exec_ops<'a, S>(
+        &mut self,
+        ops: &[Op],
+        access: Access<'a>,
+        state_read: &S,
+        op_gas_cost: &impl OpGasCost,
+        gas_limit: GasLimit,
+    ) -> Result<Gas, StateReadError<S::Error>>
+    where
+        S: StateRead,
+    {
+        self.exec(access, state_read, ops, op_gas_cost, gas_limit)
+            .await
+    }
 
-            // Yield early if we have insufficient gas.
-            remaining_gas = match remaining_gas.checked_sub(op_gas_cost(&op)) {
-                None => return Ok(Yield::OutOfGas { remaining_gas }),
-                Some(gas) => gas,
-            };
-
-            // Step forward the virtual machine by the operation.
-            match step_op(op, access, state_read, &mut self.op_vm)
-                .await
-                .map_err(|err| StateReadError::Op(self.op_vm.pc, err))?
-            {
-                None => break Ok(Yield::Complete),
-                Some(new_pc) => self.op_vm.pc = new_pc,
-            }
-        }
+    /// Execute the given mapped bytecode from the current state of the VM.
+    ///
+    /// This is a wrapper around `exec` that expects operation access in the form
+    /// of `&BytecodeMapped`.
+    pub async fn exec_bytecode_mapped<'a, S>(
+        &mut self,
+        access: Access<'a>,
+        state_read: &S,
+        bytecode_mapped: &BytecodeMapped,
+        op_gas_cost: &impl OpGasCost,
+        gas_limit: GasLimit,
+    ) -> Result<Gas, StateReadError<S::Error>>
+    where
+        S: StateRead,
+    {
+        self.exec(access, state_read, bytecode_mapped, op_gas_cost, gas_limit)
+            .await
     }
 }
 
@@ -188,83 +174,26 @@ impl From<Op> for OpKind {
     }
 }
 
-/// Construct a State Read VM from bytes.
-pub fn from_bytes<I>(
-    bytes: I,
-) -> BytecodeVm<Enumerate<impl Iterator<Item = Result<Op, FromBytesError>>>>
+impl<F> OpGasCost for F
 where
-    I: IntoIterator<Item = u8>,
+    F: Fn(&Op) -> Gas,
 {
-    BytecodeVm {
-        from_bytes: asm::from_bytes(bytes.into_iter()).enumerate(),
-        ops: vec![],
-        op_vm: OpVm::default(),
+    fn op_gas_cost(&self, op: &Op) -> Gas {
+        (*self)(op)
     }
 }
 
-/// Execute the given bytecode starting from the first operation.
-///
-/// Upon reaching a `Halt` operation or reaching the end of the operation
-/// sequence, returns the resulting parsed `Op`s along with the end state of
-/// the VM.
-pub async fn exec_bytecode<'a, S>(
-    bytes: impl IntoIterator<Item = u8>,
-    access: Access<'a>,
-    state_read: &S,
-) -> StateReadResult<(Vec<Op>, OpVm), S::Error>
-where
-    S: StateRead,
-{
-    let mut vm = from_bytes(bytes);
-    loop {
-        if let Yield::Complete = vm
-            .exec_bounded(access, state_read, |_op| 1, Gas::MAX)
-            .await?
-        {
-            return Ok((vm.ops, vm.op_vm));
-        }
+impl<'a> OpAccess for &'a [Op] {
+    type Error = core::convert::Infallible;
+    fn op_access(&mut self, index: usize) -> Option<Result<Op, Self::Error>> {
+        self.get(index).copied().map(Ok)
     }
 }
 
-/// Execute the given list of operations starting from the first.
-///
-/// Upon reaching a `Halt` operation or reaching the end of the operation
-/// sequence, returns the resulting state of the `Vm`.
-pub async fn exec_ops<'a, S>(
-    ops: &[Op],
-    access: Access<'a>,
-    state_read: &S,
-) -> StateReadResult<OpVm, S::Error>
-where
-    S: StateRead,
-{
-    todo!()
-    // let mut vm = OpVm::default();
-    // let ops = ops.to_vec();
-    // vm.exec(ops, access, state_read, |_op| 1, GasLimit::UNLIMITED)
-    //     .await
-    //     .map(|_gas| vm)
-}
-
-/// Step forward the VM by a single operation.
-///
-/// Returns a `Some(usize)` representing the new program counter resulting from
-/// this step, or `None` in the case that execution has halted.
-pub async fn step_op<'a, S>(
-    op: Op,
-    access: Access<'a>,
-    state_read: S,
-    vm: &mut OpVm,
-) -> OpResult<Option<usize>, S::Error>
-where
-    S: StateRead,
-{
-    match OpKind::from(op) {
-        OpKind::Sync(op) => step_op_sync(op, access, vm).map_err(From::from),
-        OpKind::Async(op) => step_op_async(op, state_read, vm)
-            .await
-            .map(Some)
-            .map_err(From::from),
+impl<'a> OpAccess for &'a BytecodeMapped {
+    type Error = core::convert::Infallible;
+    fn op_access(&mut self, index: usize) -> Option<Result<Op, Self::Error>> {
+        self.op(index).map(Ok)
     }
 }
 
@@ -272,7 +201,7 @@ where
 ///
 /// Returns a `Some(usize)` representing the new program counter resulting from
 /// this step, or `None` in the case that execution has halted.
-pub fn step_op_sync(op: OpSync, access: Access, vm: &mut OpVm) -> OpSyncResult<Option<usize>> {
+pub fn step_op_sync(op: OpSync, access: Access, vm: &mut Vm) -> OpSyncResult<Option<usize>> {
     match op {
         OpSync::Constraint(op) => constraint_vm::step_op(access, op, &mut vm.stack)?,
         OpSync::ControlFlow(op) => return step_op_ctrl_flow(op, vm).map_err(From::from),
@@ -288,14 +217,17 @@ pub fn step_op_sync(op: OpSync, access: Access, vm: &mut OpVm) -> OpSyncResult<O
 /// Returns a `usize` representing the new program counter resulting from this step.
 pub async fn step_op_async<S>(
     op: OpAsync,
-    state_read: S,
-    vm: &mut OpVm,
+    set_addr: &ContentAddress,
+    state_read: &S,
+    vm: &mut Vm,
 ) -> OpAsyncResult<usize, S::Error>
 where
     S: StateRead,
 {
     match op {
-        OpAsync::StateReadWordRange => state_read::word_range(state_read, &mut *vm).await?,
+        OpAsync::StateReadWordRange => {
+            state_read::word_range(state_read, set_addr, &mut *vm).await?
+        }
         OpAsync::StateReadWordRangeExt => state_read::word_range_ext(state_read, &mut *vm).await?,
     }
     // Every operation besides control flow steps forward program counter by 1.
@@ -306,7 +238,7 @@ where
 /// Step forward state reading by the given control flow operation.
 ///
 /// Returns a `bool` indicating whether or not to continue execution.
-pub fn step_op_ctrl_flow(op: asm::ControlFlow, vm: &mut OpVm) -> OpSyncResult<Option<usize>> {
+pub fn step_op_ctrl_flow(op: asm::ControlFlow, vm: &mut Vm) -> OpSyncResult<Option<usize>> {
     match op {
         asm::ControlFlow::Jump => ctrl_flow::jump(vm).map(Some).map_err(From::from),
         asm::ControlFlow::JumpIf => ctrl_flow::jump_if(vm).map(Some),
@@ -315,7 +247,7 @@ pub fn step_op_ctrl_flow(op: asm::ControlFlow, vm: &mut OpVm) -> OpSyncResult<Op
 }
 
 /// Step forward state reading by the given memory operation.
-pub fn step_op_memory(op: asm::Memory, vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn step_op_memory(op: asm::Memory, vm: &mut Vm) -> OpSyncResult<()> {
     match op {
         asm::Memory::Alloc => memory::alloc(vm),
         asm::Memory::Capacity => memory::capacity(vm),
@@ -342,6 +274,192 @@ fn bool_from_word(word: Word) -> Option<bool> {
 }
 
 #[cfg(test)]
+pub(crate) mod test_util {
+    use super::*;
+    use crate::types::{solution::SolutionData, ContentAddress, IntentAddress, Key};
+
+    pub(crate) const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
+    pub(crate) const TEST_INTENT_CA: ContentAddress = ContentAddress([0xAA; 32]);
+    pub(crate) const TEST_INTENT_ADDR: IntentAddress = IntentAddress {
+        set: TEST_SET_CA,
+        intent: TEST_INTENT_CA,
+    };
+    pub(crate) const TEST_SOLUTION_DATA: SolutionData = SolutionData {
+        intent_to_solve: TEST_INTENT_ADDR,
+        decision_variables: vec![],
+    };
+    pub(crate) const TEST_SOLUTION_ACCESS: SolutionAccess = SolutionAccess {
+        data: &[TEST_SOLUTION_DATA],
+        index: 0,
+    };
+    pub(crate) const TEST_ACCESS: Access = Access {
+        solution: TEST_SOLUTION_ACCESS,
+        state_slots: StateSlots::EMPTY,
+    };
+
+    // A test `StateRead` implementation that returns random yet deterministic
+    // option values for every possible set, key and range combination.
+    pub(crate) struct State;
+
+    // A test `StateRead` implementation that always returns a
+    // random-yet-deterministic `Some` value for every possible set, key and
+    // range combination.
+    pub(crate) struct StateSome;
+
+    // A test `StateRead` implementation that always returns `None`.
+    pub(crate) struct StateNone;
+
+    // A test `StateRead` implementation that always returns `Some(42)`.
+    pub(crate) struct State42;
+
+    impl StateRead for State {
+        type Error = core::convert::Infallible;
+        async fn word_range(
+            &self,
+            set_addr: ContentAddress,
+            key: Key,
+            num_words: usize,
+        ) -> Result<Vec<Option<Word>>, Self::Error> {
+            use rand::{Rng, SeedableRng};
+            let seed = state_rng_seed(set_addr, key);
+            let mut rng = rand::rngs::SmallRng::from_seed(seed);
+            let words = (0..num_words).map(move |_| rng.gen()).collect();
+            Ok(words)
+        }
+    }
+
+    impl StateRead for StateSome {
+        type Error = core::convert::Infallible;
+        async fn word_range(
+            &self,
+            set_addr: ContentAddress,
+            key: Key,
+            num_words: usize,
+        ) -> Result<Vec<Option<Word>>, Self::Error> {
+            use rand::{Rng, SeedableRng};
+            let seed = state_rng_seed(set_addr, key);
+            let mut rng = rand::rngs::SmallRng::from_seed(seed);
+            let words = (0..num_words).map(move |_| Some(rng.gen())).collect();
+            Ok(words)
+        }
+    }
+
+    impl StateRead for StateNone {
+        type Error = core::convert::Infallible;
+        async fn word_range(
+            &self,
+            _set_addr: ContentAddress,
+            _key: Key,
+            num_words: usize,
+        ) -> Result<Vec<Option<Word>>, Self::Error> {
+            Ok(vec![None; num_words])
+        }
+    }
+
+    impl StateRead for State42 {
+        type Error = core::convert::Infallible;
+        async fn word_range(
+            &self,
+            _set_addr: ContentAddress,
+            _key: Key,
+            num_words: usize,
+        ) -> Result<Vec<Option<Word>>, Self::Error> {
+            Ok(vec![Some(42); num_words])
+        }
+    }
+
+    // For now, pretend all ops cost 1 gas.
+    pub(crate) fn op_gas_cost(_op: &Op) -> Gas {
+        1
+    }
+
+    // Derive a deterministic RNG seed from an intent set content address and key.
+    fn state_rng_seed(set_addr: ContentAddress, key: Key) -> [u8; 32] {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::default();
+        set_addr.hash(&mut hasher);
+        key.hash(&mut hasher);
+        let hash = hasher.finish().to_be_bytes();
+        let mut seed = vec![];
+        seed.extend(hash);
+        seed.extend(hash);
+        seed.extend(hash);
+        seed.extend(hash);
+        seed.try_into().unwrap()
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::*;
+
+    // A simple sanity test to check basic functionality.
+    #[tokio::test]
+    async fn no_yield() {
+        let mut vm = Vm::default();
+        let ops = &[
+            asm::Stack::Push(6).into(),
+            asm::Stack::Push(7).into(),
+            asm::Alu::Mul.into(),
+        ];
+        let spent = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .await
+            .unwrap();
+        assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
+        assert_eq!(vm.pc, ops.len());
+        assert_eq!(&vm.stack[..], &[42]);
+    }
+
+    // Test that we get exepcted results when yielding due to gas limits.
+    #[tokio::test]
+    async fn yield_per_op() {
+        let mut vm = Vm::default();
+        let ops = &[
+            asm::Stack::Push(6).into(),
+            asm::Stack::Push(7).into(),
+            asm::Alu::Mul.into(),
+        ];
+        // Force the VM to yield after every op to test behaviour.
+        let op_gas_cost = |_op: &_| GasLimit::DEFAULT_PER_YIELD;
+        let spent = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .await
+            .unwrap();
+        assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
+        assert_eq!(vm.pc, ops.len());
+        assert_eq!(&vm.stack[..], &[42]);
+    }
+
+    // Test VM behaves as expected when continuing execution over more operations.
+    #[tokio::test]
+    async fn continue_execution() {
+        let mut vm = Vm::default();
+
+        // Execute first set of ops.
+        let ops = &[
+            asm::Stack::Push(6).into(),
+            asm::Stack::Push(7).into(),
+            asm::Alu::Mul.into(),
+        ];
+        let spent = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .await
+            .unwrap();
+        assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
+        assert_eq!(vm.pc, ops.len());
+        assert_eq!(&vm.stack[..], &[42]);
+
+        // Continue executing from current state over the new ops.
+        vm.pc = 0;
+        let ops = &[asm::Stack::Push(6).into(), asm::Alu::Div.into()];
+        let spent = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .await
+            .unwrap();
+        assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
+        assert_eq!(vm.pc, ops.len());
+        assert_eq!(&vm.stack[..], &[7]);
+    }
 }

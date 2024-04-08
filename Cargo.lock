@@ -417,7 +417,9 @@ dependencies = [
  "essential-constraint-vm",
  "essential-state-asm",
  "essential-types",
+ "rand",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 //! Memory operation implementations and related items.
 
-use crate::{asm::Word, MemoryError, MemoryResult, OpSyncResult, OpVm};
+use crate::{asm::Word, MemoryError, MemoryResult, OpSyncResult, Vm};
 
 /// A type representing the VM's memory.
 ///
@@ -104,7 +104,7 @@ impl core::ops::Deref for Memory {
 }
 
 /// `Memory::Alloc` operation.
-pub fn alloc(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn alloc(vm: &mut Vm) -> OpSyncResult<()> {
     let size = vm.stack.pop()?;
     let size = usize::try_from(size).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.memory.alloc(size)?;
@@ -112,14 +112,14 @@ pub fn alloc(vm: &mut OpVm) -> OpSyncResult<()> {
 }
 
 /// `Memory::Capacity` operation.
-pub fn capacity(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn capacity(vm: &mut Vm) -> OpSyncResult<()> {
     let cap = Word::try_from(vm.memory.capacity()).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.stack.push(cap)?;
     Ok(())
 }
 
 /// `Memory::Clear` operation.
-pub fn clear(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn clear(vm: &mut Vm) -> OpSyncResult<()> {
     let index = vm.stack.pop()?;
     let index = usize::try_from(index).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.memory.clear(index)?;
@@ -127,7 +127,7 @@ pub fn clear(vm: &mut OpVm) -> OpSyncResult<()> {
 }
 
 /// `Memory::Clear` operation.
-pub fn clear_range(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn clear_range(vm: &mut Vm) -> OpSyncResult<()> {
     let [index, len] = vm.stack.pop2()?;
     let range = range_from_start_len(index, len).ok_or(MemoryError::IndexOutOfBounds)?;
     vm.memory.clear_range(range)?;
@@ -135,7 +135,7 @@ pub fn clear_range(vm: &mut OpVm) -> OpSyncResult<()> {
 }
 
 /// `Memory::Free` operation.
-pub fn free(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn free(vm: &mut Vm) -> OpSyncResult<()> {
     let size = vm.stack.pop()?;
     let size = usize::try_from(size).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.memory.free(size);
@@ -143,7 +143,7 @@ pub fn free(vm: &mut OpVm) -> OpSyncResult<()> {
 }
 
 // `Memory::IsSome` operation.
-pub fn is_some(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn is_some(vm: &mut Vm) -> OpSyncResult<()> {
     let index = vm.stack.pop()?;
     let index = usize::try_from(index).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.memory.is_some(index)?;
@@ -151,14 +151,14 @@ pub fn is_some(vm: &mut OpVm) -> OpSyncResult<()> {
 }
 
 /// `Memory::Capacity` operation.
-pub fn length(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn length(vm: &mut Vm) -> OpSyncResult<()> {
     let cap = Word::try_from(vm.memory.len()).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.stack.push(cap)?;
     Ok(())
 }
 
 /// `Memory::Load` operation.
-pub fn load(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn load(vm: &mut Vm) -> OpSyncResult<()> {
     let index = vm.stack.pop()?;
     let index = usize::try_from(index).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.memory.load(index)?;
@@ -166,20 +166,20 @@ pub fn load(vm: &mut OpVm) -> OpSyncResult<()> {
 }
 
 /// `Memory::Push` operation.
-pub fn push(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn push(vm: &mut Vm) -> OpSyncResult<()> {
     let word = vm.stack.pop()?;
     vm.memory.push(Some(word))?;
     Ok(())
 }
 
 /// `Memory::PushNone` operation.
-pub fn push_none(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn push_none(vm: &mut Vm) -> OpSyncResult<()> {
     vm.memory.push(None)?;
     Ok(())
 }
 
 /// `Memory::Store` operation.
-pub fn store(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn store(vm: &mut Vm) -> OpSyncResult<()> {
     let [index, value] = vm.stack.pop2()?;
     let index = usize::try_from(index).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.memory.store(index, value)?;
@@ -187,7 +187,7 @@ pub fn store(vm: &mut OpVm) -> OpSyncResult<()> {
 }
 
 /// `Memory::Truncate` operation.
-pub fn truncate(vm: &mut OpVm) -> OpSyncResult<()> {
+pub fn truncate(vm: &mut Vm) -> OpSyncResult<()> {
     let len = vm.stack.pop()?;
     let len = usize::try_from(len).map_err(|_| MemoryError::IndexOutOfBounds)?;
     vm.memory.truncate(len);

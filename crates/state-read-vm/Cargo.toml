@@ -8,3 +8,7 @@ constraint-vm = { workspace = true }
 essential-state-asm = { workspace = true }
 essential-types = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+rand = { workspace = true }
+tokio = { workspace = true }

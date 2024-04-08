@@ -114,3 +114,9 @@ pub enum MemoryError {
     #[error("operation would cause memory to overflow")]
     Overflow,
 }
+
+impl<E> From<core::convert::Infallible> for OpError<E> {
+    fn from(_: core::convert::Infallible) -> Self {
+        panic!("`Infallible` cannot be constructed")
+    }
+}
