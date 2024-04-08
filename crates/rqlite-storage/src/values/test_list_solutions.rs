@@ -1,8 +1,6 @@
-use test_utils::{empty_solution, sign_with_random_keypair};
-
-use crate::encode;
-
 use super::*;
+use crate::encode;
+use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[test]
 fn test_empty_query() {
@@ -80,7 +78,7 @@ fn test_valid_query() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxx".to_string();
-    let Signed { data, signature } = sign_with_random_keypair(empty_solution());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
 
     let queries = QueryValues {
         queries: vec![Some(Rows {

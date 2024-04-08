@@ -1,13 +1,11 @@
-use serde_json::Number;
-use test_utils::{empty_solution, sign_with_random_keypair};
-
-use crate::encode;
-
 use super::*;
+use crate::encode;
+use serde_json::Number;
+use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[test]
 fn test_valid_query() {
-    let Signed { data, signature } = sign_with_random_keypair(empty_solution());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
     let r = map_solution_to_block(
         Default::default(),
         &[
@@ -34,7 +32,7 @@ fn test_valid_query() {
     let Signed {
         data: data2,
         signature: signature2,
-    } = sign_with_random_keypair(empty_solution());
+    } = sign_with_random_keypair(Solution::empty());
     let r = map_solution_to_block(
         r,
         &[
@@ -68,7 +66,7 @@ fn test_valid_query() {
     let Signed {
         data: data3,
         signature: signature3,
-    } = sign_with_random_keypair(empty_solution());
+    } = sign_with_random_keypair(Solution::empty());
     let r = map_solution_to_block(
         r,
         &[
@@ -105,7 +103,7 @@ fn test_valid_query() {
 
 #[test]
 fn test_block_id_zero() {
-    let Signed { data, signature } = sign_with_random_keypair(empty_solution());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
     map_solution_to_block(
         Default::default(),
         &[
@@ -122,7 +120,7 @@ fn test_block_id_zero() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxx".to_string();
-    let Signed { data, signature } = sign_with_random_keypair(empty_solution());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
 
     map_solution_to_block(
         Default::default(),
@@ -247,7 +245,7 @@ fn test_invalid_data() {
 
 #[test]
 fn test_wrong_num_columns() {
-    let Signed { data, signature } = sign_with_random_keypair(empty_solution());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
     map_solution_to_block(
         Default::default(),
         &[
