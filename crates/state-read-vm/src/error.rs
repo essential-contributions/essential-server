@@ -116,7 +116,7 @@ pub enum MemoryError {
 }
 
 impl<E> From<core::convert::Infallible> for OpError<E> {
-    fn from(_: core::convert::Infallible) -> Self {
-        panic!("`Infallible` cannot be constructed")
+    fn from(err: core::convert::Infallible) -> Self {
+        match err {}
     }
 }
