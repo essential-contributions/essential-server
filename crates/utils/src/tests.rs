@@ -1,7 +1,6 @@
 use crate::{hash, recover, serialize, sign, verify};
-use essential_types::Signature;
 use secp256k1::hashes::hex::DisplayHex;
-use test_utils::{intent_with_vars, keypair};
+use test_utils::{intent_with_vars, keypair, sign_corrupted, sign_with_random_keypair};
 
 #[test]
 fn test_serialize_intent() {
@@ -48,8 +47,8 @@ fn test_fail_to_recover() {
 
 #[test]
 fn test_verify_signature() {
-    let signed = sign(intent_with_vars(1), keypair([0xcd; 32]).0);
-    assert!(verify(intent_with_vars(1), signed.signature));
-    // verify against a different signature
-    assert!(!verify(intent_with_vars(1), Signature([0u8; 64], 0)));
+    let signed = sign_with_random_keypair(intent_with_vars(1));
+    let signed_corrupted = sign_corrupted(intent_with_vars(1));
+    assert!(verify(signed));
+    assert!(!verify(signed_corrupted));
 }

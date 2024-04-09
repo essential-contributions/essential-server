@@ -53,14 +53,14 @@ pub fn sign<T: Serialize>(data: T, sk: SecretKey) -> Signed<T> {
 }
 
 /// Verify signature against data
-pub fn verify<T: Serialize>(data: T, sig: Signature) -> bool {
+pub fn verify<T: Serialize>(signed: Signed<T>) -> bool {
     let secp = Secp256k1::new();
-    let hashed_data = hash(&data);
+    let hashed_data = hash(&signed.data);
     let message = Message::from_digest(hashed_data);
-    if let Ok(pk) = recover_from_message(message, sig.clone()) {
+    if let Ok(pk) = recover_from_message(message, &signed.signature) {
         secp.verify_ecdsa(
             &message,
-            &secp256k1::ecdsa::Signature::from_compact(&sig.0).unwrap(),
+            &secp256k1::ecdsa::Signature::from_compact(&signed.signature.0).unwrap(),
             &pk,
         )
         .is_ok()
@@ -69,13 +69,15 @@ pub fn verify<T: Serialize>(data: T, sig: Signature) -> bool {
     }
 }
 
+/// Recover public key from `Signed.data` and `Signed.signature`
 pub fn recover<T: Serialize>(signed: Signed<T>) -> anyhow::Result<PublicKey> {
     let hashed_data = hash(&signed.data);
     let message = Message::from_digest(hashed_data);
-    recover_from_message(message, signed.signature)
+    recover_from_message(message, &signed.signature)
 }
 
-pub fn recover_from_message(message: Message, signature: Signature) -> anyhow::Result<PublicKey> {
+/// Recover public key from signed `secp256k1::Message` and `Signature`
+pub fn recover_from_message(message: Message, signature: &Signature) -> anyhow::Result<PublicKey> {
     let recovery_id = RecoveryId::from_i32(i32::from(signature.1 as u16))?;
     let recoverable_signature = RecoverableSignature::from_compact(&signature.0, recovery_id)?;
     let secp = Secp256k1::new();

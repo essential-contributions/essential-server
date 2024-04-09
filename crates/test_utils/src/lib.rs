@@ -2,7 +2,7 @@ use essential_types::{
     intent::{Directive, Intent},
     slots::Slots,
     solution::{DecisionVariable, PartialSolution, PartialSolutionData, Solution, SolutionData},
-    ContentAddress, IntentAddress, Signed, Word,
+    ContentAddress, IntentAddress, Signature, Signed, Word,
 };
 use secp256k1::{rand::rngs::OsRng, PublicKey, Secp256k1, SecretKey};
 use serde::Serialize;
@@ -98,4 +98,11 @@ pub fn keypair(key: [u8; 32]) -> (SecretKey, PublicKey) {
 
 pub fn sign_with_random_keypair<T: Serialize>(data: T) -> Signed<T> {
     sign(data, random_keypair().0)
+}
+
+pub fn sign_corrupted<T: Serialize>(data: T) -> Signed<T> {
+    let mut signed = sign(data, random_keypair().0);
+    // TODO: is this a good way to create a corrupted signature?
+    signed.signature = Signature([0u8; 64], 0);
+    signed
 }
