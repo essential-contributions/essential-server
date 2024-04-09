@@ -102,30 +102,9 @@ impl GasLimit {
 }
 
 impl Vm {
-    /// Execute over the given operation access from the current state of the VM.
-    ///
-    /// Upon reaching a `Halt` operation or reaching the end of the operation
-    /// sequence, returns the gas spent and the `Vm` will be left in the
-    /// resulting state.
-    pub async fn exec<'a, S, OA>(
-        &mut self,
-        access: Access<'a>,
-        state_read: &S,
-        op_access: OA,
-        op_gas_cost: &impl OpGasCost,
-        gas_limit: GasLimit,
-    ) -> Result<Gas, StateReadError<S::Error>>
-    where
-        S: StateRead,
-        OA: OpAccess,
-        OA::Error: Into<OpError<S::Error>>,
-    {
-        future::exec_boxed(self, access, state_read, op_access, op_gas_cost, gas_limit).await
-    }
-
     /// Execute the given operations from the current state of the VM.
     ///
-    /// This is a wrapper around `exec` that expects operation access in the form
+    /// This is a wrapper around [`Vm::exec`] that expects operation access in the form
     /// of a `&[Op]`.
     pub async fn exec_ops<'a, S>(
         &mut self,
@@ -146,11 +125,15 @@ impl Vm {
     ///
     /// This is a wrapper around `exec` that expects operation access in the form
     /// of `&BytecodeMapped`.
-    pub async fn exec_bytecode_mapped<'a, S>(
+    ///
+    /// This can be a more memory efficient alternative to `Vm::exec_ops` due
+    /// to the compact representation of operations in the form of bytecode and
+    /// indices.
+    pub async fn exec_bytecode<'a, S>(
         &mut self,
+        bytecode_mapped: &BytecodeMapped,
         access: Access<'a>,
         state_read: &S,
-        bytecode_mapped: &BytecodeMapped,
         op_gas_cost: &impl OpGasCost,
         gas_limit: GasLimit,
     ) -> Result<Gas, StateReadError<S::Error>>
@@ -159,6 +142,85 @@ impl Vm {
     {
         self.exec(access, state_read, bytecode_mapped, op_gas_cost, gas_limit)
             .await
+    }
+
+    /// Execute the given bytecode from the current state of the VM.
+    ///
+    /// The given bytecode will be mapped lazily during execution. This
+    /// can be more efficient than pre-mapping the bytecode and using
+    /// [`Vm::exec_bytecode`] in the case that execution may fail early.
+    ///
+    /// However, successful execution still requires building the full
+    /// [`BytecodeMapped`] instance internally. So if bytecode has already been
+    /// mapped, [`Vm::exec_bytecode`] should be preferred.
+    pub async fn exec_bytecode_iter<'a, S, I>(
+        &mut self,
+        bytecode_iter: I,
+        access: Access<'a>,
+        state_read: &S,
+        op_gas_cost: &impl OpGasCost,
+        gas_limit: GasLimit,
+    ) -> Result<Gas, StateReadError<S::Error>>
+    where
+        S: StateRead,
+        I: IntoIterator<Item = u8>,
+    {
+        /// A type wrapper around `BytecodeMapped` that lazily constructs the
+        /// map from the given bytecode as operations are accessed.
+        struct BytecodeMappedLazy<I> {
+            mapped: BytecodeMapped,
+            iter: I,
+        }
+
+        // Op access lazily populates operations from the given byte iterator
+        // as necessary.
+        impl<I> OpAccess for BytecodeMappedLazy<I>
+        where
+            I: Iterator<Item = u8>,
+        {
+            type Error = asm::FromBytesError;
+            fn op_access(&mut self, index: usize) -> Option<Result<Op, Self::Error>> {
+                while self.mapped.op_indices().len() < index {
+                    match bytecode::parse_op(&mut self.iter)? {
+                        Err(err) => return Some(Err(err)),
+                        Ok(op) => self.mapped.push_op(op),
+                    }
+                }
+                self.mapped.op(index).map(Ok)
+            }
+        }
+
+        let bytecode_lazy = BytecodeMappedLazy {
+            mapped: BytecodeMapped::default(),
+            iter: bytecode_iter.into_iter(),
+        };
+        self.exec(access, state_read, bytecode_lazy, op_gas_cost, gas_limit)
+            .await
+    }
+
+    /// Execute over the given operation access from the current state of the VM.
+    ///
+    /// Upon reaching a `Halt` operation or reaching the end of the operation
+    /// sequence, returns the gas spent and the `Vm` will be left in the
+    /// resulting state.
+    ///
+    /// The type requirements for the `op_access` argument can make this
+    /// finicky to use directly. You may prefer one of wrapper methods:
+    /// [`Vm::exec_ops`], [`Vm::exec_bytecode`] or [`Vm::exec_bytecode_iter`].
+    pub async fn exec<'a, S, OA>(
+        &mut self,
+        access: Access<'a>,
+        state_read: &S,
+        op_access: OA,
+        op_gas_cost: &impl OpGasCost,
+        gas_limit: GasLimit,
+    ) -> Result<Gas, StateReadError<S::Error>>
+    where
+        S: StateRead,
+        OA: OpAccess,
+        OA::Error: Into<OpError<S::Error>>,
+    {
+        future::exec_boxed(self, access, state_read, op_access, op_gas_cost, gas_limit).await
     }
 }
 
