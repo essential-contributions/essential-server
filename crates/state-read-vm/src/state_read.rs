@@ -113,7 +113,7 @@ mod tests {
             asm::Stack::Push(0).into(), // Key2
             asm::Stack::Push(0).into(), // Key3
             asm::Stack::Push(num_words).into(),
-            asm::StateRead::WordRange.into(),
+            asm::StateRead::WordRange,
         ];
         vm.exec_ops(ops, access, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
             .await
@@ -139,7 +139,7 @@ mod tests {
             asm::Stack::Push(0).into(), // Key2
             asm::Stack::Push(0).into(), // Key3
             asm::Stack::Push(num_words).into(),
-            asm::StateRead::WordRange.into(),
+            asm::StateRead::WordRange,
         ];
         vm.exec_ops(ops, access, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
             .await
@@ -170,7 +170,7 @@ mod tests {
             asm::Stack::Push(3).into(), // Key2
             asm::Stack::Push(4).into(), // Key3
             asm::Stack::Push(num_words).into(),
-            asm::StateRead::WordRangeExtern.into(),
+            asm::StateRead::WordRangeExtern,
         ];
         vm.exec_ops(ops, TEST_ACCESS, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
             .await
@@ -198,7 +198,7 @@ mod tests {
             asm::Stack::Push(3).into(), // Key2
             asm::Stack::Push(4).into(), // Key3
             asm::Stack::Push(num_words).into(),
-            asm::StateRead::WordRangeExtern.into(),
+            asm::StateRead::WordRangeExtern,
         ];
         vm.exec_ops(ops, TEST_ACCESS, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
             .await

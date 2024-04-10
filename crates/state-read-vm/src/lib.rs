@@ -402,6 +402,7 @@ pub(crate) mod test_util {
     };
 
     // A test `StateRead` implementation represented using a map.
+    #[derive(Clone)]
     pub(crate) struct State(BTreeMap<ContentAddress, BTreeMap<Key, Word>>);
 
     #[derive(Debug, Error)]
@@ -422,6 +423,19 @@ pub(crate) mod test_util {
                     })
                     .collect(),
             )
+        }
+
+        // Update the value at the given key within the given intent set address.
+        pub(crate) fn set(&mut self, set_addr: ContentAddress, key: &Key, value: Option<Word>) {
+            let set = self.0.entry(set_addr).or_default();
+            match value {
+                None => {
+                    set.remove(key);
+                }
+                Some(value) => {
+                    set.insert(*key, value);
+                }
+            }
         }
     }
 
@@ -468,11 +482,6 @@ pub(crate) mod test_util {
             Ok(words)
         }
     }
-
-    // For now, pretend all ops cost 1 gas.
-    pub(crate) fn op_gas_cost(_op: &Op) -> Gas {
-        1
-    }
 }
 
 #[cfg(test)]
@@ -489,12 +498,13 @@ mod tests {
             asm::Stack::Push(7).into(),
             asm::Alu::Mul.into(),
         ];
+        let op_gas_cost = &|_: &Op| 1;
         let spent = vm
             .exec_ops(
                 ops,
                 TEST_ACCESS,
                 &State::EMPTY,
-                &op_gas_cost,
+                op_gas_cost,
                 GasLimit::UNLIMITED,
             )
             .await
@@ -541,12 +551,13 @@ mod tests {
             asm::Stack::Push(7).into(),
             asm::Alu::Mul.into(),
         ];
+        let op_gas_cost = &|_: &Op| 1;
         let spent = vm
             .exec_ops(
                 ops,
                 TEST_ACCESS,
                 &State::EMPTY,
-                &op_gas_cost,
+                op_gas_cost,
                 GasLimit::UNLIMITED,
             )
             .await
@@ -627,5 +638,136 @@ mod tests {
             .unwrap();
         assert_eq!(spent_ops, spent_bc_iter);
         assert_eq!(vm_ops, vm_bc_iter);
+    }
+
+    // Emulate the process of reading pre state, applying mutations to produce
+    // post state, and checking the constraints afterwards.
+    #[tokio::test]
+    async fn read_pre_post_state_and_check_constraints() {
+        use crate::types::solution::{Mutation, Solution, SolutionData, StateMutation};
+
+        let intent_addr = TEST_INTENT_ADDR;
+
+        // In the pre-state, we have [Some(40), None, Some(42)].
+        let pre_state = State::new(vec![(
+            intent_addr.set.clone(),
+            vec![([0, 0, 0, 0], 40), ([0, 0, 0, 2], 42)],
+        )]);
+
+        // The full solution that we're checking.
+        let solution = Solution {
+            data: vec![SolutionData {
+                intent_to_solve: intent_addr.clone(),
+                decision_variables: vec![],
+            }],
+            // We have one mutation that sets a missing value to 41.
+            state_mutations: vec![StateMutation {
+                pathway: 0,
+                mutations: vec![Mutation {
+                    key: [0, 0, 0, 1],
+                    value: Some(41),
+                }],
+            }],
+            partial_solutions: vec![],
+        };
+
+        // Construct access to the necessary solution data for the VM.
+        let mut access = Access {
+            solution: SolutionAccess {
+                data: &solution.data,
+                index: 0,
+            },
+            // Haven't calculated these yet.
+            state_slots: StateSlots::EMPTY,
+        };
+
+        // A simple state read program that reads words directly to the slots.
+        let ops = &[
+            asm::Stack::Push(3).into(),
+            asm::Memory::Alloc.into(),
+            asm::Stack::Push(0).into(), // Key0
+            asm::Stack::Push(0).into(), // Key1
+            asm::Stack::Push(0).into(), // Key2
+            asm::Stack::Push(0).into(), // Key3
+            asm::Stack::Push(3).into(), // Num words
+            asm::StateRead::WordRange,
+        ];
+
+        // Execute the program.
+        let mut vm = Vm::default();
+        vm.exec_ops(ops, access, &pre_state, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await
+            .unwrap();
+
+        // Collect the state slots.
+        let pre_state_slots = vm.into_state_slots();
+
+        // Apply the state mutations to the state to produce the post state.
+        let mut post_state = pre_state.clone();
+        for mutation in solution.state_mutations {
+            let solution_data = &solution.data[usize::from(mutation.pathway)];
+            let set_addr = &solution_data.intent_to_solve.set;
+            for Mutation { key, value } in mutation.mutations.iter() {
+                post_state.set(set_addr.clone(), key, *value);
+            }
+        }
+
+        // Execute the program with the post state.
+        let mut vm = Vm::default();
+        vm.exec_ops(ops, access, &post_state, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await
+            .unwrap();
+
+        // Collect the state slots.
+        let post_state_slots = vm.into_state_slots();
+
+        // State slots should have updated.
+        assert_eq!(&pre_state_slots[..], &[Some(40), None, Some(42)]);
+        assert_eq!(&post_state_slots[..], &[Some(40), Some(41), Some(42)]);
+
+        // Now, they can be used for constraint checking.
+        access.state_slots = StateSlots {
+            pre: &pre_state_slots[..],
+            post: &post_state_slots[..],
+        };
+        let constraints: &[Vec<u8>] = &[
+            // Check that the first pre and post slots are equal.
+            constraint_vm::asm::to_bytes(vec![
+                asm::Stack::Push(0).into(), // slot
+                asm::Stack::Push(0).into(), // pre
+                asm::Access::State.into(),
+                asm::Stack::Push(0).into(), // slot
+                asm::Stack::Push(1).into(), // post
+                asm::Access::State.into(),
+                asm::Pred::Eq.into(),
+            ])
+            .collect(),
+            // Check that the second pre state is none, but post is some.
+            constraint_vm::asm::to_bytes(vec![
+                asm::Stack::Push(1).into(), // slot
+                asm::Stack::Push(0).into(), // pre
+                asm::Access::StateIsSome.into(),
+                asm::Pred::Not.into(),
+                asm::Stack::Push(1).into(), // slot
+                asm::Stack::Push(1).into(), // post
+                asm::Access::StateIsSome.into(),
+                asm::Pred::And.into(),
+            ])
+            .collect(),
+            // Check that the third pre and post slots are equal.
+            constraint_vm::asm::to_bytes(vec![
+                asm::Stack::Push(2).into(), // slot
+                asm::Stack::Push(0).into(), // pre
+                asm::Access::State.into(),
+                asm::Stack::Push(2).into(), // slot
+                asm::Stack::Push(1).into(), // post
+                asm::Access::State.into(),
+                asm::Pred::Eq.into(),
+            ])
+            .collect(),
+        ];
+        constraint_vm::check_intent(constraints, access).unwrap();
+
+        // Constraints pass - we're free to apply the updated state!
     }
 }
