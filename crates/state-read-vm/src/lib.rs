@@ -27,6 +27,8 @@
 //! async operations, but yield based on a user-specified gas limit too. See the
 //! [`ExecFuture`] docs for further details on the implementation.
 
+#![deny(missing_docs, unsafe_code)]
+
 #[doc(inline)]
 pub use bytecode::{BytecodeMapped, BytecodeMappedSlice};
 #[doc(inline)]
@@ -88,15 +90,20 @@ pub enum OpKind {
 /// The set of operations performed synchronously.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum OpSync {
+    /// All operations available to the constraint checker.
     Constraint(asm::Constraint),
+    /// Operations for controlling the flow of the program.
     ControlFlow(asm::ControlFlow),
+    /// Operations for controlling the flow of the program.
     Memory(asm::Memory),
 }
 
 /// The set of operations that are performed asynchronously.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub enum OpAsync {
+    /// Read a range of words from state starting at the key.
     StateReadWordRange,
+    /// Read a range of words from external state starting at the key.
     StateReadWordRangeExt,
 }
 
