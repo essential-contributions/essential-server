@@ -26,7 +26,6 @@
 //! The `Vm::exec_*` functions all return `Future`s that not only yield on
 //! async operations, but yield based on a user-specified gas limit too. See the
 //! [`ExecFuture`] docs for further details on the implementation.
-
 #![deny(missing_docs, unsafe_code)]
 
 #[doc(inline)]

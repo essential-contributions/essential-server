@@ -263,7 +263,7 @@ where
 /// `&'a mut Vm` and returns it upon completion.
 ///
 /// This allows for moving ownership of the VM between the async operation
-/// future and the `ExecOpsFuture`.
+/// future and the `ExecFuture`.
 async fn step_op_async_owned<'a, S>(
     op: OpAsync,
     set_addr: ContentAddress,
