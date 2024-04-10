@@ -58,7 +58,7 @@ mod state_read;
 /// The operation execution state of the State Read VM.
 #[derive(Debug, Default, PartialEq)]
 pub struct Vm {
-    /// The "program counter", i.e. index of the current operation within the program.
+    /// The program counter, i.e. index of the current operation within the program.
     pub pc: usize,
     /// The stack machine.
     pub stack: Stack,
@@ -80,7 +80,7 @@ pub struct GasLimit {
 
 /// Distinguish between sync and async ops to ease `Future` implementation.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub enum OpKind {
+pub(crate) enum OpKind {
     /// Operations that yield immediately.
     Sync(OpSync),
     /// Operations returning a future.
@@ -89,7 +89,7 @@ pub enum OpKind {
 
 /// The set of operations performed synchronously.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub enum OpSync {
+pub(crate) enum OpSync {
     /// All operations available to the constraint checker.
     Constraint(asm::Constraint),
     /// Operations for controlling the flow of the program.
@@ -100,7 +100,7 @@ pub enum OpSync {
 
 /// The set of operations that are performed asynchronously.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub enum OpAsync {
+pub(crate) enum OpAsync {
     /// Read a range of words from state starting at the key.
     StateReadWordRange,
     /// Read a range of words from external state starting at the key.
@@ -128,8 +128,9 @@ pub trait OpGasCost {
 }
 
 impl GasLimit {
-    /// Adjust this to match recommended poll time limit on supported validator
-    /// hardware.
+    /// The default value used for the `per_yield` limit.
+    // TODO: Adjust this to match recommended poll time limit on supported validator
+    // hardware.
     pub const DEFAULT_PER_YIELD: Gas = 4_096;
 
     /// Unlimited gas limit with default gas-per-yield.
@@ -141,6 +142,10 @@ impl GasLimit {
 
 impl Vm {
     /// Execute the given operations from the current state of the VM.
+    ///
+    /// Upon reaching a `Halt` operation or reaching the end of the operation
+    /// sequence, returns the gas spent and the `Vm` will be left in the
+    /// resulting state.
     ///
     /// This is a wrapper around [`Vm::exec`] that expects operation access in
     /// the form of a `&[Op]`.
@@ -165,8 +170,12 @@ impl Vm {
 
     /// Execute the given mapped bytecode from the current state of the VM.
     ///
-    /// This is a wrapper around `exec` that expects operation access in the form
-    /// of [`&BytecodeMapped`][BytecodeMapped].
+    /// Upon reaching a `Halt` operation or reaching the end of the operation
+    /// sequence, returns the gas spent and the `Vm` will be left in the
+    /// resulting state.
+    ///
+    /// This is a wrapper around [`Vm::exec`] that expects operation access in
+    /// the form of [`&BytecodeMapped`][BytecodeMapped].
     ///
     /// This can be a more memory efficient alternative to [`Vm::exec_ops`] due
     /// to the compact representation of operations in the form of bytecode and
@@ -187,6 +196,10 @@ impl Vm {
     }
 
     /// Execute the given bytecode from the current state of the VM.
+    ///
+    /// Upon reaching a `Halt` operation or reaching the end of the operation
+    /// sequence, returns the gas spent and the `Vm` will be left in the
+    /// resulting state.
     ///
     /// The given bytecode will be mapped lazily during execution. This
     /// can be more efficient than pre-mapping the bytecode and using
@@ -247,8 +260,11 @@ impl Vm {
     /// resulting state.
     ///
     /// The type requirements for the `op_access` argument can make this
-    /// finicky to use directly. You may prefer one of wrapper methods:
-    /// [`Vm::exec_ops`], [`Vm::exec_bytecode`] or [`Vm::exec_bytecode_iter`].
+    /// finicky to use directly. You may prefer one of the convenience methods:
+    ///
+    /// - [`Vm::exec_ops`]
+    /// - [`Vm::exec_bytecode`]
+    /// - [`Vm::exec_bytecode_iter`]
     pub async fn exec<'a, S, OA>(
         &mut self,
         access: Access<'a>,
@@ -267,7 +283,7 @@ impl Vm {
 
     /// Consumes the `Vm` and returns the read state slots.
     ///
-    /// The returned slots correlate directly with the memory content.
+    /// The returned slots correspond directly with the current memory content.
     pub fn into_state_slots(self) -> Vec<Option<Word>> {
         self.memory.into()
     }
