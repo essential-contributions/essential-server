@@ -514,7 +514,7 @@ mod tests {
         assert_eq!(&vm.stack[..], &[42]);
     }
 
-    // Test that we get exepcted results when yielding due to gas limits.
+    // Test that we get expected results when yielding due to gas limits.
     #[tokio::test]
     async fn yield_per_op() {
         let mut vm = Vm::default();
