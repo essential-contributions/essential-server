@@ -1,6 +1,6 @@
 //! Items related to bytecode representation for the State Read VM.
 
-use crate::asm::{FromBytesError, Op, Opcode};
+use crate::asm::Op;
 
 /// A memory efficient representation of a sequence of operations parsed from bytecode.
 ///
@@ -101,17 +101,6 @@ impl FromIterator<Op> for BytecodeMapped {
     }
 }
 
-/// Parse an `Op` from the given byte iterator. Returns `None` if the iterator is empty.
-pub(crate) fn parse_op(
-    mut bytes: &mut impl Iterator<Item = u8>,
-) -> Option<Result<Op, FromBytesError>> {
-    let opcode_byte = bytes.next()?;
-    let res = Opcode::try_from(opcode_byte)
-        .map_err(From::from)
-        .and_then(|opcode| opcode.parse_op(&mut bytes).map_err(From::from));
-    Some(res)
-}
-
 /// Given a bytecode slice and an operation mapping that is assumed to have been
 /// previously validated, produce an iterator yielding all associated operations.
 fn expect_ops_from_indices<'a>(
@@ -121,7 +110,9 @@ fn expect_ops_from_indices<'a>(
     const EXPECT_MSG: &str = "validated upon construction";
     op_indices.into_iter().map(|ix| {
         let mut bytes = bytecode[ix..].iter().copied();
-        parse_op(&mut bytes).expect(EXPECT_MSG).expect(EXPECT_MSG)
+        Op::from_bytes(&mut bytes)
+            .expect(EXPECT_MSG)
+            .expect(EXPECT_MSG)
     })
 }
 

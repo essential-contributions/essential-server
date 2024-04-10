@@ -1,3 +1,5 @@
+//! The types of errors that might occur throughout state read execution.
+
 #[doc(inline)]
 use crate::{
     asm::{self, Word},

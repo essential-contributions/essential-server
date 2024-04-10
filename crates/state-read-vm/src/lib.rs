@@ -7,18 +7,21 @@ pub use constraint_vm::{
     self as constraint, Access, SolutionAccess, Stack, StateSlotSlice, StateSlots,
 };
 use error::{MemoryError, OpError, StateReadError};
+#[doc(inline)]
 pub use error::{MemoryResult, OpAsyncResult, OpResult, OpSyncResult, StateReadResult};
 #[doc(inline)]
 pub use essential_state_asm as asm;
 use essential_state_asm::{Op, Word};
 pub use essential_types::{self as types, ContentAddress};
+#[doc(inline)]
+pub use future::ExecFuture;
 pub use memory::Memory;
 pub use state_read::StateRead;
 
 mod bytecode;
 mod ctrl_flow;
 pub mod error;
-pub mod future;
+mod future;
 mod memory;
 mod state_read;
 
@@ -181,7 +184,7 @@ impl Vm {
             type Error = asm::FromBytesError;
             fn op_access(&mut self, index: usize) -> Option<Result<Op, Self::Error>> {
                 while self.mapped.op_indices().len() < index {
-                    match bytecode::parse_op(&mut self.iter)? {
+                    match Op::from_bytes(&mut self.iter)? {
                         Err(err) => return Some(Err(err)),
                         Ok(op) => self.mapped.push_op(op),
                     }

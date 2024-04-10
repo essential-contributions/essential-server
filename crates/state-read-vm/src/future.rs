@@ -21,6 +21,10 @@ use core::{
 ///   the operation and temporarily takes ownership of the VM. This future
 ///   is stored in `pending_op` until it's ready.
 ///
+/// This type should not be constructed directly. Instead, it is used as a part
+/// of the implementation of [`Vm::exec`] and exposed publicly for documentation
+/// of its behaviour.
+///
 /// ## Allocations
 ///
 /// A boxed future is allocated for each asynchronous operation as it begins
@@ -199,7 +203,6 @@ where
                     let set_addr = self.access.solution.this_data().intent_to_solve.set.clone();
                     let future = Box::pin(step_op_async_owned(op, set_addr, self.state_read, vm));
                     self.pending_op = Some(PendingOp { future, next_spent });
-                    cx.waker().wake_by_ref();
                     return Poll::Pending;
                 }
             };
