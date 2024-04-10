@@ -208,7 +208,11 @@ fn range_from_start_len(start: Word, len: Word) -> Option<std::ops::Range<usize>
 
 #[cfg(test)]
 mod tests {
-    use crate::{test_util::*, *};
+    use crate::{
+        error::{MemoryError, OpSyncError},
+        test_util::*,
+        *,
+    };
 
     #[tokio::test]
     async fn alloc() {
@@ -450,5 +454,77 @@ mod tests {
             .unwrap();
         assert_eq!(&vm.memory[..], &[None]);
         assert_eq!(vm.memory.capacity(), 3);
+    }
+
+    #[tokio::test]
+    async fn load_index_oob() {
+        let mut vm = Vm::default();
+        let ops = &[asm::Stack::Push(0).into(), asm::Memory::Load.into()];
+        let res = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await;
+        match res {
+            Err(StateReadError::Op(
+                _,
+                OpError::Sync(OpSyncError::Memory(MemoryError::IndexOutOfBounds)),
+            )) => (),
+            _ => panic!("expected index out of bounds, found {:?}", res),
+        }
+    }
+
+    #[tokio::test]
+    async fn store_index_oob() {
+        let mut vm = Vm::default();
+        let ops = &[
+            asm::Stack::Push(0).into(),
+            asm::Stack::Push(0).into(),
+            asm::Memory::Store.into(),
+        ];
+        let res = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await;
+        match res {
+            Err(StateReadError::Op(
+                _,
+                OpError::Sync(OpSyncError::Memory(MemoryError::IndexOutOfBounds)),
+            )) => (),
+            _ => panic!("expected index out of bounds, found {:?}", res),
+        }
+    }
+
+    #[tokio::test]
+    async fn push_overflow() {
+        let mut vm = Vm::default();
+        let ops = &[asm::Stack::Push(42).into(), asm::Memory::Push.into()];
+        let res = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await;
+        match res {
+            Err(StateReadError::Op(
+                _,
+                OpError::Sync(OpSyncError::Memory(MemoryError::Overflow)),
+            )) => (),
+            _ => panic!("expected overflow, found {:?}", res),
+        }
+    }
+
+    #[tokio::test]
+    async fn alloc_overflow() {
+        let mut vm = Vm::default();
+        let overflow_cap = Word::try_from(Memory::SIZE_LIMIT.checked_add(1).unwrap()).unwrap();
+        let ops = &[
+            asm::Stack::Push(overflow_cap).into(),
+            asm::Memory::Alloc.into(),
+        ];
+        let res = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await;
+        match res {
+            Err(StateReadError::Op(
+                _,
+                OpError::Sync(OpSyncError::Memory(MemoryError::Overflow)),
+            )) => (),
+            _ => panic!("expected overflow, found {:?}", res),
+        }
     }
 }
