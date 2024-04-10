@@ -89,3 +89,31 @@ fn write_words_to_memory<E>(vm: &mut Vm, words: Vec<Option<Word>>) -> OpAsyncRes
     vm.stack.push(start)?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{test_util::*, *};
+
+    #[tokio::test]
+    async fn state_read_42s() {
+        let mut vm = Vm::default();
+        let num_words = 3;
+        let ops = &[
+            asm::Stack::Push(num_words).into(),
+            asm::Memory::Alloc.into(),
+            asm::Stack::Push(0).into(), // Key0
+            asm::Stack::Push(0).into(), // Key1
+            asm::Stack::Push(0).into(), // Key2
+            asm::Stack::Push(0).into(), // Key3
+            asm::Stack::Push(num_words).into(),
+            asm::StateRead::WordRange.into(),
+        ];
+        let spent = vm
+            .exec_ops(ops, TEST_ACCESS, &State42, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await
+            .unwrap();
+        assert_eq!(spent, 8);
+        assert_eq!(&vm.memory[..], &[Some(42), Some(42), Some(42)]);
+        assert_eq!(vm.memory.capacity(), 3);
+    }
+}

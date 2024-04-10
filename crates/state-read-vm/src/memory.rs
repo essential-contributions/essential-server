@@ -60,10 +60,7 @@ impl Memory {
 
     /// Push a word to the stack.
     pub fn push(&mut self, opt: Option<Word>) -> MemoryResult<()> {
-        if self.capacity() >= self.len() {
-            return Err(MemoryError::Overflow);
-        }
-        if self.len() >= Self::SIZE_LIMIT {
+        if self.len() >= self.capacity() {
             return Err(MemoryError::Overflow);
         }
         self.0.push(opt);
@@ -72,10 +69,11 @@ impl Memory {
 
     /// Extend memory with the given values.
     pub fn extend(&mut self, words: Vec<Option<Word>>) -> MemoryResult<()> {
-        if self.len() + words.len() > Self::SIZE_LIMIT {
-            return Err(MemoryError::Overflow);
-        }
-        if self.capacity() + words.len() > self.len() {
+        let new_len = self
+            .len()
+            .checked_add(words.len())
+            .ok_or(MemoryError::Overflow)?;
+        if new_len > self.capacity() {
             return Err(MemoryError::Overflow);
         }
         self.0.extend(words);

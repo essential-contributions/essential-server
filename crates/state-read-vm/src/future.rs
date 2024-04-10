@@ -203,6 +203,7 @@ where
                     let set_addr = self.access.solution.this_data().intent_to_solve.set.clone();
                     let future = Box::pin(step_op_async_owned(op, set_addr, self.state_read, vm));
                     self.pending_op = Some(PendingOp { future, next_spent });
+                    cx.waker().wake_by_ref();
                     return Poll::Pending;
                 }
             };
