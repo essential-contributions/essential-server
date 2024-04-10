@@ -132,8 +132,6 @@ where
     type Output = Result<Gas, StateReadError<S::Error>>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-        println!("POLL");
-
         // Poll the async operation future if there is one pending.
         let vm = match self.pending_op.as_mut() {
             None => self.vm.take().expect("future polled after completion"),
@@ -160,10 +158,6 @@ where
                 self.gas.spent = next_spent;
                 self.gas.next_yield_threshold =
                     self.gas.spent.saturating_add(self.gas.limit.per_yield);
-
-                println!("  {:?}", vm.stack);
-                println!("  {} gas spent", self.gas.spent);
-
                 vm
             }
         };
@@ -194,8 +188,6 @@ where
                 Ok(next_spent) => next_spent,
             };
 
-            println!("{:02X}: {op:?}", vm.pc);
-
             let res = match OpKind::from(op) {
                 OpKind::Sync(op) => step_op_sync(op, self.access, vm),
                 OpKind::Async(op) => {
@@ -220,9 +212,6 @@ where
             // Operation successful, so update gas spent.
             self.gas.spent = next_spent;
 
-            println!("  {:?}", vm.stack);
-            println!("  {} gas spent", self.gas.spent);
-
             // Update the program counter, or exit if we're done.
             match opt_new_pc {
                 None => break,
@@ -234,7 +223,6 @@ where
                 self.gas.next_yield_threshold =
                     self.gas.spent.saturating_add(self.gas.limit.per_yield);
                 self.vm = Some(vm);
-                println!("--- YIELD ---");
                 cx.waker().wake_by_ref();
                 return Poll::Pending;
             }
