@@ -11,7 +11,7 @@ use error::{MemoryError, OpError, StateReadError};
 pub use error::{MemoryResult, OpAsyncResult, OpResult, OpSyncResult, StateReadResult};
 #[doc(inline)]
 pub use essential_state_asm as asm;
-use essential_state_asm::{Op, Word};
+use essential_state_asm::Op;
 pub use essential_types::{self as types, ContentAddress};
 #[doc(inline)]
 pub use future::ExecFuture;
@@ -329,19 +329,10 @@ pub fn step_op_memory(op: asm::Memory, vm: &mut Vm) -> OpSyncResult<()> {
     }
 }
 
-/// Parse a `bool` from a word, where 0 is false, 1 is true and any other value is invalid.
-fn bool_from_word(word: Word) -> Option<bool> {
-    match word {
-        0 => Some(false),
-        1 => Some(true),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test_util {
     use super::*;
-    use crate::types::{solution::SolutionData, ContentAddress, IntentAddress, Key};
+    use crate::types::{solution::SolutionData, ContentAddress, IntentAddress, Key, Word};
 
     pub(crate) const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
     pub(crate) const TEST_INTENT_CA: ContentAddress = ContentAddress([0xAA; 32]);

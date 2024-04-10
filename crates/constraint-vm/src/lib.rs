@@ -38,9 +38,9 @@ pub use error::{CheckResult, ConstraintResult, OpResult, StackResult};
 use error::{ConstraintError, ConstraintErrors, ConstraintsUnsatisfied};
 #[doc(inline)]
 pub use essential_constraint_asm as asm;
-use essential_constraint_asm::{Op, Word};
+use essential_constraint_asm::Op;
 pub use essential_types as types;
-use essential_types::ConstraintBytecode;
+use essential_types::{convert::bool_from_word, ConstraintBytecode};
 #[doc(inline)]
 pub use stack::Stack;
 
@@ -197,15 +197,6 @@ pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> OpResult<()> {
         asm::Stack::Push(word) => stack.push(word).map_err(From::from),
         asm::Stack::Pop => stack.pop().map(|_| ()).map_err(From::from),
         asm::Stack::Swap => stack.pop2_push2(|a, b| Ok([b, a])),
-    }
-}
-
-/// Parse a `bool` from a word, where 0 is false, 1 is true and any other value is invalid.
-fn bool_from_word(word: Word) -> Option<bool> {
-    match word {
-        0 => Some(false),
-        1 => Some(true),
-        _ => None,
     }
 }
 

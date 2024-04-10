@@ -1,8 +1,8 @@
 //! ControlFlow operation implementations.
 
 use crate::{
-    bool_from_word,
     error::{ControlFlowError, OpSyncResult, StackError},
+    types::convert::bool_from_word,
     Vm,
 };
 

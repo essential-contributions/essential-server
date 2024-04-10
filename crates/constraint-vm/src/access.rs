@@ -1,6 +1,6 @@
 //! Access operation implementations.
 
-use crate::{bool_from_word, error::AccessError, OpResult, Stack};
+use crate::{error::AccessError, types::convert::bool_from_word, OpResult, Stack};
 use essential_constraint_asm::Word;
 use essential_types::{
     convert::word_4_from_u8_32,
