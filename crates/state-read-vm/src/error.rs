@@ -77,9 +77,6 @@ pub enum OpSyncError {
     /// An error occurred during a `Memory` operation.
     #[error("memory operation error: {0}")]
     Memory(#[from] MemoryError),
-    /// An error occurred during a `Stack` operation.
-    #[error("stack operation error: {0}")]
-    Stack(#[from] StackError),
 }
 
 /// A synchronous operation failed.
@@ -120,5 +117,11 @@ pub enum MemoryError {
 impl<E> From<core::convert::Infallible> for OpError<E> {
     fn from(err: core::convert::Infallible) -> Self {
         match err {}
+    }
+}
+
+impl From<StackError> for OpSyncError {
+    fn from(err: StackError) -> Self {
+        OpSyncError::Constraint(err.into())
     }
 }
