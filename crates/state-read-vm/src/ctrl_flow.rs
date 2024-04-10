@@ -25,7 +25,12 @@ pub fn jump_if(vm: &mut Vm) -> OpSyncResult<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{asm, test_util::*, *};
+    use crate::{
+        asm,
+        error::{ControlFlowError, OpSyncError},
+        test_util::*,
+        *,
+    };
 
     #[tokio::test]
     async fn jump_forward() {
@@ -150,5 +155,28 @@ mod tests {
             2 /*setup*/ + 13 * nth_power as u64 /*loop*/ + 2 /*cleanup*/
         );
         assert_eq!(&vm.stack[..], &[2i64.pow(nth_power as u32)]);
+    }
+
+    #[tokio::test]
+    async fn jump_if_invalid_cond() {
+        let mut vm = Vm::default();
+        let invalid_cond = 2; // Valid is 0 or 1.
+        let ops = &[
+            asm::Stack::Push(0).into(), // Destination Index.
+            asm::Stack::Push(invalid_cond).into(),
+            asm::ControlFlow::JumpIf.into(),
+        ];
+        let res = vm
+            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .await;
+        match res {
+            Err(StateReadError::Op(
+                _,
+                OpError::Sync(OpSyncError::ControlFlow(ControlFlowError::InvalidJumpIfCondition(
+                    n,
+                ))),
+            )) if n == invalid_cond => (),
+            _ => panic!("expected overflow, found {:?}", res),
+        }
     }
 }
