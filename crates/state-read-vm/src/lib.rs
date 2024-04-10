@@ -1,4 +1,31 @@
 //! The essential state read VM implementation.
+//!
+//! ## Reading State
+//!
+//! The primary entrypoint for this crate is the [`Vm` type][Vm].
+//!
+//! The `Vm` allows for executing operations that read state and apply any
+//! necessary operations in order to form the final, expected state slot layout
+//! within the VM's [`Memory`]. The `Vm`'s memory can be accessed directly
+//! from the `Vm`, or the `Vm` can be consumed and state slots returned with
+//! [`Vm::into_state_slots`].
+//!
+//! ## Executing Ops
+//!
+//! There are three primary methods available for executing operations:
+//!
+//! - [`Vm::exec_ops`]
+//! - [`Vm::exec_bytecode`]
+//! - [`Vm::exec_bytecode_iter`]
+//!
+//! Each have slightly different performance implications, so be sure to read
+//! the docs before selecting a method.
+//!
+//! ## Execution Future
+//!
+//! The `Vm::exec_*` functions all return `Future`s that not only yield on
+//! async operations, but yield based on a user-specified gas limit too. See the
+//! [`ExecFuture`] docs for further details on the implementation.
 
 #[doc(inline)]
 pub use bytecode::{BytecodeMapped, BytecodeMappedSlice};
@@ -12,7 +39,8 @@ pub use error::{MemoryResult, OpAsyncResult, OpResult, OpSyncResult, StateReadRe
 #[doc(inline)]
 pub use essential_state_asm as asm;
 use essential_state_asm::Op;
-pub use essential_types::{self as types, ContentAddress};
+pub use essential_types as types;
+use essential_types::{ContentAddress, Word};
 #[doc(inline)]
 pub use future::ExecFuture;
 pub use memory::Memory;
@@ -107,8 +135,12 @@ impl GasLimit {
 impl Vm {
     /// Execute the given operations from the current state of the VM.
     ///
-    /// This is a wrapper around [`Vm::exec`] that expects operation access in the form
-    /// of a `&[Op]`.
+    /// This is a wrapper around [`Vm::exec`] that expects operation access in
+    /// the form of a `&[Op]`.
+    ///
+    /// If memory bloat is a concern, consider using the [`Vm::exec_bytecode`]
+    /// or [`Vm::exec_bytecode_iter`] methods which allow for providing a more
+    /// compact representation of the operations in the form of mapped bytecode.
     pub async fn exec_ops<'a, S>(
         &mut self,
         ops: &[Op],
@@ -224,6 +256,13 @@ impl Vm {
         OA::Error: Into<OpError<S::Error>>,
     {
         future::exec_boxed(self, access, state_read, op_access, op_gas_cost, gas_limit).await
+    }
+
+    /// Consumes the `Vm` and returns the read state slots.
+    ///
+    /// The returned slots correlate directly with the memory content.
+    pub fn into_state_slots(self) -> Vec<Option<Word>> {
+        self.memory.into()
     }
 }
 

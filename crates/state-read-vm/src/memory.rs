@@ -103,6 +103,12 @@ impl core::ops::Deref for Memory {
     }
 }
 
+impl From<Memory> for Vec<Option<Word>> {
+    fn from(memory: Memory) -> Self {
+        memory.0
+    }
+}
+
 /// `Memory::Alloc` operation.
 pub fn alloc(vm: &mut Vm) -> OpSyncResult<()> {
     let size = vm.stack.pop()?;
