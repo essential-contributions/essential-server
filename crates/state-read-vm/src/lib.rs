@@ -159,9 +159,9 @@ impl Vm {
     /// Execute the given mapped bytecode from the current state of the VM.
     ///
     /// This is a wrapper around `exec` that expects operation access in the form
-    /// of `&BytecodeMapped`.
+    /// of [`&BytecodeMapped`][BytecodeMapped].
     ///
-    /// This can be a more memory efficient alternative to `Vm::exec_ops` due
+    /// This can be a more memory efficient alternative to [`Vm::exec_ops`] due
     /// to the compact representation of operations in the form of bytecode and
     /// indices.
     pub async fn exec_bytecode<'a, S>(
@@ -305,7 +305,7 @@ impl<'a> OpAccess for &'a BytecodeMapped {
 ///
 /// Returns a `Some(usize)` representing the new program counter resulting from
 /// this step, or `None` in the case that execution has halted.
-pub fn step_op_sync(op: OpSync, access: Access, vm: &mut Vm) -> OpSyncResult<Option<usize>> {
+pub(crate) fn step_op_sync(op: OpSync, access: Access, vm: &mut Vm) -> OpSyncResult<Option<usize>> {
     match op {
         OpSync::Constraint(op) => constraint_vm::step_op(access, op, &mut vm.stack)?,
         OpSync::ControlFlow(op) => return step_op_ctrl_flow(op, vm).map_err(From::from),
@@ -319,7 +319,7 @@ pub fn step_op_sync(op: OpSync, access: Access, vm: &mut Vm) -> OpSyncResult<Opt
 /// Step forward the VM by a single asynchronous operation.
 ///
 /// Returns a `usize` representing the new program counter resulting from this step.
-pub async fn step_op_async<S>(
+pub(crate) async fn step_op_async<S>(
     op: OpAsync,
     set_addr: &ContentAddress,
     state_read: &S,
@@ -342,7 +342,7 @@ where
 /// Step forward state reading by the given control flow operation.
 ///
 /// Returns a `bool` indicating whether or not to continue execution.
-pub fn step_op_ctrl_flow(op: asm::ControlFlow, vm: &mut Vm) -> OpSyncResult<Option<usize>> {
+pub(crate) fn step_op_ctrl_flow(op: asm::ControlFlow, vm: &mut Vm) -> OpSyncResult<Option<usize>> {
     match op {
         asm::ControlFlow::Jump => ctrl_flow::jump(vm).map(Some).map_err(From::from),
         asm::ControlFlow::JumpIf => ctrl_flow::jump_if(vm).map(Some),
@@ -351,7 +351,7 @@ pub fn step_op_ctrl_flow(op: asm::ControlFlow, vm: &mut Vm) -> OpSyncResult<Opti
 }
 
 /// Step forward state reading by the given memory operation.
-pub fn step_op_memory(op: asm::Memory, vm: &mut Vm) -> OpSyncResult<()> {
+pub(crate) fn step_op_memory(op: asm::Memory, vm: &mut Vm) -> OpSyncResult<()> {
     match op {
         asm::Memory::Alloc => memory::alloc(vm),
         asm::Memory::Capacity => memory::capacity(vm),
