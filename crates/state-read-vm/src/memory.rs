@@ -20,7 +20,6 @@ impl Memory {
         if self.capacity() + size > Self::SIZE_LIMIT {
             return Err(MemoryError::Overflow);
         }
-        // TODO: Bound how much memory can be allocated.
         self.0.reserve_exact(size);
         Ok(())
     }
