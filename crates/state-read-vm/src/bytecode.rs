@@ -119,7 +119,7 @@ fn expect_ops_from_indices<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::asm;
+    use crate::*;
 
     // This ensures that, in the worst case where there is one operation per
     // byte (i.e. there are no `Push` operations), the size of `BytecodeMapped`

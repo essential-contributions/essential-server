@@ -6,7 +6,7 @@ use crate::{asm::Word, MemoryError, MemoryResult, OpSyncResult, Vm};
 ///
 /// `Memory` is a thin wrapper around a `Vec<Option<Word>>`. The `Vec` mutable methods
 /// are intentionally not exposed in order to maintain close control over capacity.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Memory(Vec<Option<Word>>);
 
 impl Memory {
@@ -220,9 +220,15 @@ mod tests {
         let cap = 5;
         assert_eq!(vm.memory.capacity(), 0);
         let ops = &[asm::Stack::Push(cap).into(), asm::Memory::Alloc.into()];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(vm.memory.capacity(), cap as usize);
     }
 
@@ -236,9 +242,15 @@ mod tests {
             asm::Memory::Alloc.into(),
             asm::Memory::Capacity.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(vm.memory.capacity(), cap as usize);
         assert_eq!(&vm.stack[..], &[cap]);
     }
@@ -253,17 +265,29 @@ mod tests {
             asm::Stack::Push(42).into(),
             asm::Memory::Push.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(vm.memory.capacity(), 1);
         assert_eq!(&vm.memory[..], &[Some(42)]);
         // Next, clear the value.
         let ops = &[asm::Stack::Push(0).into(), asm::Memory::Clear.into()];
         vm.pc = 0;
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         // Capacity remains the same. But the value is `None`.
         assert_eq!(vm.memory.capacity(), 1);
         assert_eq!(&vm.memory[..], &[None]);
@@ -284,9 +308,15 @@ mod tests {
             asm::Stack::Push(42).into(),
             asm::Memory::Push.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(vm.memory.capacity(), 4);
         assert_eq!(&vm.memory[..], &[Some(42), Some(42), Some(42), Some(42)]);
         // Next, clear the values at indices 1 and 2.
@@ -296,9 +326,15 @@ mod tests {
             asm::Memory::ClearRange.into(),
         ];
         vm.pc = 0;
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         // Capacity remains the same, but middle values should be None.
         assert_eq!(vm.memory.capacity(), 4);
         assert_eq!(&vm.memory[..], &[Some(42), None, None, Some(42)]);
@@ -316,9 +352,15 @@ mod tests {
             asm::Stack::Push(size).into(),
             asm::Memory::Free.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(vm.memory.capacity(), 0);
     }
 
@@ -333,9 +375,15 @@ mod tests {
             asm::Stack::Push(0).into(), // Check if the value at index 0 is `Some`
             asm::Memory::IsSome.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(&vm.stack[..], &[1 /*true*/],);
     }
 
@@ -353,9 +401,15 @@ mod tests {
             asm::Memory::Push.into(),
             asm::Memory::Length.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         // Make sure that capacity and length are tracked separately correctly.
         assert_eq!(vm.memory.capacity(), 6);
         assert_eq!(vm.memory.len(), 3);
@@ -373,9 +427,15 @@ mod tests {
             asm::Stack::Push(0).into(), // Load the value at index 0
             asm::Memory::Load.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(&vm.memory[..], &[Some(42)]);
         assert_eq!(&vm.stack[..], &[42]);
     }
@@ -389,9 +449,15 @@ mod tests {
             asm::Stack::Push(42).into(),
             asm::Memory::Push.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(vm.memory.capacity(), 1);
         assert_eq!(&vm.memory[..], &[Some(42)]);
         assert!(vm.stack.is_empty());
@@ -406,9 +472,15 @@ mod tests {
             asm::Memory::PushNone.into(),
             asm::Memory::PushNone.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(vm.memory.capacity(), 2);
         assert_eq!(&vm.memory[..], &[None, None]);
         assert!(vm.stack.is_empty());
@@ -429,9 +501,15 @@ mod tests {
             asm::Stack::Push(42).into(),
             asm::Memory::Store.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(&vm.memory[..], &[None, Some(42)]);
     }
 
@@ -449,9 +527,15 @@ mod tests {
             asm::Stack::Push(1).into(),
             asm::Memory::Truncate.into(),
         ];
-        vm.exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
-            .await
-            .unwrap();
+        vm.exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await
+        .unwrap();
         assert_eq!(&vm.memory[..], &[None]);
         assert_eq!(vm.memory.capacity(), 3);
     }
@@ -461,7 +545,13 @@ mod tests {
         let mut vm = Vm::default();
         let ops = &[asm::Stack::Push(0).into(), asm::Memory::Load.into()];
         let res = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await;
         match res {
             Err(StateReadError::Op(
@@ -481,7 +571,13 @@ mod tests {
             asm::Memory::Store.into(),
         ];
         let res = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await;
         match res {
             Err(StateReadError::Op(
@@ -497,7 +593,13 @@ mod tests {
         let mut vm = Vm::default();
         let ops = &[asm::Stack::Push(42).into(), asm::Memory::Push.into()];
         let res = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await;
         match res {
             Err(StateReadError::Op(
@@ -517,7 +619,13 @@ mod tests {
             asm::Memory::Alloc.into(),
         ];
         let res = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await;
         match res {
             Err(StateReadError::Op(

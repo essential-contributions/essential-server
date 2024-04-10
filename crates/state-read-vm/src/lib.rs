@@ -56,7 +56,7 @@ mod memory;
 mod state_read;
 
 /// The operation execution state of the State Read VM.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Vm {
     /// The "program counter", i.e. index of the current operation within the program.
     pub pc: usize,
@@ -222,7 +222,7 @@ impl Vm {
         {
             type Error = asm::FromBytesError;
             fn op_access(&mut self, index: usize) -> Option<Result<Op, Self::Error>> {
-                while self.mapped.op_indices().len() < index {
+                while self.mapped.op_indices().len() <= index {
                     match Op::from_bytes(&mut self.iter)? {
                         Err(err) => return Some(Err(err)),
                         Ok(op) => self.mapped.push_op(op),
@@ -379,6 +379,8 @@ pub(crate) fn step_op_memory(op: asm::Memory, vm: &mut Vm) -> OpSyncResult<()> {
 pub(crate) mod test_util {
     use super::*;
     use crate::types::{solution::SolutionData, ContentAddress, IntentAddress, Key, Word};
+    use std::collections::BTreeMap;
+    use thiserror::Error;
 
     pub(crate) const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
     pub(crate) const TEST_INTENT_CA: ContentAddress = ContentAddress([0xAA; 32]);
@@ -399,95 +401,77 @@ pub(crate) mod test_util {
         state_slots: StateSlots::EMPTY,
     };
 
-    // A test `StateRead` implementation that returns random yet deterministic
-    // option values for every possible set, key and range combination.
-    pub(crate) struct State;
+    // A test `StateRead` implementation represented using a map.
+    pub(crate) struct State(BTreeMap<ContentAddress, BTreeMap<Key, Word>>);
 
-    // A test `StateRead` implementation that always returns a
-    // random-yet-deterministic `Some` value for every possible set, key and
-    // range combination.
-    pub(crate) struct StateSome;
+    #[derive(Debug, Error)]
+    #[error("no value for the given intent set, key pair")]
+    pub struct InvalidStateRead;
 
-    // A test `StateRead` implementation that always returns `None`.
-    pub(crate) struct StateNone;
+    impl State {
+        // Empry state, fine for tests unrelated to reading state.
+        pub(crate) const EMPTY: Self = State(BTreeMap::new());
 
-    // A test `StateRead` implementation that always returns `Some(42)`.
-    pub(crate) struct State42;
+        // Shorthand test state constructor.
+        pub(crate) fn new(sets: Vec<(ContentAddress, Vec<(Key, Word)>)>) -> Self {
+            State(
+                sets.into_iter()
+                    .map(|(addr, vec)| {
+                        let map: BTreeMap<_, _> = vec.into_iter().collect();
+                        (addr, map)
+                    })
+                    .collect(),
+            )
+        }
+    }
+
+    impl core::ops::Deref for State {
+        type Target = BTreeMap<ContentAddress, BTreeMap<Key, Word>>;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
 
     impl StateRead for State {
-        type Error = core::convert::Infallible;
+        type Error = InvalidStateRead;
         async fn word_range(
             &self,
             set_addr: ContentAddress,
-            key: Key,
+            mut key: Key,
             num_words: usize,
         ) -> Result<Vec<Option<Word>>, Self::Error> {
-            use rand::{Rng, SeedableRng};
-            let seed = state_rng_seed(set_addr, key);
-            let mut rng = rand::rngs::SmallRng::from_seed(seed);
-            let words = (0..num_words).map(move |_| rng.gen()).collect();
+            // Get the key that follows this one.
+            fn next_key(mut key: Key) -> Option<Key> {
+                for w in key.iter_mut().rev() {
+                    match *w {
+                        Word::MAX => *w = Word::MIN,
+                        _ => {
+                            *w += 1;
+                            return Some(key);
+                        }
+                    }
+                }
+                None
+            }
+
+            // Collect the words.
+            let mut words = vec![];
+            for _ in 0..num_words {
+                let opt = self
+                    .get(&set_addr)
+                    .ok_or(InvalidStateRead)?
+                    .get(&key)
+                    .cloned();
+                words.push(opt);
+                key = next_key(key).ok_or(InvalidStateRead)?;
+            }
             Ok(words)
-        }
-    }
-
-    impl StateRead for StateSome {
-        type Error = core::convert::Infallible;
-        async fn word_range(
-            &self,
-            set_addr: ContentAddress,
-            key: Key,
-            num_words: usize,
-        ) -> Result<Vec<Option<Word>>, Self::Error> {
-            use rand::{Rng, SeedableRng};
-            let seed = state_rng_seed(set_addr, key);
-            let mut rng = rand::rngs::SmallRng::from_seed(seed);
-            let words = (0..num_words).map(move |_| Some(rng.gen())).collect();
-            Ok(words)
-        }
-    }
-
-    impl StateRead for StateNone {
-        type Error = core::convert::Infallible;
-        async fn word_range(
-            &self,
-            _set_addr: ContentAddress,
-            _key: Key,
-            num_words: usize,
-        ) -> Result<Vec<Option<Word>>, Self::Error> {
-            Ok(vec![None; num_words])
-        }
-    }
-
-    impl StateRead for State42 {
-        type Error = core::convert::Infallible;
-        async fn word_range(
-            &self,
-            _set_addr: ContentAddress,
-            _key: Key,
-            num_words: usize,
-        ) -> Result<Vec<Option<Word>>, Self::Error> {
-            Ok(vec![Some(42); num_words])
         }
     }
 
     // For now, pretend all ops cost 1 gas.
     pub(crate) fn op_gas_cost(_op: &Op) -> Gas {
         1
-    }
-
-    // Derive a deterministic RNG seed from an intent set content address and key.
-    fn state_rng_seed(set_addr: ContentAddress, key: Key) -> [u8; 32] {
-        use std::hash::{Hash, Hasher};
-        let mut hasher = std::collections::hash_map::DefaultHasher::default();
-        set_addr.hash(&mut hasher);
-        key.hash(&mut hasher);
-        let hash = hasher.finish().to_be_bytes();
-        let mut seed = vec![];
-        seed.extend(hash);
-        seed.extend(hash);
-        seed.extend(hash);
-        seed.extend(hash);
-        seed.try_into().unwrap()
     }
 }
 
@@ -506,7 +490,13 @@ mod tests {
             asm::Alu::Mul.into(),
         ];
         let spent = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &op_gas_cost,
+                GasLimit::UNLIMITED,
+            )
             .await
             .unwrap();
         assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
@@ -526,7 +516,13 @@ mod tests {
         // Force the VM to yield after every op to test behaviour.
         let op_gas_cost = |_op: &_| GasLimit::DEFAULT_PER_YIELD;
         let spent = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &op_gas_cost,
+                GasLimit::UNLIMITED,
+            )
             .await
             .unwrap();
         assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
@@ -546,7 +542,13 @@ mod tests {
             asm::Alu::Mul.into(),
         ];
         let spent = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &op_gas_cost,
+                GasLimit::UNLIMITED,
+            )
             .await
             .unwrap();
         assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
@@ -557,11 +559,73 @@ mod tests {
         vm.pc = 0;
         let ops = &[asm::Stack::Push(6).into(), asm::Alu::Div.into()];
         let spent = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &op_gas_cost, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &op_gas_cost,
+                GasLimit::UNLIMITED,
+            )
             .await
             .unwrap();
         assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
         assert_eq!(vm.pc, ops.len());
         assert_eq!(&vm.stack[..], &[7]);
+    }
+
+    // Ensure basic programs evaluate to the same thing
+    #[tokio::test]
+    async fn exec_method_behaviours_match() {
+        // The operations of the test program.
+        let ops: &[Op] = &[
+            asm::Stack::Push(6).into(),
+            asm::Stack::Push(7).into(),
+            asm::Alu::Mul.into(),
+        ];
+
+        // Execute the ops using `exec_ops`.
+        let mut vm_ops = Vm::default();
+        let spent_ops = vm_ops
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
+            .await
+            .unwrap();
+
+        // Execute the same ops but as mapped bytecode.
+        let mapped: BytecodeMapped = ops.iter().copied().collect();
+        let mut vm_bc = Vm::default();
+        let spent_bc = vm_bc
+            .exec_bytecode(
+                &mapped,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
+            .await
+            .unwrap();
+        assert_eq!(spent_ops, spent_bc);
+        assert_eq!(vm_ops, vm_bc);
+
+        // Execute the same ops, but from a bytes iterator.
+        let bc_iter = mapped.bytecode().iter().copied();
+        let mut vm_bc_iter = Vm::default();
+        let spent_bc_iter = vm_bc_iter
+            .exec_bytecode_iter(
+                bc_iter,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
+            .await
+            .unwrap();
+        assert_eq!(spent_ops, spent_bc_iter);
+        assert_eq!(vm_ops, vm_bc_iter);
     }
 }

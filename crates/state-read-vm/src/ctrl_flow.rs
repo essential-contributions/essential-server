@@ -45,7 +45,13 @@ mod tests {
             asm::Alu::Mul.into(),
         ];
         let spent = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_op: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_op: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await
             .unwrap();
         assert_eq!(spent, 5);
@@ -75,7 +81,7 @@ mod tests {
             total,
         };
         let res = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_op: &Op| 1, gas_limit)
+            .exec_ops(ops, TEST_ACCESS, &State::EMPTY, &|_op: &Op| 1, gas_limit)
             .await;
         let err = match res {
             // The failing operations hould be the `Push` that follows the final
@@ -108,7 +114,13 @@ mod tests {
             asm::Alu::Mul.into(), // Jump destination.
         ];
         let spent = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_op: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_op: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await
             .unwrap();
         assert_eq!(spent, 9);
@@ -146,7 +158,13 @@ mod tests {
             asm::Stack::Pop.into(),  // [value]
         ];
         let spent = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_op: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_op: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await
             .unwrap();
         // After 5 total iterations, the result should be 2^5.
@@ -167,7 +185,13 @@ mod tests {
             asm::ControlFlow::JumpIf.into(),
         ];
         let res = vm
-            .exec_ops(ops, TEST_ACCESS, &State, &|_: &Op| 1, GasLimit::UNLIMITED)
+            .exec_ops(
+                ops,
+                TEST_ACCESS,
+                &State::EMPTY,
+                &|_: &Op| 1,
+                GasLimit::UNLIMITED,
+            )
             .await;
         match res {
             Err(StateReadError::Op(
