@@ -1,7 +1,8 @@
 use crate::{
     error::{OpError, OutOfGasError, StateReadError},
-    step_op_async, step_op_sync, ContentAddress, Gas, GasLimit, OpAccess, OpAsync, OpAsyncResult,
-    OpGasCost, OpKind, StateRead, Vm,
+    state_read::{self, StateReadFuture},
+    step_op_sync, ContentAddress, Gas, GasLimit, OpAccess, OpAsync, OpAsyncResult, OpGasCost,
+    OpKind, StateRead, Vm,
 };
 use constraint_vm::Access;
 use core::{
@@ -24,14 +25,6 @@ use core::{
 /// This type should not be constructed directly. Instead, it is used as a part
 /// of the implementation of [`Vm::exec`] and exposed publicly for documentation
 /// of its behaviour.
-///
-/// ## Allocations
-///
-/// A boxed future is allocated for each asynchronous operation as it begins
-/// execution so that it may be stored within `ExecFuture` and polled.
-///
-/// Otherwise, the future requires no extra allocation beyond regular stack
-/// and memory manipulation.
 ///
 /// ## Yield Behavior
 ///
@@ -88,7 +81,7 @@ where
     gas: GasExec,
     /// In the case that the operation future is pending (i.e a state read is in
     /// progress), we store the future here.
-    pending_op: Option<PendingOp<'a, S::Error>>,
+    pending_op: Option<PendingOp<'a, S>>,
 }
 
 /// Track gas limits and expenditure for execution.
@@ -102,12 +95,23 @@ struct GasExec {
 }
 
 /// Encapsulates a pending operation.
-struct PendingOp<'a, E> {
+struct PendingOp<'a, S>
+where
+    S: StateRead,
+{
     // The future representing the operation in progress.
-    #[allow(clippy::type_complexity)]
-    future: Pin<Box<dyn 'a + Future<Output = (&'a mut Vm, OpAsyncResult<usize, E>)>>>,
+    future: StepOpAsyncFuture<'a, S>,
     /// Total gas that will have been spent upon completing the op.
     next_spent: Gas,
+}
+
+/// The future type produced when performing an async operation.
+enum StepOpAsyncFuture<'a, S>
+where
+    S: StateRead,
+{
+    /// The async `StateRead::WordRange` (or `WordRangeExtern`) operation future.
+    StateRead(StateReadFuture<'a, S>),
 }
 
 impl From<GasLimit> for GasExec {
@@ -117,6 +121,18 @@ impl From<GasLimit> for GasExec {
             spent: 0,
             next_yield_threshold: limit.per_yield,
             limit,
+        }
+    }
+}
+
+// Allow for consuming the async operation future to retake ownership of the stored `&mut Vm`.
+impl<'a, S> From<StepOpAsyncFuture<'a, S>> for &'a mut Vm
+where
+    S: StateRead,
+{
+    fn from(future: StepOpAsyncFuture<'a, S>) -> Self {
+        match future {
+            StepOpAsyncFuture::StateRead(future) => future.vm,
         }
     }
 }
@@ -136,14 +152,15 @@ where
         let vm = match self.pending_op.as_mut() {
             None => self.vm.take().expect("future polled after completion"),
             Some(pending) => {
-                let (vm, res) = match Pin::new(&mut pending.future).poll(cx) {
+                let res = match Pin::new(&mut pending.future).poll(cx) {
                     Poll::Pending => return Poll::Pending,
                     Poll::Ready(ready) => ready,
                 };
 
-                // Drop the future now we've resumed.
+                // Drop the future now we've resumed, retake ownership of the `&mut Vm`.
+                let pending = self.pending_op.take().expect("guaranteed `Some`");
                 let next_spent = pending.next_spent;
-                self.pending_op.take();
+                let vm: &'a mut Vm = pending.future.into();
 
                 // Handle the op result.
                 match res {
@@ -193,7 +210,14 @@ where
                 OpKind::Async(op) => {
                     // Async op takes ownership of the VM and returns it upon future completion.
                     let set_addr = self.access.solution.this_data().intent_to_solve.set.clone();
-                    let future = Box::pin(step_op_async_owned(op, set_addr, self.state_read, vm));
+                    let pc = vm.pc;
+                    let future = match step_op_async(op, set_addr, self.state_read, vm) {
+                        Err(err) => {
+                            let err = StateReadError::Op(pc, err.into());
+                            return Poll::Ready(Err(err));
+                        }
+                        Ok(fut) => fut,
+                    };
                     self.pending_op = Some(PendingOp { future, next_spent });
                     cx.waker().wake_by_ref();
                     return Poll::Pending;
@@ -233,6 +257,30 @@ where
     }
 }
 
+impl<'vm, S> Future for StepOpAsyncFuture<'vm, S>
+where
+    S: StateRead,
+{
+    // Future returns a result with the new program counter.
+    type Output = OpAsyncResult<usize, S::Error>;
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let (prev_pc, res) = match *self {
+            Self::StateRead(ref mut future) => {
+                let pc = future.vm.pc;
+                match Pin::new(future).poll(cx) {
+                    Poll::Pending => return Poll::Pending,
+                    Poll::Ready(res) => (pc, res),
+                }
+            }
+        };
+        // Every operation besides control flow steps forward
+        // program counter by 1.
+        let new_pc = prev_pc.checked_add(1).expect("pc can never exceed `usize`");
+        let res = res.map(|()| new_pc);
+        Poll::Ready(res)
+    }
+}
+
 /// Creates the VM execution future.
 pub(crate) fn exec<'a, S, OA, OG>(
     vm: &'a mut Vm,
@@ -259,22 +307,28 @@ where
     }
 }
 
-/// A version of the `step_op_async` function that takes ownership of the
-/// `&'a mut Vm` and returns it upon completion.
+/// Step forward the given `Vm` with the given asynchronous operation.
 ///
-/// This allows for moving ownership of the VM between the async operation
-/// future and the `ExecFuture`.
-async fn step_op_async_owned<'a, S>(
+/// Returns a future representing the completion of the operation.
+fn step_op_async<'a, S>(
     op: OpAsync,
     set_addr: ContentAddress,
     state_read: &'a S,
     vm: &'a mut Vm,
-) -> (&'a mut Vm, OpAsyncResult<usize, S::Error>)
+) -> OpAsyncResult<StepOpAsyncFuture<'a, S>, S::Error>
 where
     S: StateRead,
 {
-    let res = step_op_async(op, &set_addr, state_read, vm).await;
-    (vm, res)
+    match op {
+        OpAsync::StateReadWordRange => {
+            let future = state_read::word_range(state_read, &set_addr, &mut *vm)?;
+            Ok(StepOpAsyncFuture::StateRead(future))
+        }
+        OpAsync::StateReadWordRangeExt => {
+            let future = state_read::word_range_ext(state_read, &mut *vm)?;
+            Ok(StepOpAsyncFuture::StateRead(future))
+        }
+    }
 }
 
 /// Shorthand for constructing an `OutOfGasError`.

@@ -6,7 +6,10 @@ use essential_state_read_vm::{
     types::{solution::SolutionData, ContentAddress, IntentAddress, Key, Word},
     Access, SolutionAccess, StateRead, StateSlots,
 };
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    future::{self, Ready},
+};
 use thiserror::Error;
 
 pub const TEST_SET_CA: ContentAddress = ContentAddress([0xFF; 32]);
@@ -64,23 +67,14 @@ impl State {
             }
         }
     }
-}
 
-impl core::ops::Deref for State {
-    type Target = BTreeMap<ContentAddress, BTreeMap<Key, Word>>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl StateRead for State {
-    type Error = InvalidStateRead;
-    async fn word_range(
+    /// Retrieve a word range.
+    pub fn word_range(
         &self,
         set_addr: ContentAddress,
         mut key: Key,
         num_words: usize,
-    ) -> Result<Vec<Option<Word>>, Self::Error> {
+    ) -> Result<Vec<Option<Word>>, InvalidStateRead> {
         // Get the key that follows this one.
         fn next_key(mut key: Key) -> Option<Key> {
             for w in key.iter_mut().rev() {
@@ -107,5 +101,20 @@ impl StateRead for State {
             key = next_key(key).ok_or(InvalidStateRead)?;
         }
         Ok(words)
+    }
+}
+
+impl core::ops::Deref for State {
+    type Target = BTreeMap<ContentAddress, BTreeMap<Key, Word>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl StateRead for State {
+    type Error = InvalidStateRead;
+    type Future = Ready<Result<Vec<Option<Word>>, Self::Error>>;
+    fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+        future::ready(self.word_range(set_addr, key, num_words))
     }
 }

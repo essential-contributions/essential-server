@@ -339,29 +339,6 @@ pub(crate) fn step_op_sync(op: OpSync, access: Access, vm: &mut Vm) -> OpSyncRes
     Ok(Some(new_pc))
 }
 
-/// Step forward the VM by a single asynchronous operation.
-///
-/// Returns a `usize` representing the new program counter resulting from this step.
-pub(crate) async fn step_op_async<S>(
-    op: OpAsync,
-    set_addr: &ContentAddress,
-    state_read: &S,
-    vm: &mut Vm,
-) -> OpAsyncResult<usize, S::Error>
-where
-    S: StateRead,
-{
-    match op {
-        OpAsync::StateReadWordRange => {
-            state_read::word_range(state_read, set_addr, &mut *vm).await?
-        }
-        OpAsync::StateReadWordRangeExt => state_read::word_range_ext(state_read, &mut *vm).await?,
-    }
-    // Every operation besides control flow steps forward program counter by 1.
-    let new_pc = vm.pc.checked_add(1).expect("pc can never exceed `usize`");
-    Ok(new_pc)
-}
-
 /// Step forward state reading by the given control flow operation.
 ///
 /// Returns a `bool` indicating whether or not to continue execution.
