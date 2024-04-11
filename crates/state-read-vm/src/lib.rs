@@ -235,13 +235,15 @@ impl Vm {
         {
             type Error = asm::FromBytesError;
             fn op_access(&mut self, index: usize) -> Option<Result<Op, Self::Error>> {
-                while self.mapped.op_indices().len() <= index {
-                    match Op::from_bytes(&mut self.iter)? {
-                        Err(err) => return Some(Err(err)),
-                        Ok(op) => self.mapped.push_op(op),
+                loop {
+                    match self.mapped.op(index) {
+                        Some(op) => return Some(Ok(op)),
+                        None => match Op::from_bytes(&mut self.iter)? {
+                            Err(err) => return Some(Err(err)),
+                            Ok(op) => self.mapped.push_op(op),
+                        },
                     }
                 }
-                self.mapped.op(index).map(Ok)
             }
         }
 
