@@ -37,7 +37,7 @@ pub trait StateRead {
 
 /// A future representing the asynchronous `StateRead` (or `StateReadExtern`) operation.
 ///
-/// Performs the state read and then writes the result
+/// Performs the state read and then writes the result to memory.
 pub(crate) struct StateReadFuture<'vm, S>
 where
     S: StateRead,
