@@ -121,10 +121,10 @@ impl From<GasLimit> for GasExec {
     }
 }
 
-impl<'a, S, OA, OG> Future for Box<ExecFuture<'a, S, OA, OG>>
+impl<'a, S, OA, OG> Future for ExecFuture<'a, S, OA, OG>
 where
     S: StateRead,
-    OA: OpAccess,
+    OA: OpAccess + Unpin,
     OG: OpGasCost,
     OA::Error: Into<OpError<S::Error>>,
 {
@@ -234,21 +234,21 @@ where
 }
 
 /// Creates the VM execution future.
-pub(crate) fn exec_boxed<'a, S, OA, OG>(
+pub(crate) fn exec<'a, S, OA, OG>(
     vm: &'a mut Vm,
     access: Access<'a>,
     state_read: &'a S,
     op_access: OA,
     op_gas_cost: &'a OG,
     gas_limit: GasLimit,
-) -> Box<ExecFuture<'a, S, OA, OG>>
+) -> ExecFuture<'a, S, OA, OG>
 where
     S: StateRead,
-    OA: OpAccess,
+    OA: OpAccess + Unpin,
     OG: OpGasCost,
     OA::Error: Into<OpError<S::Error>>,
 {
-    Box::new(ExecFuture {
+    ExecFuture {
         access,
         state_read,
         op_access,
@@ -256,7 +256,7 @@ where
         vm: Some(vm),
         gas: GasExec::from(gas_limit),
         pending_op: None,
-    })
+    }
 }
 
 /// A version of the `step_op_async` function that takes ownership of the

@@ -218,6 +218,7 @@ impl Vm {
     where
         S: StateRead,
         I: IntoIterator<Item = u8>,
+        I::IntoIter: Unpin,
     {
         /// A type wrapper around `BytecodeMapped` that lazily constructs the
         /// map from the given bytecode as operations are accessed.
@@ -274,10 +275,10 @@ impl Vm {
     ) -> Result<Gas, StateReadError<S::Error>>
     where
         S: StateRead,
-        OA: OpAccess,
+        OA: OpAccess + Unpin,
         OA::Error: Into<OpError<S::Error>>,
     {
-        future::exec_boxed(self, access, state_read, op_access, op_gas_cost, gas_limit).await
+        future::exec(self, access, state_read, op_access, op_gas_cost, gas_limit).await
     }
 
     /// Consumes the `Vm` and returns the read state slots.
