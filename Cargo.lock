@@ -346,7 +346,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/vm-items#6b135ad4481e39214b7418620a979d4e100e42e2"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#8b3158d1633460c8d8038b5d17e83ccdd8bb3837"
 dependencies = [
  "essential-asm-spec",
  "essential-types",
@@ -358,7 +358,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/vm-items#6b135ad4481e39214b7418620a979d4e100e42e2"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#8b3158d1633460c8d8038b5d17e83ccdd8bb3837"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -367,7 +367,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/vm-items#6b135ad4481e39214b7418620a979d4e100e42e2"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#8b3158d1633460c8d8038b5d17e83ccdd8bb3837"
 dependencies = [
  "essential-asm-gen",
  "essential-types",
@@ -403,7 +403,7 @@ dependencies = [
 [[package]]
 name = "essential-state-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/vm-items#6b135ad4481e39214b7418620a979d4e100e42e2"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#8b3158d1633460c8d8038b5d17e83ccdd8bb3837"
 dependencies = [
  "essential-asm-gen",
  "essential-constraint-asm",
@@ -425,7 +425,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/vm-items#6b135ad4481e39214b7418620a979d4e100e42e2"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#8b3158d1633460c8d8038b5d17e83ccdd8bb3837"
 dependencies = [
  "serde",
 ]
