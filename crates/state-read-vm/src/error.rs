@@ -80,6 +80,9 @@ pub enum OpSyncError {
     /// An error occurred during a `Memory` operation.
     #[error("memory operation error: {0}")]
     Memory(#[from] MemoryError),
+    /// The next program counter would overflow.
+    #[error("the next program counter would overflow")]
+    PcOverflow,
 }
 
 /// A synchronous operation failed.
@@ -94,6 +97,9 @@ pub enum OpAsyncError<E> {
     /// An error occurred during a `Stack` operation.
     #[error("stack operation error: {0}")]
     Stack(#[from] StackError),
+    /// The next program counter would overflow.
+    #[error("the next program counter would overflow")]
+    PcOverflow,
 }
 
 /// Errors occuring during `ControlFlow` operation.

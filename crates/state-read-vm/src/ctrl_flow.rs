@@ -1,7 +1,7 @@
 //! ControlFlow operation implementations.
 
 use crate::{
-    error::{ControlFlowError, OpSyncResult, StackError},
+    error::{ControlFlowError, OpSyncError, OpSyncResult, StackError},
     types::convert::bool_from_word,
     Vm,
 };
@@ -18,7 +18,7 @@ pub fn jump_if(vm: &mut Vm) -> OpSyncResult<usize> {
     let cond = bool_from_word(cond).ok_or(ControlFlowError::InvalidJumpIfCondition(cond))?;
     let new_pc = match cond {
         true => usize::try_from(new_pc).map_err(|_| StackError::IndexOutOfBounds)?,
-        false => vm.pc.checked_add(1).expect("pc can never exceeds `usize`"),
+        false => vm.pc.checked_add(1).ok_or(OpSyncError::PcOverflow)?,
     };
     Ok(new_pc)
 }

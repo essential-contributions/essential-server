@@ -34,7 +34,7 @@ pub use bytecode::{BytecodeMapped, BytecodeMappedSlice};
 pub use constraint_vm::{
     self as constraint, Access, SolutionAccess, Stack, StateSlotSlice, StateSlots,
 };
-use error::{MemoryError, OpError, StateReadError};
+use error::{MemoryError, OpError, OpSyncError, StateReadError};
 #[doc(inline)]
 pub use error::{MemoryResult, OpAsyncResult, OpResult, OpSyncResult, StateReadResult};
 #[doc(inline)]
@@ -337,7 +337,7 @@ pub(crate) fn step_op_sync(op: OpSync, access: Access, vm: &mut Vm) -> OpSyncRes
         OpSync::Memory(op) => step_op_memory(op, &mut *vm)?,
     }
     // Every operation besides control flow steps forward program counter by 1.
-    let new_pc = vm.pc.checked_add(1).expect("pc can never exceed `usize`");
+    let new_pc = vm.pc.checked_add(1).ok_or(OpSyncError::PcOverflow)?;
     Ok(Some(new_pc))
 }
 

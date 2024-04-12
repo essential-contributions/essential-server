@@ -1,5 +1,5 @@
 use crate::{
-    error::{OpError, OutOfGasError, StateReadError},
+    error::{OpAsyncError, OpError, OutOfGasError, StateReadError},
     state_read::{self, StateReadFuture},
     step_op_sync, ContentAddress, Gas, GasLimit, OpAccess, OpAsync, OpAsyncResult, OpGasCost,
     OpKind, StateRead, Vm,
@@ -274,9 +274,8 @@ where
                 }
             }
         };
-        // Every operation besides control flow steps forward
-        // program counter by 1.
-        let new_pc = prev_pc.checked_add(1).expect("pc can never exceed `usize`");
+        // Every operation besides control flow steps forward program counter by 1.
+        let new_pc = prev_pc.checked_add(1).ok_or(OpAsyncError::PcOverflow)?;
         let res = res.map(|()| new_pc);
         Poll::Ready(res)
     }
