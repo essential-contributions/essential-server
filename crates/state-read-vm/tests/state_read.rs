@@ -25,6 +25,7 @@ async fn state_read_3_42s() {
         asm::Stack::Push(0).into(), // Key3
         asm::Stack::Push(num_words).into(),
         asm::StateRead::WordRange,
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(ops, access, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
         .await
@@ -51,6 +52,7 @@ async fn state_read_some_none_some() {
         asm::Stack::Push(0).into(), // Key3
         asm::Stack::Push(num_words).into(),
         asm::StateRead::WordRange,
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(ops, access, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
         .await
@@ -82,6 +84,7 @@ async fn state_read_ext() {
         asm::Stack::Push(4).into(), // Key3
         asm::Stack::Push(num_words).into(),
         asm::StateRead::WordRangeExtern,
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(ops, TEST_ACCESS, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
         .await
@@ -110,6 +113,7 @@ async fn state_read_ext_nones() {
         asm::Stack::Push(4).into(), // Key3
         asm::Stack::Push(num_words).into(),
         asm::StateRead::WordRangeExtern,
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(ops, TEST_ACCESS, &state, &|_: &Op| 1, GasLimit::UNLIMITED)
         .await

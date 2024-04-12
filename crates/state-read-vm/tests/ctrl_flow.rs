@@ -19,6 +19,7 @@ async fn jump_forward() {
         asm::Stack::Push(6).into(), // Jump destination.
         asm::Stack::Push(7).into(),
         asm::Alu::Mul.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     let spent = vm
         .exec_ops(
@@ -30,7 +31,7 @@ async fn jump_forward() {
         )
         .await
         .unwrap();
-    assert_eq!(spent, 5);
+    assert_eq!(spent, 6);
     assert_eq!(&vm.stack[..], &[42]);
 }
 
@@ -88,6 +89,7 @@ async fn jump_if_forward() {
         asm::ControlFlow::Halt.into(),
         asm::ControlFlow::Halt.into(),
         asm::Alu::Mul.into(), // Jump destination.
+        asm::ControlFlow::Halt.into(),
     ];
     let spent = vm
         .exec_ops(
@@ -99,7 +101,7 @@ async fn jump_if_forward() {
         )
         .await
         .unwrap();
-    assert_eq!(spent, 9);
+    assert_eq!(spent, 10);
     assert_eq!(&vm.stack[..], &[42]);
 }
 
@@ -132,6 +134,7 @@ async fn jump_if_back() {
         // Pop the counter so that we're left with the value.
         asm::Stack::Swap.into(), // [value, counter]
         asm::Stack::Pop.into(),  // [value]
+        asm::ControlFlow::Halt.into(),
     ];
     let spent = vm
         .exec_ops(
@@ -146,7 +149,7 @@ async fn jump_if_back() {
     // After 5 total iterations, the result should be 2^5.
     assert_eq!(
         spent,
-        2 /*setup*/ + 13 * nth_power as u64 /*loop*/ + 2 /*cleanup*/
+        2 /*setup*/ + 13 * nth_power as u64 /*loop*/ + 3 /*cleanup*/
     );
     assert_eq!(&vm.stack[..], &[2i64.pow(nth_power as u32)]);
 }
@@ -174,6 +177,53 @@ async fn jump_if_invalid_cond() {
             _,
             OpError::Sync(OpSyncError::ControlFlow(ControlFlowError::InvalidJumpIfCondition(n))),
         )) if n == invalid_cond => (),
+        _ => panic!("expected overflow, found {:?}", res),
+    }
+}
+
+#[tokio::test]
+async fn missing_halt() {
+    let mut vm = Vm::default();
+    let ops = &[
+        asm::Stack::Push(6).into(),
+        asm::Stack::Push(7).into(),
+        asm::Alu::Mul.into(),
+    ];
+    let res = vm
+        .exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await;
+    match res {
+        Err(StateReadError::PcOutOfRange(pc)) if pc == ops.len() => (),
+        _ => panic!("expected overflow, found {:?}", res),
+    }
+}
+
+#[tokio::test]
+async fn jump_pc_out_of_range() {
+    let mut vm = Vm::default();
+    let pc_out_of_range = 3;
+    let ops = &[
+        asm::Stack::Push(pc_out_of_range).into(),
+        asm::ControlFlow::Jump.into(),
+        asm::ControlFlow::Halt.into(),
+    ];
+    let res = vm
+        .exec_ops(
+            ops,
+            TEST_ACCESS,
+            &State::EMPTY,
+            &|_: &Op| 1,
+            GasLimit::UNLIMITED,
+        )
+        .await;
+    match res {
+        Err(StateReadError::PcOutOfRange(pc)) if pc == pc_out_of_range as usize => (),
         _ => panic!("expected overflow, found {:?}", res),
     }
 }

@@ -238,8 +238,9 @@ where
 
             // Update the program counter, or exit if we're done.
             match opt_new_pc {
-                None => break,
                 Some(new_pc) => vm.pc = new_pc,
+                // `None` is returned after encountering a `Halt` operation.
+                None => return Poll::Ready(Ok(self.gas.spent)),
             }
 
             // Yield if we've reached our gas limit.
@@ -252,8 +253,8 @@ where
             }
         }
 
-        // Completed execution successfully.
-        Poll::Ready(Ok(self.gas.spent))
+        // Programs must complete with a `Halt` operation.
+        Poll::Ready(Err(StateReadError::PcOutOfRange(vm.pc)))
     }
 }
 

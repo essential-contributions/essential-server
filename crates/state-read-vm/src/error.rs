@@ -29,6 +29,9 @@ pub enum StateReadError<E> {
     /// The operation at the specified index failed.
     #[error("operation at index {0} failed: {1}")]
     Op(usize, OpError<E>),
+    /// The program counter is out of range.
+    #[error("program counter {0} out of range (note: programs must end with `Halt`)")]
+    PcOutOfRange(usize),
 }
 
 /// An individual operation failed during state read execution.

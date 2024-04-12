@@ -12,7 +12,11 @@ async fn alloc() {
     let mut vm = Vm::default();
     let cap = 5;
     assert_eq!(vm.memory.capacity(), 0);
-    let ops = &[asm::Stack::Push(cap).into(), asm::Memory::Alloc.into()];
+    let ops = &[
+        asm::Stack::Push(cap).into(),
+        asm::Memory::Alloc.into(),
+        asm::ControlFlow::Halt.into(),
+    ];
     vm.exec_ops(
         ops,
         TEST_ACCESS,
@@ -34,6 +38,7 @@ async fn capacity() {
         asm::Stack::Push(cap).into(),
         asm::Memory::Alloc.into(),
         asm::Memory::Capacity.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -57,6 +62,7 @@ async fn clear() {
         asm::Memory::Alloc.into(),
         asm::Stack::Push(42).into(),
         asm::Memory::Push.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -70,7 +76,11 @@ async fn clear() {
     assert_eq!(vm.memory.capacity(), 1);
     assert_eq!(&vm.memory[..], &[Some(42)]);
     // Next, clear the value.
-    let ops = &[asm::Stack::Push(0).into(), asm::Memory::Clear.into()];
+    let ops = &[
+        asm::Stack::Push(0).into(),
+        asm::Memory::Clear.into(),
+        asm::ControlFlow::Halt.into(),
+    ];
     vm.pc = 0;
     vm.exec_ops(
         ops,
@@ -100,6 +110,7 @@ async fn clear_range() {
         asm::Memory::Push.into(),
         asm::Stack::Push(42).into(),
         asm::Memory::Push.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -117,6 +128,7 @@ async fn clear_range() {
         asm::Stack::Push(1).into(),
         asm::Stack::Push(2).into(),
         asm::Memory::ClearRange.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.pc = 0;
     vm.exec_ops(
@@ -144,6 +156,7 @@ async fn free() {
         asm::Memory::Alloc.into(),
         asm::Stack::Push(size).into(),
         asm::Memory::Free.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -167,6 +180,7 @@ async fn is_some() {
         asm::Memory::Push.into(),
         asm::Stack::Push(0).into(), // Check if the value at index 0 is `Some`
         asm::Memory::IsSome.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -193,6 +207,7 @@ async fn length() {
         asm::Stack::Push(42).into(),
         asm::Memory::Push.into(),
         asm::Memory::Length.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -219,6 +234,7 @@ async fn load() {
         asm::Memory::Push.into(),
         asm::Stack::Push(0).into(), // Load the value at index 0
         asm::Memory::Load.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -241,6 +257,7 @@ async fn push() {
         asm::Memory::Alloc.into(),
         asm::Stack::Push(42).into(),
         asm::Memory::Push.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -264,6 +281,7 @@ async fn push_none() {
         asm::Memory::Alloc.into(),
         asm::Memory::PushNone.into(),
         asm::Memory::PushNone.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -293,6 +311,7 @@ async fn store() {
         asm::Stack::Push(1).into(),
         asm::Stack::Push(42).into(),
         asm::Memory::Store.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -319,6 +338,7 @@ async fn truncate() {
         // Truncate down to one `None`. Doesn't affect capacity.
         asm::Stack::Push(1).into(),
         asm::Memory::Truncate.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     vm.exec_ops(
         ops,
@@ -336,7 +356,11 @@ async fn truncate() {
 #[tokio::test]
 async fn load_index_oob() {
     let mut vm = Vm::default();
-    let ops = &[asm::Stack::Push(0).into(), asm::Memory::Load.into()];
+    let ops = &[
+        asm::Stack::Push(0).into(),
+        asm::Memory::Load.into(),
+        asm::ControlFlow::Halt.into(),
+    ];
     let res = vm
         .exec_ops(
             ops,
@@ -362,6 +386,7 @@ async fn store_index_oob() {
         asm::Stack::Push(0).into(),
         asm::Stack::Push(0).into(),
         asm::Memory::Store.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     let res = vm
         .exec_ops(
@@ -384,7 +409,11 @@ async fn store_index_oob() {
 #[tokio::test]
 async fn push_overflow() {
     let mut vm = Vm::default();
-    let ops = &[asm::Stack::Push(42).into(), asm::Memory::Push.into()];
+    let ops = &[
+        asm::Stack::Push(42).into(),
+        asm::Memory::Push.into(),
+        asm::ControlFlow::Halt.into(),
+    ];
     let res = vm
         .exec_ops(
             ops,
@@ -407,6 +436,7 @@ async fn alloc_overflow() {
     let ops = &[
         asm::Stack::Push(overflow_cap).into(),
         asm::Memory::Alloc.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     let res = vm
         .exec_ops(

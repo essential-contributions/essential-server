@@ -17,6 +17,7 @@ async fn no_yield() {
         asm::Stack::Push(6).into(),
         asm::Stack::Push(7).into(),
         asm::Alu::Mul.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     let op_gas_cost = &|_: &Op| 1;
     let spent = vm
@@ -30,7 +31,7 @@ async fn no_yield() {
         .await
         .unwrap();
     assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
-    assert_eq!(vm.pc, ops.len());
+    assert_eq!(vm.pc, ops.len() - 1);
     assert_eq!(&vm.stack[..], &[42]);
 }
 
@@ -42,6 +43,7 @@ async fn yield_per_op() {
         asm::Stack::Push(6).into(),
         asm::Stack::Push(7).into(),
         asm::Alu::Mul.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     // Force the VM to yield after every op to test behaviour.
     let op_gas_cost = |_op: &_| GasLimit::DEFAULT_PER_YIELD;
@@ -56,7 +58,7 @@ async fn yield_per_op() {
         .await
         .unwrap();
     assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
-    assert_eq!(vm.pc, ops.len());
+    assert_eq!(vm.pc, ops.len() - 1);
     assert_eq!(&vm.stack[..], &[42]);
 }
 
@@ -70,6 +72,7 @@ async fn continue_execution() {
         asm::Stack::Push(6).into(),
         asm::Stack::Push(7).into(),
         asm::Alu::Mul.into(),
+        asm::ControlFlow::Halt.into(),
     ];
     let op_gas_cost = &|_: &Op| 1;
     let spent = vm
@@ -83,12 +86,16 @@ async fn continue_execution() {
         .await
         .unwrap();
     assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
-    assert_eq!(vm.pc, ops.len());
+    assert_eq!(vm.pc, ops.len() - 1);
     assert_eq!(&vm.stack[..], &[42]);
 
     // Continue executing from current state over the new ops.
     vm.pc = 0;
-    let ops = &[asm::Stack::Push(6).into(), asm::Alu::Div.into()];
+    let ops = &[
+        asm::Stack::Push(6).into(),
+        asm::Alu::Div.into(),
+        asm::ControlFlow::Halt.into(),
+    ];
     let spent = vm
         .exec_ops(
             ops,
@@ -100,7 +107,7 @@ async fn continue_execution() {
         .await
         .unwrap();
     assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
-    assert_eq!(vm.pc, ops.len());
+    assert_eq!(vm.pc, ops.len() - 1);
     assert_eq!(&vm.stack[..], &[7]);
 }
 
@@ -112,6 +119,7 @@ async fn exec_method_behaviours_match() {
         asm::Stack::Push(6).into(),
         asm::Stack::Push(7).into(),
         asm::Alu::Mul.into(),
+        asm::ControlFlow::Halt.into(),
     ];
 
     // Execute the ops using `exec_ops`.
@@ -209,6 +217,7 @@ async fn read_pre_post_state_and_check_constraints() {
         asm::Stack::Push(0).into(), // Key3
         asm::Stack::Push(3).into(), // Num words
         asm::StateRead::WordRange,
+        asm::ControlFlow::Halt.into(),
     ];
 
     // Execute the program.
