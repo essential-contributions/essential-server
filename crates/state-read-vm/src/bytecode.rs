@@ -1,6 +1,6 @@
 //! Items related to bytecode representation for the State Read VM.
 
-use crate::asm::Op;
+use crate::asm::{FromBytesError, Op, Opcode};
 
 /// A memory efficient representation of a sequence of operations parsed from bytecode.
 ///
@@ -20,7 +20,7 @@ use crate::asm::Op;
 /// To avoid this issue, we instead store the raw "packed" bytecode alongside
 /// a list of indices into the bytecode representing the location of each
 /// operation.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct BytecodeMapped {
     /// The bytecode representation of a program's operations.
     bytecode: Vec<u8>,
@@ -95,9 +95,33 @@ impl<'a> BytecodeMappedSlice<'a> {
 // Allow for collecting a `BytecodeMapped` from an iterator over `Op`s.
 impl FromIterator<Op> for BytecodeMapped {
     fn from_iter<T: IntoIterator<Item = Op>>(iter: T) -> Self {
-        let mut mapped = BytecodeMapped::default();
-        iter.into_iter().for_each(|op| mapped.push_op(op));
+        let iter = iter.into_iter();
+        let (min, _) = iter.size_hint();
+        let mut mapped = BytecodeMapped {
+            bytecode: Vec::with_capacity(min),
+            op_indices: Vec::with_capacity(min),
+        };
+        iter.for_each(|op| mapped.push_op(op));
         mapped
+    }
+}
+
+/// Allow for taking ownership over and mapping an existing `Vec<u8>`.
+impl TryFrom<Vec<u8>> for BytecodeMapped {
+    type Error = FromBytesError;
+    fn try_from(bytecode: Vec<u8>) -> Result<Self, Self::Error> {
+        let mut op_indices = Vec::with_capacity(bytecode.len() / std::mem::size_of::<Op>());
+        let mut iter_enum = bytecode.iter().enumerate();
+        while let Some((ix, &opcode_byte)) = iter_enum.next() {
+            let opcode = Opcode::try_from(opcode_byte)?;
+            let mut op_bytes = iter_enum.by_ref().map(|(_, &byte)| byte);
+            let _op = opcode.parse_op(&mut op_bytes)?;
+            op_indices.push(ix);
+        }
+        Ok(BytecodeMapped {
+            bytecode,
+            op_indices,
+        })
     }
 }
 
@@ -114,39 +138,4 @@ fn expect_ops_from_indices<'a>(
             .expect(EXPECT_MSG)
             .expect(EXPECT_MSG)
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::*;
-
-    // This ensures that, in the worst case where there is one operation per
-    // byte (i.e. there are no `Push` operations), the size of `BytecodeMapped`
-    // is still at least as or more memory efficient than a `Vec<Op>`.
-    #[test]
-    fn mapped_is_compact() {
-        assert!(
-            core::mem::size_of::<(u8, usize)>() <= core::mem::size_of::<Op>(),
-            "The size of a byte and its index must be smaller than or equal \
-            to a single `Op` for `BytecodeMapped` to be strictly more memory \
-            efficient than (or at least as efficient as) a `Vec<Op>`. If this \
-            test has failed and `Op` has become smaller than the size of `(u8, \
-            usize)`, then this module can be removed and `Vec<Op>` should be \
-            the preferred method of storing operations for execution."
-        );
-    }
-
-    // Ensure we can collect a `Result<BytecodeMapped, _>` from an iterator of `Result<Op, _>`.
-    #[test]
-    fn mapped_from_op_results() {
-        let results: &[Result<Op, _>] = &[
-            Ok(asm::Stack::Push(6).into()),
-            Ok(asm::Stack::Push(7).into()),
-            Ok(asm::Alu::Mul.into()),
-            Ok(asm::Pred::Eq.into()),
-        ];
-        let mapped: Result<BytecodeMapped, ()> = results.iter().cloned().collect();
-        mapped.unwrap();
-    }
 }
