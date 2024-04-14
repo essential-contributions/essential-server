@@ -10,5 +10,6 @@ essential-types = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+futures = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }

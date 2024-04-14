@@ -47,16 +47,23 @@ async fn yield_per_op() {
     ];
     // Force the VM to yield after every op to test behaviour.
     let op_gas_cost = |_op: &_| GasLimit::DEFAULT_PER_YIELD;
-    let spent = vm
-        .exec_ops(
-            ops,
-            TEST_ACCESS,
-            &State::EMPTY,
-            &op_gas_cost,
-            GasLimit::UNLIMITED,
-        )
-        .await
-        .unwrap();
+
+    let state = State::EMPTY;
+    let mut future = vm.exec_ops(ops, TEST_ACCESS, &state, &op_gas_cost, GasLimit::UNLIMITED);
+
+    // Test that we yield once per op before reaching `Halt`.
+    let mut yield_count = 0;
+    let spent = {
+        let mut future = std::pin::pin!(future);
+        loop {
+            match futures::poll!(&mut future) {
+                std::task::Poll::Pending => yield_count += 1,
+                std::task::Poll::Ready(res) => break res.unwrap(),
+            }
+        }
+    };
+
+    assert_eq!(yield_count, ops.len() - 1);
     assert_eq!(spent, ops.iter().map(op_gas_cost).sum());
     assert_eq!(vm.pc, ops.len() - 1);
     assert_eq!(&vm.stack[..], &[42]);
