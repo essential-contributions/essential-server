@@ -11,6 +11,7 @@ ed25519-dalek = "2.1.0"
 essential-constraint-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-state-asm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+futures = "0.3"
 postcard = { version = "1.0.8", default-featues = false, features = ["alloc"] }
 rand = { version = "0.8", features = ["small_rng"] }
 rayon = "1"
@@ -24,6 +25,7 @@ tokio = { version = "1.36.0", features = ["full"] }
 
 constraint-vm = { path = "crates/constraint-vm", package = "essential-constraint-vm" }
 memory-storage = { path = "crates/memory-storage" }
+state-read-vm = { path = "crates/state-read-vm", package = "essential-state-read-vm" }
 storage = { path = "crates/storage" }
 test-utils = { path = "crates/test_utils" }
 utils = { path = "crates/utils" }

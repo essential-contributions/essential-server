@@ -38,9 +38,9 @@ pub use error::{CheckResult, ConstraintResult, OpResult, StackResult};
 use error::{ConstraintError, ConstraintErrors, ConstraintsUnsatisfied};
 #[doc(inline)]
 pub use essential_constraint_asm as asm;
-use essential_constraint_asm::{Op, Word};
+use essential_constraint_asm::Op;
 pub use essential_types as types;
-use essential_types::ConstraintBytecode;
+use essential_types::{convert::bool_from_word, ConstraintBytecode};
 #[doc(inline)]
 pub use stack::Stack;
 
@@ -200,19 +200,9 @@ pub fn step_op_stack(op: asm::Stack, stack: &mut Stack) -> OpResult<()> {
     }
 }
 
-/// Parse a `bool` from a word, where 0 is false, 1 is true and any other value is invalid.
-fn bool_from_word(word: Word) -> Option<bool> {
-    match word {
-        0 => Some(false),
-        1 => Some(true),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test_util {
     use crate::{
-        asm::{Pred, Stack},
         types::{solution::SolutionData, ContentAddress, IntentAddress},
         *,
     };
@@ -234,6 +224,15 @@ pub(crate) mod test_util {
     pub(crate) const TEST_ACCESS: Access = Access {
         solution: TEST_SOLUTION_ACCESS,
         state_slots: StateSlots::EMPTY,
+    };
+}
+
+#[cfg(test)]
+mod pred_tests {
+    use crate::{
+        asm::{Pred, Stack},
+        test_util::*,
+        *,
     };
 
     #[test]
