@@ -6,7 +6,7 @@ use essential_types::{
 use rqlite_storage::RqliteStorage;
 use std::vec;
 use storage::{StateStorage, Storage};
-use test_utils::{empty::Empty, instantiate::Instantiate, sign_with_random_keypair};
+use test_utils::{empty::Empty, intent_with_decision_variables, sign_with_random_keypair};
 use utils::hash;
 
 #[tokio::test]
@@ -57,13 +57,13 @@ async fn test_update_state_batch() {
         .insert_intent_set(storage_layout.clone(), intent)
         .await
         .unwrap();
-    let intent = sign_with_random_keypair(vec![Intent::with_decision_variables(3)]);
+    let intent = sign_with_random_keypair(vec![intent_with_decision_variables(3)]);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
         .unwrap();
     let address_0 = ContentAddress(hash(&vec![Intent::empty()]));
-    let address_1 = ContentAddress(hash(&vec![Intent::with_decision_variables(3)]));
+    let address_1 = ContentAddress(hash(&vec![intent_with_decision_variables(3)]));
     let key = [0; 4];
     let v = storage
         .update_state(&address_0, &key, Some(1))
@@ -115,8 +115,8 @@ async fn test_insert_intent_set() {
         .await
         .unwrap();
     let intent_1 = sign_with_random_keypair(vec![
-        Intent::with_decision_variables(1),
-        Intent::with_decision_variables(2),
+        intent_with_decision_variables(1),
+        intent_with_decision_variables(2),
     ]);
     storage
         .insert_intent_set(storage_layout, intent_1)
@@ -128,8 +128,8 @@ async fn test_insert_intent_set() {
         vec![
             vec![Intent::empty()],
             vec![
-                Intent::with_decision_variables(1),
-                Intent::with_decision_variables(2)
+                intent_with_decision_variables(1),
+                intent_with_decision_variables(2)
             ]
         ]
     );

@@ -1,7 +1,10 @@
 use super::*;
-use essential_types::{solution::Solution, Batch};
+use essential_types::Batch;
 use std::vec;
-use test_utils::{duration_secs, instantiate::Instantiate, sign_with_random_keypair};
+use test_utils::{
+    duration_secs, intent_with_decision_variables, sign_with_random_keypair,
+    solution_with_decision_variables,
+};
 
 fn intent_set(intents: Vec<Intent>) -> IntentSet {
     let order = intents
@@ -50,26 +53,26 @@ fn create_blocks(blocks: Vec<(u64, Block)>) -> BTreeMap<Duration, Block> {
 #[test]
 fn test_page_intents() {
     let (order, intents) = list_of_intent_sets(vec![
-        vec![Intent::with_decision_variables(0)],
-        vec![Intent::with_decision_variables(1)],
+        vec![intent_with_decision_variables(0)],
+        vec![intent_with_decision_variables(1)],
         vec![
-            Intent::with_decision_variables(2),
-            Intent::with_decision_variables(3),
+            intent_with_decision_variables(2),
+            intent_with_decision_variables(3),
         ],
     ]);
 
     let r = page_intents(order.iter(), &intents, 0, 1);
-    assert_eq!(r, vec![vec![Intent::with_decision_variables(0)]]);
+    assert_eq!(r, vec![vec![intent_with_decision_variables(0)]]);
 
     let r = page_intents(order.iter(), &intents, 1, 1);
-    assert_eq!(r, vec![vec![Intent::with_decision_variables(1)]]);
+    assert_eq!(r, vec![vec![intent_with_decision_variables(1)]]);
 
     let r = page_intents(order.iter(), &intents, 1, 2);
     assert_eq!(
         r,
         vec![vec![
-            Intent::with_decision_variables(2),
-            Intent::with_decision_variables(3)
+            intent_with_decision_variables(2),
+            intent_with_decision_variables(3)
         ]]
     );
 
@@ -77,8 +80,8 @@ fn test_page_intents() {
     assert_eq!(
         r,
         vec![
-            vec![Intent::with_decision_variables(0)],
-            vec![Intent::with_decision_variables(1)]
+            vec![intent_with_decision_variables(0)],
+            vec![intent_with_decision_variables(1)]
         ]
     );
 
@@ -86,11 +89,11 @@ fn test_page_intents() {
     assert_eq!(
         r,
         vec![
-            vec![Intent::with_decision_variables(0)],
-            vec![Intent::with_decision_variables(1)],
+            vec![intent_with_decision_variables(0)],
+            vec![intent_with_decision_variables(1)],
             vec![
-                Intent::with_decision_variables(2),
-                Intent::with_decision_variables(3)
+                intent_with_decision_variables(2),
+                intent_with_decision_variables(3)
             ]
         ]
     );
@@ -99,11 +102,11 @@ fn test_page_intents() {
 #[test]
 fn test_page_intents_by_time() {
     let (order, intents) = list_of_intent_sets(vec![
-        vec![Intent::with_decision_variables(0)],
-        vec![Intent::with_decision_variables(1)],
+        vec![intent_with_decision_variables(0)],
+        vec![intent_with_decision_variables(1)],
         vec![
-            Intent::with_decision_variables(2),
-            Intent::with_decision_variables(3),
+            intent_with_decision_variables(2),
+            intent_with_decision_variables(3),
         ],
     ]);
     let order: BTreeMap<_, _> = order
@@ -113,17 +116,17 @@ fn test_page_intents_by_time() {
         .collect();
 
     let r = page_intents_by_time(&order, &intents, duration_secs(0)..duration_secs(1), 0, 1);
-    assert_eq!(r, vec![vec![Intent::with_decision_variables(0)]]);
+    assert_eq!(r, vec![vec![intent_with_decision_variables(0)]]);
 
     let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(2), 0, 1);
-    assert_eq!(r, vec![vec![Intent::with_decision_variables(1)]]);
+    assert_eq!(r, vec![vec![intent_with_decision_variables(1)]]);
 
     let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(10), 1, 1);
     assert_eq!(
         r,
         vec![vec![
-            Intent::with_decision_variables(2),
-            Intent::with_decision_variables(3)
+            intent_with_decision_variables(2),
+            intent_with_decision_variables(3)
         ]]
     );
 
@@ -143,7 +146,7 @@ fn test_paging_blocks() {
                     batch: Batch {
                         solutions: ((i * 10)..(i * 10 + 10))
                             .map(|i| {
-                                sign_with_random_keypair(Solution::with_decision_variables(
+                                sign_with_random_keypair(solution_with_decision_variables(
                                     i as usize,
                                 ))
                             })

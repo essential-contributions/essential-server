@@ -7,7 +7,7 @@ use essential_types::{
     slots::StateSlot,
 };
 use test_utils::{
-    empty::Empty, instantiate::Instantiate, sign_corrupted, sign_with_random_keypair,
+    empty::Empty, intent_with_decision_variables, sign_corrupted, sign_with_random_keypair,
 };
 
 #[test]
@@ -35,7 +35,7 @@ fn test_fail_too_many_intents() {
 #[test]
 #[should_panic(expected = "Too many decision variables")]
 fn test_fail_too_many_decision_variables() {
-    let intent = Intent::with_decision_variables((MAX_DECISION_VARIABLES + 1) as usize);
+    let intent = intent_with_decision_variables((MAX_DECISION_VARIABLES + 1) as usize);
     intent.validate().unwrap();
 }
 
