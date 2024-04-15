@@ -4,14 +4,15 @@ use essential_types::{
     ContentAddress, IntentAddress,
 };
 
-/// Utility trait to provide empty Instantiaters for essential types
-pub trait Empty<T> {
-    fn empty() -> T;
+/// Utility trait to provide empty instantiaters for essential types
+pub trait Empty {
+    /// Create an empty instance of the type
+    fn empty() -> Self;
 }
 
-impl Empty<Intent> for Intent {
-    fn empty() -> Intent {
-        Intent {
+impl Empty for Intent {
+    fn empty() -> Self {
+        Self {
             slots: Default::default(),
             state_read: Default::default(),
             constraints: Default::default(),
@@ -20,24 +21,24 @@ impl Empty<Intent> for Intent {
     }
 }
 
-impl Empty<ContentAddress> for ContentAddress {
-    fn empty() -> ContentAddress {
-        ContentAddress([0; 32])
+impl Empty for ContentAddress {
+    fn empty() -> Self {
+        Self([0; 32])
     }
 }
 
-impl Empty<IntentAddress> for IntentAddress {
-    fn empty() -> IntentAddress {
-        IntentAddress {
+impl Empty for IntentAddress {
+    fn empty() -> Self {
+        Self {
             set: ContentAddress::empty(),
             intent: ContentAddress::empty(),
         }
     }
 }
 
-impl Empty<Solution> for Solution {
-    fn empty() -> Solution {
-        Solution {
+impl Empty for Solution {
+    fn empty() -> Self {
+        Self {
             data: Default::default(),
             state_mutations: Default::default(),
             partial_solutions: Default::default(),
@@ -45,9 +46,9 @@ impl Empty<Solution> for Solution {
     }
 }
 
-impl Empty<PartialSolution> for PartialSolution {
-    fn empty() -> PartialSolution {
-        PartialSolution {
+impl Empty for PartialSolution {
+    fn empty() -> Self {
+        Self {
             data: Default::default(),
             state_mutations: Default::default(),
         }
