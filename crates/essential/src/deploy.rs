@@ -1,4 +1,4 @@
-use crate::validate::Validate;
+use crate::validate::validate_intents;
 use essential_types::{intent::Intent, ContentAddress, Signed, StorageLayout};
 use storage::Storage;
 
@@ -9,7 +9,7 @@ pub async fn deploy<S>(storage: &S, intent: Signed<Vec<Intent>>) -> anyhow::Resu
 where
     S: Storage,
 {
-    intent.validate()?;
+    validate_intents(&intent)?;
 
     match storage
         .insert_intent_set(StorageLayout, intent.clone())

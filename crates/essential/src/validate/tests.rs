@@ -1,6 +1,7 @@
+use super::{validate_intent, validate_intents};
 use crate::validate::{
-    Validate, MAX_CONSTRAINTS, MAX_CONSTRAINT_SIZE, MAX_DECISION_VARIABLES, MAX_DIRECTIVE_SIZE,
-    MAX_INTENTS, MAX_NUM_STATE_SLOTS, MAX_STATE_LEN, MAX_STATE_READS, MAX_STATE_READ_SIZE,
+    MAX_CONSTRAINTS, MAX_CONSTRAINT_SIZE_IN_BYTES, MAX_DECISION_VARIABLES, MAX_DIRECTIVE_SIZE,
+    MAX_INTENTS, MAX_NUM_STATE_SLOTS, MAX_STATE_LEN, MAX_STATE_READS, MAX_STATE_READ_SIZE_IN_BYTES,
 };
 use essential_types::{
     intent::{Directive, Intent},
@@ -14,7 +15,7 @@ use test_utils::{
 fn test_empty_intent() {
     let intent = Intent::empty();
     let intent = sign_with_random_keypair(vec![intent]);
-    intent.validate().unwrap();
+    validate_intents(&intent).unwrap();
 }
 
 #[test]
@@ -22,21 +23,22 @@ fn test_empty_intent() {
 fn test_fail_invalid_signature() {
     let intent = Intent::empty();
     let intent = sign_corrupted(vec![intent]);
-    intent.validate().unwrap();
+    validate_intents(&intent).unwrap();
 }
 
 #[test]
 #[should_panic(expected = "Too many intents")]
 fn test_fail_too_many_intents() {
-    let intent_set: Vec<Intent> = (0..MAX_INTENTS + 1).map(|_| Intent::empty()).collect();
-    intent_set.validate().unwrap();
+    let intents: Vec<Intent> = (0..MAX_INTENTS + 1).map(|_| Intent::empty()).collect();
+    let intents = sign_with_random_keypair(intents);
+    validate_intents(&intents).unwrap();
 }
 
 #[test]
 #[should_panic(expected = "Too many decision variables")]
 fn test_fail_too_many_decision_variables() {
     let intent = intent_with_decision_variables((MAX_DECISION_VARIABLES + 1) as usize);
-    intent.validate().unwrap();
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
@@ -46,7 +48,7 @@ fn test_fail_too_many_state_slots() {
     intent.slots.state = (0..MAX_NUM_STATE_SLOTS + 1)
         .map(|_| StateSlot::empty())
         .collect();
-    intent.validate().unwrap();
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
@@ -58,7 +60,7 @@ fn test_fail_invalid_state_slots_length() {
         amount: 1,
         program_index: Default::default(),
     }];
-    intent.validate().unwrap();
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
@@ -67,10 +69,10 @@ fn test_fail_state_slots_length_too_large() {
     let mut intent = Intent::empty();
     intent.slots.state = vec![StateSlot {
         index: Default::default(),
-        amount: MAX_STATE_LEN as u32 + 1,
+        amount: MAX_STATE_LEN + 1,
         program_index: Default::default(),
     }];
-    intent.validate().unwrap();
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
@@ -78,7 +80,7 @@ fn test_fail_state_slots_length_too_large() {
 fn test_fail_directive_too_large() {
     let mut intent = Intent::empty();
     intent.directive = Directive::Maximize(vec![0; MAX_DIRECTIVE_SIZE + 1]);
-    intent.validate().unwrap();
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
@@ -86,15 +88,15 @@ fn test_fail_directive_too_large() {
 fn test_fail_too_many_state_reads() {
     let mut intent = Intent::empty();
     intent.state_read = (0..MAX_STATE_READS + 1).map(|_| vec![]).collect();
-    intent.validate().unwrap();
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
 #[should_panic(expected = "State read too large")]
 fn test_fail_state_read_too_large() {
     let mut intent = Intent::empty();
-    intent.state_read = vec![vec![0u8; MAX_STATE_READ_SIZE + 1]];
-    intent.validate().unwrap();
+    intent.state_read = vec![vec![0u8; MAX_STATE_READ_SIZE_IN_BYTES + 1]];
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
@@ -102,13 +104,13 @@ fn test_fail_state_read_too_large() {
 fn test_fail_too_many_constraints() {
     let mut intent = Intent::empty();
     intent.constraints = (0..MAX_CONSTRAINTS + 1).map(|_| vec![]).collect();
-    intent.validate().unwrap();
+    validate_intent(&intent).unwrap();
 }
 
 #[test]
 #[should_panic(expected = "Constraint too large")]
 fn test_fail_constraint_too_large() {
     let mut intent = Intent::empty();
-    intent.constraints = vec![vec![0u8; MAX_CONSTRAINT_SIZE + 1]];
-    intent.validate().unwrap();
+    intent.constraints = vec![vec![0u8; MAX_CONSTRAINT_SIZE_IN_BYTES + 1]];
+    validate_intent(&intent).unwrap();
 }

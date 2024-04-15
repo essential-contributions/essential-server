@@ -51,6 +51,6 @@ fn test_fail_to_recover() {
 fn test_verify_signature() {
     let signed = sign_with_random_keypair(intent_with_decision_variables(1));
     let signed_corrupted = sign_corrupted(intent_with_decision_variables(1));
-    assert!(verify(signed));
-    assert!(!verify(signed_corrupted));
+    assert!(verify(&signed));
+    assert!(!verify(&signed_corrupted));
 }

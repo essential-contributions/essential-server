@@ -53,7 +53,7 @@ pub fn sign<T: Serialize>(data: T, sk: SecretKey) -> Signed<T> {
 }
 
 /// Verify signature against data
-pub fn verify<T: Serialize>(signed: Signed<T>) -> bool {
+pub fn verify<T: Serialize>(signed: &Signed<T>) -> bool {
     let secp = Secp256k1::new();
     let hashed_data = hash(&signed.data);
     let message = Message::from_digest(hashed_data);
