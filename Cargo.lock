@@ -254,7 +254,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/upstream-vms#b526b959e090669eee91fb48e5b4d77c44361fc2"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#a130898f40891099dd54d23bba78d92353df0550"
 dependencies = [
  "serde",
 ]
