@@ -7,7 +7,7 @@ use crate::{
             MAX_STATE_MUTATIONS,
         },
     },
-    tests::deploy_intent,
+    utils::{deploy_empty_intent, deploy_intent},
 };
 use essential_types::{
     intent::Intent,
@@ -93,12 +93,10 @@ fn test_fail_too_many_partial_solutions() {
 
 #[tokio::test]
 async fn test_retrieve_intent_set() {
-    let storage = MemoryStorage::new();
+    let (intent_address, storage) = deploy_empty_intent().await;
     let mut solution = Solution::empty();
-    let intent = Intent::empty();
-    let address = deploy_intent(&storage, intent).await;
     solution.data = vec![SolutionData {
-        intent_to_solve: address.clone(),
+        intent_to_solve: intent_address,
         decision_variables: Default::default(),
     }];
     let solution = sign_with_random_keypair(solution);
@@ -119,9 +117,7 @@ async fn test_fail_to_retrieve_intent_set() {
 
 #[tokio::test]
 async fn test_retrieve_partial_solution() {
-    let storage = MemoryStorage::new();
-    let intent = Intent::empty();
-    let intent_address = deploy_intent(&storage, intent).await;
+    let (intent_address, storage) = deploy_empty_intent().await;
     let mut partial_solution = PartialSolution::empty();
     partial_solution.data = vec![PartialSolutionData {
         intent_to_solve: intent_address.clone(),
@@ -147,10 +143,8 @@ async fn test_fail_to_retrieve_partial_solution() {
 
 #[tokio::test]
 async fn test_all_intents_must_be_in_the_set() {
-    let storage = MemoryStorage::new();
+    let (intent_address, storage) = deploy_empty_intent().await;
     let mut solution = Solution::empty();
-    let intent = Intent::empty();
-    let intent_address = deploy_intent(&storage, intent).await;
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
         decision_variables: Default::default(),
@@ -161,9 +155,7 @@ async fn test_all_intents_must_be_in_the_set() {
 
 #[tokio::test]
 async fn test_all_state_mutations_must_have_an_intent_in_the_set() {
-    let storage = MemoryStorage::new();
-    let intent = Intent::empty();
-    let intent_address = deploy_intent(&storage, intent).await;
+    let (intent_address, storage) = deploy_empty_intent().await;
     let mut solution = Solution::empty();
     solution.state_mutations = vec![StateMutation {
         pathway: 0,
@@ -193,9 +185,7 @@ async fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
 #[tokio::test]
 #[should_panic(expected = "Decision variables mismatch")]
 async fn test_fail_decision_variables_mismatch() {
-    let storage = MemoryStorage::new();
-    let intent = Intent::empty();
-    let intent_address = deploy_intent(&storage, intent).await;
+    let (intent_address, storage) = deploy_empty_intent().await;
     let mut solution = Solution::empty();
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
@@ -208,10 +198,9 @@ async fn test_fail_decision_variables_mismatch() {
 #[tokio::test]
 #[should_panic(expected = "Invalid transient decision variable")]
 async fn test_fail_invalid_transient_decision_variable() {
-    let storage = MemoryStorage::new();
     let mut intent = Intent::empty();
     intent.slots.decision_variables = 1;
-    let intent_address = deploy_intent(&storage, intent).await;
+    let (intent_address, storage) = deploy_intent(intent).await;
     let mut solution = Solution::empty();
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
@@ -227,9 +216,8 @@ async fn test_fail_invalid_transient_decision_variable() {
 #[tokio::test]
 #[should_panic(expected = "All intents must be in the set")]
 async fn test_fail_not_all_intents_in_set() {
-    let storage = MemoryStorage::new();
+    let (intent_address, storage) = deploy_empty_intent().await;
     let mut solution = Solution::empty();
-    let intent_address = deploy_intent(&storage, Intent::empty()).await;
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
         decision_variables: Default::default(),
