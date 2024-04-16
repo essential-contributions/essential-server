@@ -33,7 +33,6 @@ pub fn sign_with_random_keypair<T: Serialize>(data: T) -> Signed<T> {
 
 pub fn sign_corrupted<T: Serialize>(data: T) -> Signed<T> {
     let mut signed = sign(data, random_keypair().0);
-    // TODO: is this a good way to create a corrupted signature?
     signed.signature = Signature([0u8; 64], 0);
     signed
 }

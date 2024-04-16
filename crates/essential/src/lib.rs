@@ -9,7 +9,6 @@ use storage::Storage;
 mod deploy;
 mod run;
 mod solution;
-mod validate;
 
 #[cfg(test)]
 mod tests;
