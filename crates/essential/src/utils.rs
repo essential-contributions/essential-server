@@ -7,7 +7,7 @@ use test_utils::{empty::Empty, sign_with_random_keypair};
 pub async fn deploy_intent_with_storage<S: Storage>(storage: &S, intent: Intent) -> IntentAddress {
     let intent_hash = ContentAddress(utils::hash(&intent));
     let intent = sign_with_random_keypair(vec![intent]);
-    let result = deploy(storage, intent.clone()).await.unwrap();
+    let result = deploy(storage, intent).await.unwrap();
     IntentAddress {
         set: result,
         intent: intent_hash,
