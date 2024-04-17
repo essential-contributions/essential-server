@@ -1,9 +1,7 @@
-use serde_json::Number;
-use test_utils::intent_with_vars;
-
-use crate::encode;
-
 use super::*;
+use crate::encode;
+use serde_json::Number;
+use test_utils::intent_with_decision_variables;
 
 #[test]
 fn test_empty_query() {
@@ -34,14 +32,14 @@ fn test_valid_queries() {
             rows: vec![Columns {
                 columns: vec![
                     Value::Number(Number::from(1)),
-                    Value::String(encode(&intent_with_vars(1))),
+                    Value::String(encode(&intent_with_decision_variables(1))),
                 ],
             }],
         })],
     };
 
     let r = list_intent_sets(queries).unwrap();
-    let expected = vec![vec![intent_with_vars(1)]];
+    let expected = vec![vec![intent_with_decision_variables(1)]];
     assert_eq!(r, expected);
 
     let queries = QueryValues {
@@ -50,19 +48,19 @@ fn test_valid_queries() {
                 Columns {
                     columns: vec![
                         Value::Number(Number::from(0)),
-                        Value::String(encode(&intent_with_vars(1))),
+                        Value::String(encode(&intent_with_decision_variables(1))),
                     ],
                 },
                 Columns {
                     columns: vec![
                         Value::Number(Number::from(1)),
-                        Value::String(encode(&intent_with_vars(1))),
+                        Value::String(encode(&intent_with_decision_variables(1))),
                     ],
                 },
                 Columns {
                     columns: vec![
                         Value::Number(Number::from(1)),
-                        Value::String(encode(&intent_with_vars(2))),
+                        Value::String(encode(&intent_with_decision_variables(2))),
                     ],
                 },
             ],
@@ -71,8 +69,11 @@ fn test_valid_queries() {
 
     let r = list_intent_sets(queries).unwrap();
     let expected = vec![
-        vec![intent_with_vars(1)],
-        vec![intent_with_vars(1), intent_with_vars(2)],
+        vec![intent_with_decision_variables(1)],
+        vec![
+            intent_with_decision_variables(1),
+            intent_with_decision_variables(2),
+        ],
     ];
     assert_eq!(r, expected);
 }
@@ -93,7 +94,7 @@ fn test_invalid_data() {
             rows: vec![Columns {
                 columns: vec![
                     Value::Bool(true),
-                    Value::String(encode(&intent_with_vars(1))),
+                    Value::String(encode(&intent_with_decision_variables(1))),
                 ],
             }],
         })],
@@ -117,7 +118,7 @@ fn test_invalid_data() {
             rows: vec![Columns {
                 columns: vec![
                     Value::Number(Number::from_f64(1.0).unwrap()),
-                    Value::String(encode(&intent_with_vars(1))),
+                    Value::String(encode(&intent_with_decision_variables(1))),
                 ],
             }],
         })],
@@ -132,7 +133,7 @@ fn test_wrong_num_columns() {
             rows: vec![Columns {
                 columns: vec![
                     Value::Number(Number::from(1)),
-                    Value::String(encode(&intent_with_vars(1))),
+                    Value::String(encode(&intent_with_decision_variables(1))),
                     Value::Number(Number::from(1)),
                 ],
             }],

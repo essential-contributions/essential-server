@@ -1,8 +1,8 @@
-use std::vec;
-
 use super::*;
+use std::vec;
 use test_utils::{
-    intent_with_vars, partial_solution_with_vars, sign_with_random_keypair, solution_with_vars,
+    intent_with_decision_variables, partial_solution_with_decision_variables,
+    sign_with_random_keypair, solution_with_decision_variables,
 };
 use utils::hash;
 
@@ -12,14 +12,14 @@ async fn test_insert_intent_set() {
     let storage_layout = StorageLayout {};
     let intents = [
         sign_with_random_keypair(vec![
-            intent_with_vars(0),
-            intent_with_vars(1),
-            intent_with_vars(2),
+            intent_with_decision_variables(0),
+            intent_with_decision_variables(1),
+            intent_with_decision_variables(2),
         ]),
         sign_with_random_keypair(vec![
-            intent_with_vars(2),
-            intent_with_vars(3),
-            intent_with_vars(4),
+            intent_with_decision_variables(2),
+            intent_with_decision_variables(3),
+            intent_with_decision_variables(4),
         ]),
     ];
     storage
@@ -70,9 +70,9 @@ async fn test_insert_intent_set() {
 #[tokio::test]
 async fn test_solutions() {
     let storage = MemoryStorage::new();
-    let solution = sign_with_random_keypair(solution_with_vars(0));
-    let solution2 = sign_with_random_keypair(solution_with_vars(1));
-    let solution3 = sign_with_random_keypair(solution_with_vars(2));
+    let solution = sign_with_random_keypair(solution_with_decision_variables(0));
+    let solution2 = sign_with_random_keypair(solution_with_decision_variables(1));
+    let solution3 = sign_with_random_keypair(solution_with_decision_variables(2));
 
     // Idempotent insert
     storage
@@ -134,9 +134,9 @@ async fn test_solutions() {
 #[tokio::test]
 async fn test_partial_solutions() {
     let storage = MemoryStorage::new();
-    let partial_solution1 = sign_with_random_keypair(partial_solution_with_vars(0));
-    let partial_solution2 = sign_with_random_keypair(partial_solution_with_vars(1));
-    let partial_solution3 = sign_with_random_keypair(partial_solution_with_vars(2));
+    let partial_solution1 = sign_with_random_keypair(partial_solution_with_decision_variables(0));
+    let partial_solution2 = sign_with_random_keypair(partial_solution_with_decision_variables(1));
+    let partial_solution3 = sign_with_random_keypair(partial_solution_with_decision_variables(2));
 
     // Idempotent insert
     storage
@@ -231,7 +231,7 @@ async fn test_partial_solutions() {
 async fn test_update_and_query_state() {
     let storage = MemoryStorage::new();
 
-    let intent_set = sign_with_random_keypair(vec![intent_with_vars(0)]);
+    let intent_set = sign_with_random_keypair(vec![intent_with_decision_variables(0)]);
     let address = ContentAddress(hash(&intent_set.data));
     let key = [0; 4];
     let word = Some(42);

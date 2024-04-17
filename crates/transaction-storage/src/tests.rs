@@ -1,7 +1,7 @@
-use essential_types::StorageLayout;
+use essential_types::{intent::Intent, StorageLayout};
 use memory_storage::MemoryStorage;
 use storage::Storage;
-use test_utils::{empty_intent, sign_with_random_keypair};
+use test_utils::{empty::Empty, sign_with_random_keypair};
 use utils::hash;
 
 use super::*;
@@ -9,7 +9,7 @@ use super::*;
 #[tokio::test]
 async fn test_can_query() {
     let storage = MemoryStorage::new();
-    let intent = empty_intent();
+    let intent = Intent::empty();
     let address = ContentAddress(hash(&vec![intent.clone()]));
     let signed = sign_with_random_keypair(vec![intent]);
     let key = [0; 4];

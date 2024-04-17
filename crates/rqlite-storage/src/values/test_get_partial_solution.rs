@@ -1,8 +1,6 @@
-use test_utils::{empty_partial_solution, sign_with_random_keypair};
-
-use crate::encode;
-
 use super::*;
+use crate::encode;
+use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[test]
 fn test_empty_query() {
@@ -28,7 +26,7 @@ fn test_invalid_query() {
 
 #[test]
 fn test_valid_partial() {
-    let Signed { data, signature } = sign_with_random_keypair(empty_partial_solution());
+    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
@@ -47,7 +45,7 @@ fn test_valid_partial() {
 
 #[test]
 fn test_invalid_partial() {
-    let Signed { data: _, signature } = sign_with_random_keypair(empty_partial_solution());
+    let Signed { data: _, signature } = sign_with_random_keypair(PartialSolution::empty());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
@@ -61,7 +59,7 @@ fn test_invalid_partial() {
 
 #[test]
 fn test_invalid_sig() {
-    let Signed { data, signature: _ } = sign_with_random_keypair(empty_partial_solution());
+    let Signed { data, signature: _ } = sign_with_random_keypair(PartialSolution::empty());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
@@ -76,7 +74,7 @@ fn test_invalid_sig() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx".to_string();
-    let Signed { data, signature } = sign_with_random_keypair(empty_partial_solution());
+    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
@@ -102,7 +100,7 @@ fn test_invalid_data() {
 
 #[test]
 fn test_wrong_num_columns() {
-    let Signed { data, signature } = sign_with_random_keypair(empty_partial_solution());
+    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
@@ -120,7 +118,7 @@ fn test_wrong_num_columns() {
 
 #[test]
 fn test_wrong_num_rows() {
-    let Signed { data, signature } = sign_with_random_keypair(empty_partial_solution());
+    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![
