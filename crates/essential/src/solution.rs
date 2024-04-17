@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
-use self::validate::validate_solution_fully;
+use self::validate::validate_solution_with_deps;
 use essential_types::{intent::Intent, solution::Solution, Hash, Signed};
 use storage::Storage;
 
@@ -16,7 +16,7 @@ pub async fn submit_solution<S>(storage: &S, solution: Signed<Solution>) -> anyh
 where
     S: Storage,
 {
-    validate_solution_fully(&solution, storage).await?;
+    validate_solution_with_deps(&solution, storage).await?;
     let solution_hash = utils::hash(&solution.data);
 
     match storage.insert_solution_into_pool(solution).await {

@@ -3,8 +3,8 @@ use crate::{
         read::{read_intents_from_storage, read_partial_solutions_from_storage},
         validate::{
             validate_intents_against_solution, validate_partial_solutions_against_solution,
-            validate_solution, validate_solution_fully, MAX_DECISION_VARIABLES, MAX_SOLUTION_DATA,
-            MAX_STATE_MUTATIONS,
+            validate_solution, validate_solution_with_deps, MAX_DECISION_VARIABLES,
+            MAX_SOLUTION_DATA, MAX_STATE_MUTATIONS,
         },
     },
     utils::{deploy_empty_intent, deploy_intent},
@@ -100,7 +100,9 @@ async fn test_retrieve_intent_set() {
         decision_variables: Default::default(),
     }];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -112,7 +114,9 @@ async fn test_fail_to_retrieve_intent_set() {
     solution_data[0].intent_to_solve = IntentAddress::empty();
     solution.data = solution_data;
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -128,7 +132,9 @@ async fn test_retrieve_partial_solution() {
     let mut solution = Solution::empty();
     solution.partial_solutions = vec![sign_with_random_keypair(partial_solution_address)];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -138,7 +144,9 @@ async fn test_fail_to_retrieve_partial_solution() {
     let mut solution = Solution::empty();
     solution.partial_solutions = vec![sign_with_random_keypair(ContentAddress::empty())];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -150,7 +158,9 @@ async fn test_all_intents_must_be_in_the_set() {
         decision_variables: Default::default(),
     }];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -166,7 +176,9 @@ async fn test_all_state_mutations_must_have_an_intent_in_the_set() {
         decision_variables: Default::default(),
     }];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -179,7 +191,9 @@ async fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
         mutations: Default::default(),
     }];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -192,7 +206,9 @@ async fn test_fail_decision_variables_mismatch() {
         decision_variables: vec![DecisionVariable::Inline(0)],
     }];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -210,7 +226,9 @@ async fn test_fail_invalid_transient_decision_variable() {
         })],
     }];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_fully(&solution, &storage).await.unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
