@@ -16,7 +16,7 @@ pub const MAX_SOLUTION_DATA: usize = 100;
 /// Maximum number of state mutations of a solution.
 pub const MAX_STATE_MUTATIONS: usize = 1000;
 /// Maximum number of partial solutions of a solution.
-pub const MAX_PARTIAL_SOLUTIONS: usize = 100;
+pub const MAX_PARTIAL_SOLUTIONS: usize = 20;
 
 /// Validation for solution.
 /// Validates the data, state mutations, and partial solutions.
