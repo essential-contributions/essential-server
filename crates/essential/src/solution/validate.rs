@@ -170,7 +170,7 @@ pub fn validate_partial_solutions_against_solution(
     Ok(())
 }
 
-pub async fn validate_solution_fully<S>(
+pub async fn validate_solution_with_deps<S>(
     solution: &Signed<Solution>,
     storage: &S,
 ) -> anyhow::Result<()>
