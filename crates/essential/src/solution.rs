@@ -1,10 +1,9 @@
-// TODO: Remove this
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 use self::validate::validate_solution_with_deps;
-use essential_types::{intent::Intent, solution::Solution, Hash, Signed};
+use essential_constraint_vm::{Access, SolutionAccess, StateSlots};
+use essential_state_read_vm::{asm::Op, GasLimit, StateRead, Vm};
+use essential_types::{solution::Solution, Hash, Signed, Word};
 use storage::Storage;
+use tokio::task::JoinSet;
 
 mod read;
 #[cfg(test)]
@@ -25,13 +24,64 @@ where
     }
 }
 
+// TODO: S: Send + 'static
+// TODO: Vm does not implement Copy
+// TODO: f64 to return?
 pub async fn check_solution<S>(storage: &S, solution: Solution) -> anyhow::Result<f64>
 where
-    S: Storage,
+    S: Storage + StateRead + Clone + Send + 'static,
 {
-    todo!()
-}
+    let intents = read::read_intents_from_storage(&solution, storage).await?;
+    let vm = Vm::default();
 
-pub async fn check_individual(intent: Intent, solution: Solution) -> anyhow::Result<f64> {
-    todo!()
+    let mut set = JoinSet::new();
+
+    for (index, data) in solution.data.iter().enumerate() {
+        let Some(intent) = intents.get(&data.intent_to_solve).cloned() else {
+            anyhow::bail!("Intent in solution data not found in intents set");
+        };
+
+        let mut_keys_len = solution
+            .state_mutations
+            .iter()
+            .filter(|sm| sm.pathway as usize == index)
+            .count();
+        let mut_keys_len: Word = mut_keys_len.try_into()?;
+
+        let data = solution.data.clone();
+        let storage = storage.clone();
+
+        set.spawn(async move {
+            let pre_state = vec![];
+            let post_state = vec![];
+
+            for state_read in &intent.state_read {
+                let solution_access = SolutionAccess {
+                    data: data.as_slice(),
+                    index,
+                    mut_keys_len,
+                };
+
+                let access = Access {
+                    solution: solution_access,
+                    state_slots: StateSlots {
+                        pre: pre_state.as_slice(),
+                        post: post_state.as_slice(),
+                    },
+                };
+
+                let result = vm
+                    .exec_bytecode_iter(
+                        state_read.iter().cloned(),
+                        access,
+                        &storage,
+                        &|_: &Op| 1,
+                        GasLimit::UNLIMITED,
+                    )
+                    .await;
+            }
+        });
+    }
+
+    Ok(0.0)
 }

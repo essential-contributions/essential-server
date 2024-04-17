@@ -1,9 +1,9 @@
-use std::{ops::Range, time::Duration};
-
+use essential_state_read_vm::StateRead;
 use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
     StorageLayout, Word,
 };
+use std::{ops::Range, time::Duration};
 use storage::Storage;
 
 mod deploy;
@@ -22,7 +22,7 @@ where
 
 impl<S> Essential<S>
 where
-    S: Storage + Clone,
+    S: Storage + StateRead + Clone + Send + 'static,
 {
     pub fn new(storage: S) -> Self {
         Self { storage }

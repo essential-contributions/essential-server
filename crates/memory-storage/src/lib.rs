@@ -1,14 +1,13 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
-
 use anyhow::bail;
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
     Batch, Block, ContentAddress, Hash, IntentAddress, Key, Signature, Signed, StorageLayout, Word,
+};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use storage::{StateStorage, Storage};
 use utils::Lock;
