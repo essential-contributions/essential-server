@@ -17,9 +17,10 @@ where
     S: Storage,
 {
     validate_solution_fully(&solution, storage).await?;
+    let solution_hash = utils::hash(&solution.data);
 
-    match storage.insert_solution_into_pool(solution.clone()).await {
-        Ok(()) => Ok(utils::hash(&solution.data)),
+    match storage.insert_solution_into_pool(solution).await {
+        Ok(()) => Ok(solution_hash),
         Err(e) => anyhow::bail!("Failed to submit solution: {}", e),
     }
 }
