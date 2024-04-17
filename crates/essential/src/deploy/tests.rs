@@ -4,7 +4,6 @@ use memory_storage::MemoryStorage;
 use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[tokio::test]
-#[ignore]
 async fn test_deploy() {
     let storage = MemoryStorage::default();
     let intent = Intent::empty();

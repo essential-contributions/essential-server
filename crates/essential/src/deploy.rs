@@ -1,8 +1,5 @@
-// TODO: Remove this
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
-use essential_types::{intent::Intent, ContentAddress, Signed};
+use crate::validate::validate_intents;
+use essential_types::{intent::Intent, ContentAddress, Signed, StorageLayout};
 use storage::Storage;
 
 #[cfg(test)]
@@ -12,5 +9,11 @@ pub async fn deploy<S>(storage: &S, intent: Signed<Vec<Intent>>) -> anyhow::Resu
 where
     S: Storage,
 {
-    todo!()
+    validate_intents(&intent)?;
+    let intent_hash = utils::hash(&intent.data);
+
+    match storage.insert_intent_set(StorageLayout, intent).await {
+        Ok(()) => Ok(ContentAddress(intent_hash)),
+        Err(e) => anyhow::bail!("Failed to deploy intent set: {}", e),
+    }
 }

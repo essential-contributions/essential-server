@@ -9,6 +9,7 @@ use storage::Storage;
 mod deploy;
 mod run;
 mod solution;
+mod validate;
 
 #[derive(Clone)]
 pub struct Essential<S>
