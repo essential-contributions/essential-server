@@ -12,12 +12,10 @@ where
     S: Storage,
 {
     validate_intents(&intent)?;
+    let intent_hash = utils::hash(&intent.data);
 
-    match storage
-        .insert_intent_set(StorageLayout, intent.clone())
-        .await
-    {
-        Ok(()) => Ok(ContentAddress(utils::hash(&intent.data))),
+    match storage.insert_intent_set(StorageLayout, intent).await {
+        Ok(()) => Ok(ContentAddress(intent_hash)),
         Err(e) => anyhow::bail!("Failed to deploy intent set: {}", e),
     }
 }
