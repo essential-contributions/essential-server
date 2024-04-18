@@ -1,10 +1,10 @@
-// TODO: Remove this
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 use self::validate::validate_solution_with_deps;
-use essential_types::{intent::Intent, solution::Solution, Hash, Signed};
+use essential_state_read_vm::{
+    asm::Op, Access, GasLimit, SolutionAccess, StateRead, StateSlots, Vm,
+};
+use essential_types::{solution::Solution, Hash, Signed, Word};
 use storage::Storage;
+use tokio::task::JoinSet;
 
 mod read;
 #[cfg(test)]
@@ -25,13 +25,66 @@ where
     }
 }
 
-pub async fn check_solution<S>(storage: &S, solution: Solution) -> anyhow::Result<f64>
+pub async fn check_solution<S>(storage: &S, solution: Solution) -> anyhow::Result<u64>
 where
-    S: Storage,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
 {
-    todo!()
-}
+    let intents = read::read_intents_from_storage(&solution, storage).await?;
+    let mut set = JoinSet::new();
 
-pub async fn check_individual(intent: Intent, solution: Solution) -> anyhow::Result<f64> {
-    todo!()
+    for (index, data) in solution.data.iter().enumerate() {
+        let Some(intent) = intents.get(&data.intent_to_solve).cloned() else {
+            anyhow::bail!("Intent in solution data not found in intents set");
+        };
+
+        let mut_keys_len = solution
+            .state_mutations
+            .iter()
+            .filter(|sm| sm.pathway as usize == index)
+            .count();
+        let mut_keys_len: Word = mut_keys_len.try_into()?;
+
+        let data = solution.data.clone();
+        let storage = storage.clone();
+        let mut results = vec![];
+
+        set.spawn(async move {
+            let pre_state = vec![];
+            let post_state = vec![];
+
+            for state_read in &intent.state_read {
+                let mut vm = Vm::default();
+                let solution_access = SolutionAccess {
+                    data: data.as_slice(),
+                    index,
+                    mut_keys_len,
+                };
+
+                let access = Access {
+                    solution: solution_access,
+                    state_slots: StateSlots {
+                        pre: pre_state.as_slice(),
+                        post: post_state.as_slice(),
+                    },
+                };
+
+                match vm
+                    .exec_bytecode_iter(
+                        state_read.iter().cloned(),
+                        access,
+                        &storage,
+                        &|_: &Op| 1,
+                        GasLimit::UNLIMITED,
+                    )
+                    .await
+                {
+                    Ok(gas) => results.push(gas),
+                    Err(e) => anyhow::bail!("State read VM execution failed: {}", e),
+                }
+            }
+            Ok(())
+        });
+    }
+    Ok(0) // TODO: what to do with gas?
 }

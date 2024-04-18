@@ -5,8 +5,11 @@ version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
+essential-state-read-vm = { workspace = true }
 essential-types = { workspace = true }
+futures = { workspace = true }
 storage = { workspace = true }
+thiserror = { workspace = true }
 utils = { workspace = true }
 
 [dev-dependencies]
