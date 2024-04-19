@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::bail;
+use essential_state_read_vm::StateRead;
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
@@ -55,6 +56,54 @@ impl MemoryStorage {
         Self {
             inner: Arc::new(Lock::new(Inner::default())),
         }
+    }
+}
+
+use std::{future::Future, pin::Pin};
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+#[error("failed to read from memory storage")]
+pub struct MemoryStorageError;
+
+impl StateRead for MemoryStorage {
+    type Error = MemoryStorageError;
+    type Future = Pin<Box<dyn Future<Output = Result<Vec<Option<Word>>, Self::Error>>>>;
+    fn word_range(&self, set_addr: ContentAddress, mut key: Key, num_words: usize) -> Self::Future {
+        fn next_key(mut key: Key) -> Option<Key> {
+            for w in key.iter_mut().rev() {
+                match *w {
+                    Word::MAX => *w = Word::MIN,
+                    _ => {
+                        *w += 1;
+                        return Some(key);
+                    }
+                }
+            }
+            None
+        }
+
+        // Clone our storage (i.e. just an `Arc`) to ensure have an owned
+        // instance for our future.
+        let storage = self.clone();
+        let future = async move {
+            let mut words = vec![];
+            for _ in 0..num_words {
+                // TODO: make use of anyhow
+
+                let opt = storage
+                    .query_state(&set_addr, &key)
+                    .await
+                    .ok()
+                    .ok_or(MemoryStorageError)?;
+
+                words.push(opt);
+                key = next_key(key).ok_or(MemoryStorageError)?;
+            }
+
+            Ok(words)
+        };
+        Box::pin(future) as Pin<Box<_>>
     }
 }
 
