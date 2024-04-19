@@ -5,9 +5,10 @@ use essential_types::{
     solution::{PartialSolution, Solution},
     Batch, Block, ContentAddress, Hash, IntentAddress, Key, Signature, Signed, StorageLayout, Word,
 };
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::FutureExt;
 use std::{
     collections::{BTreeMap, HashMap},
+    pin::Pin,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -365,10 +366,12 @@ impl Storage for MemoryStorage {
 impl StateRead for MemoryStorage {
     type Error = MemoryStorageError;
 
-    type Future = BoxFuture<'static, Result<Vec<Option<Word>>, Self::Error>>;
+    type Future =
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
 
     fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
-        self.word_range(set_addr, key, num_words).boxed()
+        let storage = self.clone();
+        async move { storage.word_range(set_addr, key, num_words).await }.boxed()
     }
 }
 

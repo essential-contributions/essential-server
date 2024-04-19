@@ -7,5 +7,5 @@ use test_utils::empty::Empty;
 async fn test_check_empty_solution() {
     let storage = MemoryStorage::default();
     let solution = Solution::empty();
-    let result = check_solution(&storage, solution).await;
+    check_solution(&storage, solution).await.unwrap();
 }
