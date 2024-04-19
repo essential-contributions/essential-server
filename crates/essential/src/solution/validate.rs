@@ -141,7 +141,6 @@ pub fn validate_partial_solutions_against_solution(
         .map(|address| address.0)
         .all(|address| {
             partial_solutions.get(address).map_or(false, |solution| {
-                // TODO: maybe remove
                 let PartialSolution {
                     data: partial_data,
                     state_mutations: partial_state_mutations,
