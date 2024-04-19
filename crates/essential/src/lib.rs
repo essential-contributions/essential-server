@@ -22,7 +22,8 @@ where
 
 impl<S> Essential<S>
 where
-    S: Storage + StateRead + Clone + Send + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
 {
     pub fn new(storage: S) -> Self {
         Self { storage }
@@ -39,7 +40,7 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    pub async fn check_solution(&self, solution: Solution) -> anyhow::Result<f64> {
+    pub async fn check_solution(&self, solution: Solution) -> anyhow::Result<u64> {
         solution::check_solution(&self.storage, solution).await
     }
 

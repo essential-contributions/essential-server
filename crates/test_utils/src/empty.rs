@@ -1,7 +1,10 @@
 use essential_types::{
     intent::{Directive, Intent},
     slots::StateSlot,
-    solution::{DecisionVariable, PartialSolution, Solution, SolutionData, StateMutation},
+    solution::{
+        DecisionVariable, PartialSolution, PartialSolutionData, Solution, SolutionData,
+        StateMutation,
+    },
     ContentAddress, IntentAddress, Word,
 };
 
@@ -86,6 +89,15 @@ impl Empty for PartialSolution {
         Self {
             data: Default::default(),
             state_mutations: Default::default(),
+        }
+    }
+}
+
+impl Empty for PartialSolutionData {
+    fn empty() -> Self {
+        Self {
+            intent_to_solve: IntentAddress::empty(),
+            decision_variables: Default::default(),
         }
     }
 }

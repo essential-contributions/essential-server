@@ -5,7 +5,6 @@ version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
-essential-constraint-vm = { workspace = true }
 essential-state-read-vm = { workspace = true }
 essential-types = { workspace = true }
 serde = { workspace = true }

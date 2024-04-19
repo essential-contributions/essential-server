@@ -1,15 +1,12 @@
-use crate::solution::submit_solution;
-use essential_types::solution::Solution;
-use memory_storage::MemoryStorage;
+use crate::{solution::submit_solution, utils::deploy_empty_intent_and_get_solution};
 use storage::Storage;
-use test_utils::{empty::Empty, sign_with_random_keypair};
+use test_utils::sign_with_random_keypair;
 
 #[tokio::test]
 async fn test_submit_empty_solution() {
-    let storage = MemoryStorage::default();
-    let solution = Solution::empty();
+    let (solution, _, storage) = deploy_empty_intent_and_get_solution().await;
     let solution = sign_with_random_keypair(solution);
-    let result = submit_solution(&storage, solution.clone()).await.unwrap();
+    let _result = submit_solution(&storage, solution.clone()).await.unwrap();
     let result = storage.list_solutions_pool().await.unwrap();
     assert_eq!(result, vec![solution]);
 }

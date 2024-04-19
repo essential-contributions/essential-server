@@ -1,15 +1,19 @@
 use anyhow::bail;
+use essential_state_read_vm::StateRead;
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
     Batch, Block, ContentAddress, Hash, IntentAddress, Key, Signature, Signed, StorageLayout, Word,
 };
+use futures::future::FutureExt;
 use std::{
     collections::{BTreeMap, HashMap},
+    pin::Pin,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use storage::{StateStorage, Storage};
+use thiserror::Error;
 use utils::Lock;
 
 #[cfg(test)]
@@ -54,6 +58,42 @@ impl MemoryStorage {
         Self {
             inner: Arc::new(Lock::new(Inner::default())),
         }
+    }
+
+    fn next_key(mut key: Key) -> Option<Key> {
+        for w in key.iter_mut().rev() {
+            match *w {
+                Word::MAX => *w = Word::MIN,
+                _ => {
+                    *w += 1;
+                    return Some(key);
+                }
+            }
+        }
+        None
+    }
+
+    pub async fn word_range(
+        &self,
+        set_addr: ContentAddress,
+        mut key: Key,
+        num_words: usize,
+    ) -> Result<Vec<Option<Word>>, MemoryStorageError> {
+        let mut words = vec![];
+        for _ in 0..num_words {
+            // TODO: make use of anyhow
+
+            let opt = self
+                .query_state(&set_addr, &key)
+                .await
+                .ok()
+                .ok_or(MemoryStorageError)?;
+
+            words.push(opt);
+            key = Self::next_key(key).ok_or(MemoryStorageError)?;
+        }
+
+        Ok(words)
     }
 }
 
@@ -322,3 +362,19 @@ impl Storage for MemoryStorage {
         Ok(v)
     }
 }
+
+impl StateRead for MemoryStorage {
+    type Error = MemoryStorageError;
+
+    type Future =
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
+
+    fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+        let storage = self.clone();
+        async move { storage.word_range(set_addr, key, num_words).await }.boxed()
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("failed to read from memory storage")]
+pub struct MemoryStorageError;

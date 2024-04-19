@@ -1,6 +1,7 @@
 use self::validate::validate_solution_with_deps;
-use essential_constraint_vm::{Access, SolutionAccess, StateSlots};
-use essential_state_read_vm::{asm::Op, GasLimit, StateRead, Vm};
+use essential_state_read_vm::{
+    asm::Op, Access, GasLimit, SolutionAccess, StateRead, StateSlots, Vm,
+};
 use essential_types::{solution::Solution, Hash, Signed, Word};
 use storage::Storage;
 use tokio::task::JoinSet;
@@ -24,16 +25,12 @@ where
     }
 }
 
-// TODO: S: Send + 'static
-// TODO: Vm does not implement Copy
-// TODO: f64 to return?
-pub async fn check_solution<S>(storage: &S, solution: Solution) -> anyhow::Result<f64>
+pub async fn check_solution<S>(storage: &S, solution: Solution) -> anyhow::Result<u64>
 where
-    S: Storage + StateRead + Clone + Send + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
 {
     let intents = read::read_intents_from_storage(&solution, storage).await?;
-    let vm = Vm::default();
-
     let mut set = JoinSet::new();
 
     for (index, data) in solution.data.iter().enumerate() {
@@ -50,12 +47,14 @@ where
 
         let data = solution.data.clone();
         let storage = storage.clone();
+        let mut results = vec![];
 
         set.spawn(async move {
             let pre_state = vec![];
             let post_state = vec![];
 
             for state_read in &intent.state_read {
+                let mut vm = Vm::default();
                 let solution_access = SolutionAccess {
                     data: data.as_slice(),
                     index,
@@ -70,7 +69,7 @@ where
                     },
                 };
 
-                let result = vm
+                match vm
                     .exec_bytecode_iter(
                         state_read.iter().cloned(),
                         access,
@@ -78,10 +77,14 @@ where
                         &|_: &Op| 1,
                         GasLimit::UNLIMITED,
                     )
-                    .await;
+                    .await
+                {
+                    Ok(gas) => results.push(gas),
+                    Err(e) => anyhow::bail!("State read VM execution failed: {}", e),
+                }
             }
+            Ok(())
         });
     }
-
-    Ok(0.0)
+    Ok(0) // TODO: what to do with gas?
 }
