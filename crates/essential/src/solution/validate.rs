@@ -81,8 +81,7 @@ pub fn validate_intents_against_solution(
         state_mutations
             .iter()
             .map(|mutation| &mutation.pathway)
-            .map(|pathway| data.get(*pathway as usize).map(|d| { &d.intent_to_solve }))
-            .all(|address| address.map_or(false, |address| intents.contains_key(address))),
+            .all(|pathway| data.get(*pathway as usize).is_some()),
         "All state mutations must have an intent in the set"
     );
 
