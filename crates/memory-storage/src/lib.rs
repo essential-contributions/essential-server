@@ -81,16 +81,12 @@ impl MemoryStorage {
     ) -> Result<Vec<Option<Word>>, MemoryStorageError> {
         let mut words = vec![];
         for _ in 0..num_words {
-            // TODO: make use of anyhow
-
             let opt = self
                 .query_state(&set_addr, &key)
                 .await
-                .ok()
-                .ok_or(MemoryStorageError)?;
-
+                .map_err(|_| MemoryStorageError::ReadError)?;
             words.push(opt);
-            key = Self::next_key(key).ok_or(MemoryStorageError)?;
+            key = Self::next_key(key).ok_or(MemoryStorageError::KeyRangeError)?
         }
 
         Ok(words)
@@ -376,5 +372,9 @@ impl StateRead for MemoryStorage {
 }
 
 #[derive(Debug, Error)]
-#[error("failed to read from memory storage")]
-pub struct MemoryStorageError;
+pub enum MemoryStorageError {
+    #[error("failed to read from memory storage")]
+    ReadError,
+    #[error("invalid key range")]
+    KeyRangeError,
+}
