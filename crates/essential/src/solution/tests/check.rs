@@ -1,11 +1,7 @@
-use crate::solution::check_solution;
-use essential_types::solution::Solution;
-use memory_storage::MemoryStorage;
-use test_utils::empty::Empty;
+use crate::{solution::check_solution, utils::solution_with_deps};
 
 #[tokio::test]
-async fn test_check_empty_solution() {
-    let storage = MemoryStorage::default();
-    let solution = Solution::empty();
+async fn test_check_solution_with_deps() {
+    let (solution, storage) = solution_with_deps().await;
     check_solution(&storage, solution).await.unwrap();
 }

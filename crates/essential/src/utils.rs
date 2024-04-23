@@ -1,7 +1,10 @@
 use crate::deploy::deploy;
 use essential_types::{
     intent::Intent,
-    solution::{PartialSolution, PartialSolutionData, Solution, SolutionData},
+    solution::{
+        DecisionVariable, DecisionVariableIndex, PartialSolution, PartialSolutionData, Solution,
+        SolutionData, StateMutation,
+    },
     ContentAddress, IntentAddress,
 };
 use memory_storage::MemoryStorage;
@@ -72,4 +75,40 @@ pub async fn deploy_partial_solution_to_storage<S: Storage>(
         .await
         .unwrap();
     ContentAddress(utils::hash(&partial_solution.data))
+}
+
+// Solution that has multiple fields set to non-default values.
+pub async fn solution_with_deps() -> (Solution, MemoryStorage) {
+    let mut intent = Intent::empty();
+    intent.slots.decision_variables = 2;
+    let (intent_address, storage) = deploy_intent(intent).await;
+    let mut solution = Solution::empty();
+    solution.data = vec![SolutionData {
+        intent_to_solve: intent_address.clone(),
+        decision_variables: vec![
+            DecisionVariable::Inline(0),
+            DecisionVariable::Transient(DecisionVariableIndex {
+                solution_data_index: 0,
+                variable_index: 0,
+            }),
+        ],
+    }];
+    let partial_solution = PartialSolution {
+        data: vec![PartialSolutionData {
+            intent_to_solve: intent_address,
+            decision_variables: vec![Some(DecisionVariable::Inline(0)), None],
+        }],
+        state_mutations: vec![StateMutation {
+            pathway: 0,
+            mutations: Default::default(),
+        }],
+    };
+    let partial_solution_address =
+        deploy_partial_solution_to_storage(&storage, partial_solution).await;
+    solution.partial_solutions = vec![sign_with_random_keypair(partial_solution_address.clone())];
+    solution.state_mutations = vec![StateMutation {
+        pathway: 0,
+        mutations: Default::default(),
+    }];
+    (solution, storage)
 }

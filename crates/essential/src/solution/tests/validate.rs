@@ -10,6 +10,7 @@ use crate::{
     utils::{
         deploy_empty_intent, deploy_empty_intent_and_get_solution, deploy_intent,
         deploy_partial_solution_to_storage, deploy_partial_solution_with_data_to_storage,
+        solution_with_deps,
     },
 };
 use essential_types::{
@@ -41,38 +42,8 @@ fn test_validate_solution() {
 
 #[tokio::test]
 async fn test_validate_solution_with_deps() {
-    let mut intent = Intent::empty();
-    intent.slots.decision_variables = 2;
-    let (intent_address, storage) = deploy_intent(intent).await;
-    let mut solution = Solution::empty();
-    solution.data = vec![SolutionData {
-        intent_to_solve: intent_address.clone(),
-        decision_variables: vec![
-            DecisionVariable::Inline(0),
-            DecisionVariable::Transient(DecisionVariableIndex {
-                solution_data_index: 0,
-                variable_index: 0,
-            }),
-        ],
-    }];
-    let partial_solution = PartialSolution {
-        data: vec![PartialSolutionData {
-            intent_to_solve: intent_address,
-            decision_variables: vec![Some(DecisionVariable::Inline(0)), None],
-        }],
-        state_mutations: vec![StateMutation {
-            pathway: 0,
-            mutations: Default::default(),
-        }],
-    };
-    let partial_solution_address =
-        deploy_partial_solution_to_storage(&storage, partial_solution).await;
-    solution.partial_solutions = vec![sign_with_random_keypair(partial_solution_address.clone())];
-    solution.state_mutations = vec![StateMutation {
-        pathway: 0,
-        mutations: Default::default(),
-    }];
-    let solution = sign_with_random_keypair(Solution::empty());
+    let (solution, storage) = solution_with_deps().await;
+    let solution = sign_with_random_keypair(solution);
     validate_solution_with_deps(&solution, &storage)
         .await
         .unwrap();
