@@ -395,7 +395,6 @@ dependencies = [
  "essential-state-read-vm",
  "essential-types",
  "memory-storage",
- "serde",
  "storage",
  "test-utils",
  "tokio",
