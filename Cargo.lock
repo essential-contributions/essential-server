@@ -392,6 +392,7 @@ name = "essential-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "essential-constraint-vm",
  "essential-state-read-vm",
  "essential-types",
  "memory-storage",

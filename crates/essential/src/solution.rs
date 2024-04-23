@@ -1,4 +1,5 @@
 use self::validate::validate_solution_with_deps;
+use essential_constraint_vm::check_intent;
 use essential_state_read_vm::{
     asm::Op, Access, GasLimit, SolutionAccess, StateRead, StateSlots, Vm,
 };
@@ -25,6 +26,7 @@ where
     }
 }
 
+/// Checks a solution against the state read VM and if that succeeds, the constraint VM.
 pub async fn check_solution<S>(storage: &S, solution: Solution) -> anyhow::Result<u64>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
@@ -47,7 +49,6 @@ where
 
         let data = solution.data.clone();
         let storage = storage.clone();
-        let mut results = vec![];
 
         set.spawn(async move {
             let pre_state = vec![];
@@ -79,12 +80,21 @@ where
                     )
                     .await
                 {
-                    Ok(gas) => results.push(gas),
+                    // TODO: gas returned from state read vm execution is not used
+                    Ok(_) => {
+                        dbg!("State read VM execution succeeded");
+                        match check_intent(&intent.constraints, access) {
+                            Ok(_gas) => {
+                                dbg!("Constraint VM execution succeeded");
+                            }
+                            Err(e) => anyhow::bail!("Constraint VM execution failed: {}", e),
+                        }
+                    }
                     Err(e) => anyhow::bail!("State read VM execution failed: {}", e),
                 }
             }
             Ok(())
         });
     }
-    Ok(1) // TODO: Assuming 1 gas for everything for now
+    Ok(1)
 }
