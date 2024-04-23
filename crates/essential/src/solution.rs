@@ -86,5 +86,5 @@ where
             Ok(())
         });
     }
-    Ok(0) // TODO: what to do with gas?
+    Ok(1) // TODO: Assuming 1 gas for everything for now
 }
