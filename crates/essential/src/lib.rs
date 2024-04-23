@@ -9,7 +9,8 @@ use storage::Storage;
 mod deploy;
 mod run;
 mod solution;
-mod validate;
+#[cfg(test)]
+mod utils;
 
 #[derive(Clone)]
 pub struct Essential<S>

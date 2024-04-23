@@ -1,10 +1,12 @@
-use crate::validate::validate_intents;
+use self::validate::validate_intents;
 use essential_types::{intent::Intent, ContentAddress, Signed, StorageLayout};
 use storage::Storage;
 
 #[cfg(test)]
 mod tests;
+mod validate;
 
+/// Validates an intent and deploys it to storage.
 pub async fn deploy<S>(storage: &S, intent: Signed<Vec<Intent>>) -> anyhow::Result<ContentAddress>
 where
     S: Storage,

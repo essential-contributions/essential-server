@@ -1,15 +1,67 @@
-use super::{validate_intent, validate_intents};
-use crate::validate::{
-    MAX_CONSTRAINTS, MAX_CONSTRAINT_SIZE_IN_BYTES, MAX_DECISION_VARIABLES, MAX_DIRECTIVE_SIZE,
-    MAX_INTENTS, MAX_NUM_STATE_SLOTS, MAX_STATE_LEN, MAX_STATE_READS, MAX_STATE_READ_SIZE_IN_BYTES,
+use crate::deploy::validate::{
+    validate_intent, validate_intents, MAX_CONSTRAINTS, MAX_CONSTRAINT_SIZE_IN_BYTES,
+    MAX_DECISION_VARIABLES, MAX_DIRECTIVE_SIZE, MAX_INTENTS, MAX_NUM_STATE_SLOTS, MAX_STATE_LEN,
+    MAX_STATE_READS, MAX_STATE_READ_SIZE_IN_BYTES,
 };
 use essential_types::{
     intent::{Directive, Intent},
-    slots::StateSlot,
+    slots::{Slots, StateSlot},
 };
-use test_utils::{
-    empty::Empty, intent_with_decision_variables, sign_corrupted, sign_with_random_keypair,
-};
+use test_utils::{empty::Empty, sign_corrupted, sign_with_random_keypair};
+
+#[test]
+#[should_panic(expected = "Too many decision variables")]
+fn test_fail_too_many_decision_variables() {
+    let mut intent = Intent::empty();
+    intent.slots = Slots {
+        decision_variables: MAX_DECISION_VARIABLES + 1,
+        state: Default::default(),
+    };
+    validate_intent(&intent).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Too many state slots")]
+fn test_fail_too_many_state_slots() {
+    let mut intent = Intent::empty();
+    intent.slots = Slots {
+        decision_variables: Default::default(),
+        state: (0..MAX_NUM_STATE_SLOTS + 1)
+            .map(|_| StateSlot::empty())
+            .collect(),
+    };
+    validate_intent(&intent).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Invalid slots state length")]
+fn test_fail_invalid_state_slots_length() {
+    let mut intent = Intent::empty();
+    intent.slots = Slots {
+        decision_variables: Default::default(),
+        state: vec![StateSlot {
+            index: u32::MAX,
+            amount: 1,
+            program_index: Default::default(),
+        }],
+    };
+    validate_intent(&intent).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Slots state length too large")]
+fn test_fail_state_slots_length_too_large() {
+    let mut intent = Intent::empty();
+    intent.slots = Slots {
+        decision_variables: Default::default(),
+        state: vec![StateSlot {
+            index: Default::default(),
+            amount: MAX_STATE_LEN as u32 + 1,
+            program_index: Default::default(),
+        }],
+    };
+    validate_intent(&intent).unwrap();
+}
 
 #[test]
 fn test_empty_intent() {
@@ -32,47 +84,6 @@ fn test_fail_too_many_intents() {
     let intents: Vec<Intent> = (0..MAX_INTENTS + 1).map(|_| Intent::empty()).collect();
     let intents = sign_with_random_keypair(intents);
     validate_intents(&intents).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "Too many decision variables")]
-fn test_fail_too_many_decision_variables() {
-    let intent = intent_with_decision_variables((MAX_DECISION_VARIABLES + 1) as usize);
-    validate_intent(&intent).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "Too many state slots")]
-fn test_fail_too_many_state_slots() {
-    let mut intent = Intent::empty();
-    intent.slots.state = (0..MAX_NUM_STATE_SLOTS + 1)
-        .map(|_| StateSlot::empty())
-        .collect();
-    validate_intent(&intent).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "Invalid slots state length")]
-fn test_fail_invalid_state_slots_length() {
-    let mut intent = Intent::empty();
-    intent.slots.state = vec![StateSlot {
-        index: u32::MAX,
-        amount: 1,
-        program_index: Default::default(),
-    }];
-    validate_intent(&intent).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "Slots state length too large")]
-fn test_fail_state_slots_length_too_large() {
-    let mut intent = Intent::empty();
-    intent.slots.state = vec![StateSlot {
-        index: Default::default(),
-        amount: MAX_STATE_LEN + 1,
-        program_index: Default::default(),
-    }];
-    validate_intent(&intent).unwrap();
 }
 
 #[test]

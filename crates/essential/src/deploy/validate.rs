@@ -6,9 +6,6 @@ use essential_types::{
 };
 use utils::verify;
 
-#[cfg(test)]
-mod tests;
-
 /// Maximum number of intents that of an intent set.
 pub const MAX_INTENTS: usize = 100;
 /// Maximum number of state read programs of an intent.
