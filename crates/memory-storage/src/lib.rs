@@ -79,7 +79,7 @@ impl StateStorage for MemoryStorage {
 
     async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)>,
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send,
     {
         let v = self.inner.apply(|i| {
             updates

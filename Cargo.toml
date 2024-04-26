@@ -6,16 +6,18 @@ resolver = "2"
 
 [workspace.dependencies]
 anyhow = "1.0.80"
+axum = "0.7.5"
 base64 = "0.22.0"
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 postcard = { version = "1.0.8", default-featues = false, features = ["alloc"] }
-reqwest = "0.12.0"
+reqwest = "0.12.4"
 secp256k1 = { version = "0.28.2", features = ["rand-std", "hashes-std"] }
 serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.114"
 sha2 = "0.10.8"
 tokio = { version = "1.36.0", features = ["full"] }
 
+essential-server = { path = "crates/essential" }
 memory-storage = { path = "crates/memory-storage" }
 storage = { path = "crates/storage" }
 test-utils = { path = "crates/test_utils" }
