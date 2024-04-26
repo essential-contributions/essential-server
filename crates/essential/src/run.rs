@@ -3,11 +3,19 @@ use essential_state_read_vm::StateRead;
 use essential_types::{solution::Solution, Hash};
 use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, Storage};
+use tokio::sync::oneshot;
 use transaction_storage::{Transaction, TransactionStorage};
 use utils::hash;
 
 #[cfg(test)]
 pub mod tests;
+
+pub struct Handle {
+    tx: oneshot::Sender<()>,
+    jh: Option<tokio::task::JoinHandle<anyhow::Result<()>>>,
+}
+
+pub struct Shutdown(oneshot::Receiver<()>);
 
 struct Solutions {
     valid_solutions: Vec<(Arc<Solution>, f64)>,
@@ -15,7 +23,7 @@ struct Solutions {
 }
 
 /// The main loop that builds blocks.
-pub async fn run<S>(storage: &S) -> anyhow::Result<()>
+pub async fn run<S>(storage: &S, shutdown: Shutdown) -> anyhow::Result<()>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -45,6 +53,8 @@ where
 
     // Commit the state updates transaction.
     transaction.commit().await?;
+
+    shutdown.0.await?;
 
     Ok(())
 }
@@ -111,4 +121,25 @@ where
         },
         transaction,
     ))
+}
+
+impl Handle {
+    pub fn new() -> (Self, Shutdown) {
+        let (tx, rx) = oneshot::channel();
+        (Self { tx, jh: None }, Shutdown(rx))
+    }
+
+    pub fn set_jh(&mut self, jh: tokio::task::JoinHandle<anyhow::Result<()>>) {
+        self.jh = Some(jh);
+    }
+
+    pub async fn shutdown(self) -> anyhow::Result<()> {
+        self.tx
+            .send(())
+            .map_err(|_| anyhow::anyhow!("Failed to send shutdown signal"))?;
+        if let Some(jh) = self.jh {
+            jh.await??;
+        }
+        Ok(())
+    }
 }
