@@ -3,10 +3,12 @@ use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
     StorageLayout, Word,
 };
+use run::{Handle, Shutdown};
 use solution::Output;
 use std::{ops::Range, sync::Arc, time::Duration};
-use storage::Storage;
 use transaction_storage::Transaction;
+
+pub use storage::Storage;
 
 mod deploy;
 mod run;
@@ -38,8 +40,18 @@ where
         Self { storage }
     }
 
-    pub async fn run(&self) -> anyhow::Result<()> {
-        run::run(&self.storage).await
+    pub fn spawn(self) -> anyhow::Result<Handle>
+    where
+        S: 'static + Send + Sync,
+    {
+        let (mut handle, shutdown) = Handle::new();
+        let jh = tokio::spawn(async move { self.run(shutdown).await });
+        handle.set_jh(jh);
+        Ok(handle)
+    }
+
+    pub async fn run(&self, shutdown: Shutdown) -> anyhow::Result<()> {
+        run::run(&self.storage, shutdown).await
     }
 
     pub async fn deploy_intent_set(
