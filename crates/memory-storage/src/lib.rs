@@ -12,7 +12,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use storage::{StateStorage, Storage};
+use storage::{state_write::StateWrite, StateStorage, Storage};
 use thiserror::Error;
 use utils::Lock;
 
@@ -359,6 +359,16 @@ impl Storage for MemoryStorage {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum MemoryStorageError {
+    #[error("failed to read from memory storage")]
+    ReadError,
+    #[error("failed to write to memory storage")]
+    WriteError,
+    #[error("invalid key range")]
+    KeyRangeError,
+}
+
 impl StateRead for MemoryStorage {
     type Error = MemoryStorageError;
 
@@ -371,10 +381,22 @@ impl StateRead for MemoryStorage {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum MemoryStorageError {
-    #[error("failed to read from memory storage")]
-    ReadError,
-    #[error("invalid key range")]
-    KeyRangeError,
+impl StateWrite for MemoryStorage {
+    type Error = MemoryStorageError;
+
+    type Future =
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
+
+    fn update_state_batch<U>(&self, updates: U) -> Self::Future
+    where
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send + 'static,
+    {
+        let storage = self.clone();
+        async move {
+            StateStorage::update_state_batch(&storage, updates)
+                .await
+                .map_err(|_| MemoryStorageError::WriteError)
+        }
+        .boxed()
+    }
 }

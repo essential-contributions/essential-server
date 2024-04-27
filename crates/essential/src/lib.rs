@@ -4,7 +4,7 @@ use essential_types::{
     StorageLayout, Word,
 };
 use std::{ops::Range, sync::Arc, time::Duration};
-use storage::Storage;
+use storage::{state_write::StateWrite, Storage};
 
 mod deploy;
 mod run;
@@ -22,8 +22,11 @@ where
 
 impl<S> Essential<S>
 where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+    <S as StateWrite>::Future: Send,
+    <S as StateWrite>::Error: Send,
 {
     pub fn new(storage: S) -> Self {
         Self { storage }

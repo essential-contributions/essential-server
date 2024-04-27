@@ -3,13 +3,15 @@
 //!
 //! Trait for the storage layer of the Essential platform.
 
-use std::{ops::Range, time::Duration};
-
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
     Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
+use std::{ops::Range, time::Duration};
+
+/// Module for state write trait.
+pub mod state_write;
 
 // TODO: Maybe this warning is right,
 // we will find out when we try to use this trait
