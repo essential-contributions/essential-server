@@ -204,7 +204,7 @@ pub fn validate_partial_solutions_against_solution(
 pub async fn validate_solution_with_deps<S>(
     solution: &Signed<Solution>,
     storage: &S,
-) -> anyhow::Result<()>
+) -> anyhow::Result<HashMap<IntentAddress, Intent>>
 where
     S: Storage,
 {
@@ -212,14 +212,12 @@ where
     validate_solution(solution)?;
     let solution = &solution.data;
     // Validation of intents being read from storage.
-    validate_intents_against_solution(
-        solution,
-        &read_intents_from_storage(solution, storage).await?,
-    )?;
+    let intents = read_intents_from_storage(solution, storage).await?;
+    validate_intents_against_solution(solution, &intents)?;
     // Validation of partial solutions being read from storage.
     validate_partial_solutions_against_solution(
         solution,
         &read_partial_solutions_from_storage(solution, storage).await?,
     )?;
-    Ok(())
+    Ok(intents)
 }

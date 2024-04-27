@@ -1,15 +1,16 @@
 use crate::deploy::deploy;
 use essential_types::{
     intent::Intent,
+    slots::{Slots, StateSlot},
     solution::{
-        DecisionVariable, DecisionVariableIndex, PartialSolution, PartialSolutionData, Solution,
-        SolutionData, StateMutation,
+        DecisionVariable, Mutation, PartialSolution, PartialSolutionData, Solution, SolutionData,
+        StateMutation,
     },
     ContentAddress, IntentAddress,
 };
 use memory_storage::MemoryStorage;
 use storage::Storage;
-use test_utils::{empty::Empty, sign_with_random_keypair};
+use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
 
 // Sign and deploy given intent to newly created memory storage.
 pub async fn deploy_intent(intent: Intent) -> (IntentAddress, MemoryStorage) {
@@ -77,38 +78,65 @@ pub async fn deploy_partial_solution_to_storage<S: Storage>(
     ContentAddress(utils::hash(&partial_solution.data))
 }
 
-// Solution that has multiple fields set to non-default values.
+// Empty solution with empty intent.
+pub async fn sanity_solution() -> (Solution, MemoryStorage) {
+    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
+    let solution = solution_with_intent(intent_address);
+    (solution, storage)
+}
+
+// Solution that has satisfies an intent.
 pub async fn solution_with_deps() -> (Solution, MemoryStorage) {
     let mut intent = Intent::empty();
-    intent.slots.decision_variables = 2;
+    intent.slots = Slots {
+        decision_variables: 1,
+        state: vec![StateSlot {
+            index: 0,
+            amount: 1,
+            program_index: 0,
+        }],
+    };
+    // Program to read state slot 0.
+    intent.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::Memory::Alloc.into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::StateRead::WordRange,
+        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+    ])
+    .collect()];
+    // Program to check pre value is 0 and post value is 42 at slot 0.
+    intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
+        essential_constraint_vm::asm::Stack::Push(0).into(), // slot
+        essential_constraint_vm::asm::Stack::Push(0).into(), // pre
+        essential_constraint_vm::asm::Access::State.into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Pred::Eq.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(), // slot
+        essential_constraint_vm::asm::Stack::Push(1).into(), // post
+        essential_constraint_vm::asm::Access::State.into(),
+        essential_state_read_vm::asm::Stack::Push(42).into(),
+        essential_constraint_vm::asm::Pred::Eq.into(),
+        essential_constraint_vm::asm::Pred::And.into(),
+    ])
+    .collect()];
     let (intent_address, storage) = deploy_intent(intent).await;
     let mut solution = Solution::empty();
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
-        decision_variables: vec![
-            DecisionVariable::Inline(0),
-            DecisionVariable::Transient(DecisionVariableIndex {
-                solution_data_index: 0,
-                variable_index: 0,
-            }),
-        ],
+        decision_variables: vec![DecisionVariable::Inline(42)],
     }];
-    let partial_solution = PartialSolution {
-        data: vec![PartialSolutionData {
-            intent_to_solve: intent_address,
-            decision_variables: vec![Some(DecisionVariable::Inline(0)), None],
-        }],
-        state_mutations: vec![StateMutation {
-            pathway: 0,
-            mutations: Default::default(),
-        }],
-    };
-    let partial_solution_address =
-        deploy_partial_solution_to_storage(&storage, partial_solution).await;
-    solution.partial_solutions = vec![sign_with_random_keypair(partial_solution_address.clone())];
+    // State mutation to satisfy the intent.
     solution.state_mutations = vec![StateMutation {
         pathway: 0,
-        mutations: Default::default(),
+        mutations: vec![Mutation {
+            key: [0, 0, 0, 0],
+            value: Some(42),
+        }],
     }];
     (solution, storage)
 }

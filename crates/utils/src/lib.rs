@@ -24,6 +24,13 @@ impl<T> Lock<T> {
     pub fn apply<U>(&self, f: impl FnOnce(&mut T) -> U) -> U {
         f(&mut self.data.lock().unwrap())
     }
+
+    pub fn inner(&self) -> T
+    where
+        T: Clone,
+    {
+        self.data.lock().unwrap().to_owned()
+    }
 }
 
 /// Serialize data using postcard
