@@ -15,8 +15,6 @@ async fn test_check_empty_solution() {
 }
 
 #[tokio::test]
-// TODO: ignored because of state slot out of bounds panic
-#[ignore]
 async fn test_check_solution_with_deps() {
     let (solution, storage) = solution_with_deps().await;
     let result = check_solution(&storage, Arc::new(solution)).await.unwrap();
