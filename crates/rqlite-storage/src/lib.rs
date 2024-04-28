@@ -1,3 +1,5 @@
+// TODO: remove this
+#![allow(unused_variables)]
 #![deny(missing_docs)]
 //! # Rqlite storage
 //! This uses a remote rqlite server to store data.
@@ -5,9 +7,13 @@
 use anyhow::{bail, ensure};
 use base64::Engine;
 use essential_types::{
-    solution::PartialSolution, Block, ContentAddress, Signed, StorageLayout, Word,
+    solution::PartialSolution, Block, ContentAddress, Hash, Signed, StorageLayout, Word,
 };
-use storage::{StateStorage, Storage};
+use std::time::Duration;
+use storage::{
+    failed_solution::{FailedSolution, SolutionFailReason},
+    StateStorage, Storage,
+};
 use utils::hash;
 
 use values::{single_value, QueryValues};
@@ -406,6 +412,13 @@ impl Storage for RqliteStorage {
         self.execute(&sql[..]).await
     }
 
+    async fn move_solutions_to_failed(
+        &self,
+        solutions: &[(Hash, SolutionFailReason)],
+    ) -> anyhow::Result<()> {
+        todo!()
+    }
+
     async fn move_partial_solutions_to_solved(
         &self,
         partial_solutions: &[essential_types::Hash],
@@ -517,6 +530,10 @@ impl Storage for RqliteStorage {
         values::list_solutions_pool(queries)
     }
 
+    async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>> {
+        todo!()
+    }
+
     async fn list_partial_solutions_pool(&self) -> anyhow::Result<Vec<Signed<PartialSolution>>> {
         // TODO: Maybe we want to page this?
         let sql = &[include_sql!("query/list_partial_solutions.sql")];
@@ -564,5 +581,16 @@ impl Storage for RqliteStorage {
             None => Ok(None),
             _ => bail!("Storage layout stored incorrectly"),
         }
+    }
+
+    async fn get_failed_solution(
+        &self,
+        solution_hash: Hash,
+    ) -> anyhow::Result<Option<FailedSolution>> {
+        todo!()
+    }
+
+    async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()> {
+        todo!()
     }
 }
