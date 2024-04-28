@@ -72,6 +72,7 @@ where
 {
     let utility = Arc::new(Lock::new(0));
     let mut set = JoinSet::new();
+    // TODO: avoid clone here?
     let state_mutations = Arc::new(solution.state_mutations.clone());
 
     for (intent_index, data) in solution.data.iter().cloned().enumerate() {

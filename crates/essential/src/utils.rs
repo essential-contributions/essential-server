@@ -3,7 +3,8 @@ use essential_types::{
     intent::Intent,
     slots::{Slots, StateSlot},
     solution::{
-        Mutation, PartialSolution, PartialSolutionData, Solution, SolutionData, StateMutation,
+        DecisionVariable, Mutation, PartialSolution, PartialSolutionData, Solution, SolutionData,
+        StateMutation,
     },
     ContentAddress, IntentAddress,
 };
@@ -89,7 +90,7 @@ pub async fn solution_with_deps() -> (Solution, MemoryStorage) {
     // Intent that expects the value of previously unset state slot with index 0 to be 42.
     let mut intent = Intent::empty();
     intent.slots = Slots {
-        decision_variables: 0,
+        decision_variables: 1, // Expects one decision variable.
         state: vec![StateSlot {
             index: 0,
             amount: 1,
@@ -128,7 +129,7 @@ pub async fn solution_with_deps() -> (Solution, MemoryStorage) {
     let mut solution = Solution::empty();
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
-        decision_variables: Default::default(),
+        decision_variables: vec![DecisionVariable::Inline(42)],
     }];
     // State mutation to satisfy the intent.
     solution.state_mutations = vec![StateMutation {
