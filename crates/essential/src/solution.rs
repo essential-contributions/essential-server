@@ -17,7 +17,7 @@ use utils::Lock;
 mod read;
 #[cfg(test)]
 mod tests;
-mod validate;
+pub(crate) mod validate;
 
 /// Validates a solution and submits it to storage.
 pub async fn submit_solution<S>(storage: &S, solution: Signed<Solution>) -> anyhow::Result<Hash>
