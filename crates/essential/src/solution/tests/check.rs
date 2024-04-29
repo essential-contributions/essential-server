@@ -1,6 +1,6 @@
 use crate::{
     solution::check_solution,
-    utils::{deploy_intent, sanity_solution, solution_with_deps},
+    test_utils::{deploy_intent, sanity_solution, solution_with_deps},
 };
 use essential_types::intent::Intent;
 use std::sync::Arc;

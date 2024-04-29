@@ -11,7 +11,7 @@ mod deploy;
 mod run;
 mod solution;
 #[cfg(test)]
-mod utils;
+mod test_utils;
 
 #[derive(Clone)]
 pub struct Essential<S>

@@ -7,7 +7,7 @@ use crate::{
             MAX_SOLUTION_DATA, MAX_STATE_MUTATIONS,
         },
     },
-    utils::{
+    test_utils::{
         deploy_empty_intent, deploy_empty_intent_and_get_solution, deploy_intent,
         deploy_partial_solution_to_storage, deploy_partial_solution_with_data_to_storage,
         solution_with_deps,
