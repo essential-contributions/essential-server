@@ -8,6 +8,7 @@ resolver = "2"
 anyhow = "1.0.80"
 axum = "0.7.5"
 base64 = "0.22.0"
+clap = { version = "4.5.4", features = ["derive"] }
 essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
@@ -25,6 +26,7 @@ tokio = { version = "1.36.0", features = ["full"] }
 
 essential-server = { path = "crates/essential" }
 memory-storage = { path = "crates/memory-storage" }
+rqlite-storage = { path = "crates/rqlite-storage" }
 storage = { path = "crates/storage" }
 test-utils = { path = "crates/test_utils" }
 transaction-storage = { path = "crates/transaction-storage" }

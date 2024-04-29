@@ -30,6 +30,7 @@
 
       packages = perSystemPkgs (pkgs: {
         essential-server = pkgs.essential-server;
+        essential-rest-server = pkgs.essential-rest-server;
         default = inputs.self.packages.${pkgs.system}.essential-server;
       });
 
