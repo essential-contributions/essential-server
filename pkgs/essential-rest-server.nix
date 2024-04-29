@@ -5,6 +5,7 @@
 , pkg-config
 , rustPlatform
 , darwin
+, nix-gitignore
 }:
 let
   src = ../.;
