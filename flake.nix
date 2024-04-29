@@ -43,7 +43,7 @@
       apps = perSystemPkgs (pkgs: {
         server-with-rqlite = {
           type = "app";
-          program = "${pkgs.server-with-rqlite}/bin/yurtc";
+          program = "${pkgs.server-with-rqlite}/bin/server-with-rqlite";
         };
         default = inputs.self.apps.${pkgs.system}.server-with-rqlite;
       });
