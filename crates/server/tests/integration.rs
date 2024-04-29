@@ -1,9 +1,14 @@
 use std::{time::Duration, vec};
 
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use essential_rest_server as server;
-use essential_types::{intent::Intent, solution::Solution, ContentAddress, IntentAddress, Signed};
+use essential_types::{
+    convert::u8_32_from_word_4, intent::Intent, solution::Solution, Block, ContentAddress,
+    IntentAddress, Signed, StorageLayout, Word,
+};
 use reqwest::Client;
 use server::run;
+use storage::{StateStorage, Storage};
 use test_utils::{empty::Empty, sign_with_random_keypair};
 
 static SERVER: &str = "localhost:0";
@@ -17,10 +22,14 @@ struct TestServer {
 }
 
 async fn setup() -> TestServer {
+    setup_with_mem(memory_storage::MemoryStorage::new()).await
+}
+
+async fn setup_with_mem(mem: memory_storage::MemoryStorage) -> TestServer {
     let (tx, rx) = tokio::sync::oneshot::channel();
     let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
     let jh = tokio::task::spawn(async {
-        let essential = essential_server::Essential::new(memory_storage::MemoryStorage::new());
+        let essential = essential_server::Essential::new(mem);
         run(essential, SERVER, tx, Some(shutdown_rx)).await
     });
     let client = Client::new();
@@ -56,7 +65,6 @@ async fn test_deploy_intent_set() {
     let address = response.json::<ContentAddress>().await.unwrap();
     assert_eq!(address.0, utils::hash(&intent_set.data));
 
-    use base64::{engine::general_purpose::URL_SAFE, Engine as _};
     let a = url
         .join(&format!("/get-intent-set/{}", URL_SAFE.encode(address.0)))
         .unwrap();
@@ -145,6 +153,70 @@ async fn test_submit_solution() {
 
     assert_eq!(solutions.len(), 1);
     assert_eq!(utils::hash(&solutions[0].data), hash);
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn test_query_state() {
+    let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
+    let address = ContentAddress(utils::hash(&intent_set.data));
+    let key = [0; 4];
+
+    let mem = memory_storage::MemoryStorage::new();
+    mem.insert_intent_set(StorageLayout {}, intent_set)
+        .await
+        .unwrap();
+    mem.update_state(&address, &key, Some(42)).await.unwrap();
+
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup_with_mem(mem).await;
+
+    let a = url
+        .join(&format!(
+            "/query-state/{}/{}",
+            URL_SAFE.encode(address.0),
+            URL_SAFE.encode(u8_32_from_word_4(key)),
+        ))
+        .unwrap();
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let value = response.json::<Option<Word>>().await.unwrap().unwrap();
+
+    assert_eq!(value, 42);
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn test_list_winning_blocks() {
+    let solution = sign_with_random_keypair(Solution::empty());
+    let hash = utils::hash(&solution.data);
+
+    let mem = memory_storage::MemoryStorage::new();
+    mem.insert_solution_into_pool(solution).await.unwrap();
+    mem.move_solutions_to_solved(&[hash]).await.unwrap();
+
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup_with_mem(mem).await;
+
+    let mut a = url.join("/list-winning-blocks").unwrap();
+    a.query_pairs_mut().append_pair("page", "0");
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let blocks = response.json::<Vec<Block>>().await.unwrap();
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(utils::hash(&blocks[0].batch.solutions[0].data), hash);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();

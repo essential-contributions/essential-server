@@ -1,3 +1,8 @@
+#![deny(missing_docs)]
+//! # Server
+//!
+//! A simple REST server for the Essential platform.
+
 use std::{net::SocketAddr, time::Duration};
 
 use axum::{
@@ -6,6 +11,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use essential_server::{Essential, Storage};
 use essential_types::{
     convert::word_4_from_u8_32, intent::Intent, solution::Solution, Block, ContentAddress, Hash,
@@ -17,6 +23,28 @@ use tokio::{
     sync::oneshot,
 };
 
+#[derive(Deserialize)]
+/// Type to deserialize a time range query parameters.
+struct TimeRange {
+    /// Start of the time range in seconds.
+    start: u64,
+    /// End of the time range in seconds.
+    end: u64,
+}
+
+#[derive(Deserialize)]
+/// Type to deserialize a page query parameter.
+struct Page {
+    /// The page number to start from.
+    page: u64,
+}
+
+/// Run the server.
+///
+/// - Takes the essential library to run it.
+/// - Address to bind to.
+/// - A channel that returns the actual chosen local address.
+/// - An optional channel that can be used to shutdown the server.
 pub async fn run<S, A>(
     essential: Essential<S>,
     addr: A,
@@ -27,7 +55,10 @@ where
     A: ToSocketAddrs,
     S: Storage + Clone + Send + Sync + 'static,
 {
+    // Spawn essential and get the handle.
     let handle = essential.clone().spawn()?;
+
+    // Create all the endpoints.
     let app = Router::new()
         .route("/deploy-intent-set", post(deploy_intent_set))
         .route("/get-intent-set/:address", get(get_intent_set))
@@ -38,18 +69,32 @@ where
         .route("/query-state/:address/:key", get(query_state))
         .route("/list-winning-blocks", get(list_winning_blocks))
         .with_state(essential.clone());
+
+    // Bind to the address.
     let listener = TcpListener::bind(addr).await?;
+
+    // Send the local address to the caller.
+    // This is useful when the address or port is chosen by the OS.
     let addr = listener.local_addr()?;
     local_addr
         .send(addr)
         .map_err(|_| anyhow::anyhow!("Failed to send local address"))?;
+
+    // Serve the app.
     axum::serve(listener, app)
+        // Attach the shutdown signal.
         .with_graceful_shutdown(shutdown(shutdown_rx))
         .await?;
+
+    // After the server is done, shutdown essential.
     handle.shutdown().await?;
+
     Ok(())
 }
 
+/// The deploy intent set post endpoint.
+///
+/// Takes a signed vector of intents as a json payload.
 async fn deploy_intent_set<S>(
     State(essential): State<Essential<S>>,
     Json(payload): Json<Signed<Vec<Intent>>>,
@@ -61,6 +106,23 @@ where
     Ok(Json(address))
 }
 
+/// The submit solution post endpoint.
+///
+/// Takes a signed solution as a json payload.
+async fn submit_solution<S>(
+    State(essential): State<Essential<S>>,
+    Json(payload): Json<Signed<Solution>>,
+) -> Result<Json<Hash>, Error>
+where
+    S: Storage + Clone + Send + Sync + 'static,
+{
+    let hash = essential.submit_solution(payload).await?;
+    Ok(Json(hash))
+}
+
+/// The get intent set get endpoint.
+///
+/// Takes a content address (encoded as base64) as a path parameter.
 async fn get_intent_set<S>(
     State(essential): State<Essential<S>>,
     Path(address): Path<String>,
@@ -68,7 +130,6 @@ async fn get_intent_set<S>(
 where
     S: Storage + Clone + Send + Sync + 'static,
 {
-    use base64::{engine::general_purpose::URL_SAFE, Engine as _};
     let address = ContentAddress(
         URL_SAFE
             .decode(address)?
@@ -79,6 +140,10 @@ where
     Ok(Json(set))
 }
 
+/// The get intent get endpoint.
+///
+/// Takes a set content address and an intent content address as path parameters.
+/// Both are encoded as base64.
 async fn get_intent<S>(
     State(essential): State<Essential<S>>,
     Path((set, address)): Path<(String, String)>,
@@ -86,7 +151,6 @@ async fn get_intent<S>(
 where
     S: Storage + Clone + Send + Sync + 'static,
 {
-    use base64::{engine::general_purpose::URL_SAFE, Engine as _};
     let set = ContentAddress(
         URL_SAFE
             .decode(set)?
@@ -103,17 +167,9 @@ where
     Ok(Json(intent))
 }
 
-#[derive(Deserialize)]
-struct TimeRange {
-    start: u64,
-    end: u64,
-}
-
-#[derive(Deserialize)]
-struct Page {
-    page: u64,
-}
-
+/// The list intent sets get endpoint.
+///
+/// Takes optional time range and page as query parameters.
 async fn list_intent_sets<S>(
     State(essential): State<Essential<S>>,
     time_range: Option<Query<TimeRange>>,
@@ -131,6 +187,9 @@ where
     Ok(Json(sets))
 }
 
+/// The list winning blocks get endpoint.
+///
+/// Takes optional time range and page as query parameters.
 async fn list_winning_blocks<S>(
     State(essential): State<Essential<S>>,
     time_range: Option<Query<TimeRange>>,
@@ -148,17 +207,7 @@ where
     Ok(Json(blocks))
 }
 
-async fn submit_solution<S>(
-    State(essential): State<Essential<S>>,
-    Json(payload): Json<Signed<Solution>>,
-) -> Result<Json<Hash>, Error>
-where
-    S: Storage + Clone + Send + Sync + 'static,
-{
-    let hash = essential.submit_solution(payload).await?;
-    Ok(Json(hash))
-}
-
+/// The list solutions pool get endpoint.
 async fn list_solutions_pool<S>(
     State(essential): State<Essential<S>>,
 ) -> Result<Json<Vec<Signed<Solution>>>, Error>
@@ -169,6 +218,12 @@ where
     Ok(Json(solutions))
 }
 
+/// The query state get endpoint.
+///
+/// Takes a content address and a key as path parameters.
+/// Both are encoded as base64.
+///
+/// Note the key is a 32 byte array of u8 encoded as base64.
 async fn query_state<S>(
     State(essential): State<Essential<S>>,
     Path((address, key)): Path<(String, String)>,
@@ -176,7 +231,6 @@ async fn query_state<S>(
 where
     S: Storage + Clone + Send + Sync + 'static,
 {
-    use base64::{engine::general_purpose::URL_SAFE, Engine as _};
     let address = ContentAddress(
         URL_SAFE
             .decode(address)?
@@ -187,24 +241,34 @@ where
         .decode(key)?
         .try_into()
         .map_err(|_| anyhow::anyhow!("State key wrong size"))?;
+
+    // Convert the key to four words.
     let key = word_4_from_u8_32(key);
 
     let state = essential.query_state(&address, &key).await?;
     Ok(Json(state))
 }
 
+/// Shutdown the server manually or on ctrl-c.
 async fn shutdown(rx: Option<oneshot::Receiver<()>>) {
+    // The manual signal is used to shutdown the server.
     let manual = async {
-        if let Some(rx) = rx {
-            rx.await.ok();
+        match rx {
+            Some(rx) => {
+                rx.await.ok();
+            }
+            None => futures::future::pending().await,
         }
     };
+
+    // The ctrl-c signal is used to shutdown the server.
     let ctrl_c = async {
         tokio::signal::ctrl_c()
             .await
             .expect("Failed to listen for ctrl-c");
     };
 
+    // Wait for either signal.
     tokio::select! {
         _ = manual => {},
         _ = ctrl_c => {},
@@ -215,6 +279,7 @@ struct Error(anyhow::Error);
 
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
+        // Return an internal server error with the error message.
         (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             format!("{}", self.0),
