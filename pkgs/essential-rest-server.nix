@@ -1,11 +1,8 @@
 # A derivation for the `essential-rest-server` crate.
 { lib
 , stdenv
-, openssl
-, pkg-config
 , rustPlatform
 , darwin
-, nix-gitignore
 }:
 let
   src = ../.;
@@ -22,6 +19,9 @@ rustPlatform.buildRustPackage {
   ] ++ lib.optionals stdenv.isDarwin [
     darwin.apple_sdk.frameworks.SystemConfiguration
   ];
+
+  # We run tests separately in CI.
+  doCheck = false;
 
   cargoLock = {
     inherit lockFile;
