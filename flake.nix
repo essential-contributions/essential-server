@@ -6,6 +6,7 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     systems.url = "github:nix-systems/default";
+    flake-utils.url = "github:numtide/flake-utils";
     yurt = {
       url = "git+ssh://git@github.com/essential-contributions/yurt.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -37,6 +38,13 @@
       devShells = perSystemPkgs (pkgs: {
         essential-server-dev = pkgs.callPackage ./shell.nix { };
         default = inputs.self.devShells.${pkgs.system}.essential-server-dev;
+      });
+
+      apps = perSystemPkgs (pkgs: {
+        server-with-rqlite = pkgs.callPackage ./apps.nix {
+          flake-utils = inputs.flake-utils;
+        };
+        default = inputs.self.apps.${pkgs.system}.server-with-rqlite;
       });
 
       formatter = perSystemPkgs (pkgs: pkgs.nixpkgs-fmt);
