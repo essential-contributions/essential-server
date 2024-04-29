@@ -14,7 +14,7 @@ use std::{
 };
 use storage::{state_write::StateWrite, StateStorage, Storage};
 use thiserror::Error;
-use utils::Lock;
+use utils::{next_key, Lock};
 
 #[cfg(test)]
 mod tests;
@@ -60,19 +60,6 @@ impl MemoryStorage {
         }
     }
 
-    fn next_key(mut key: Key) -> Option<Key> {
-        for w in key.iter_mut().rev() {
-            match *w {
-                Word::MAX => *w = Word::MIN,
-                _ => {
-                    *w += 1;
-                    return Some(key);
-                }
-            }
-        }
-        None
-    }
-
     pub async fn word_range(
         &self,
         set_addr: ContentAddress,
@@ -86,7 +73,7 @@ impl MemoryStorage {
                 .await
                 .map_err(|_| MemoryStorageError::ReadError)?;
             words.push(opt);
-            key = Self::next_key(key).ok_or(MemoryStorageError::KeyRangeError)?
+            key = next_key(key).ok_or(MemoryStorageError::KeyRangeError)?
         }
 
         Ok(words)
@@ -114,7 +101,7 @@ impl StateStorage for MemoryStorage {
 
     async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)>,
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send,
     {
         let v = self.inner.apply(|i| {
             updates
@@ -389,9 +376,10 @@ impl StateWrite for MemoryStorage {
 
     fn update_state_batch<U>(&self, updates: U) -> Self::Future
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send + 'static,
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send,
     {
         let storage = self.clone();
+        let updates = updates.into_iter().collect::<Vec<_>>();
         async move {
             StateStorage::update_state_batch(&storage, updates)
                 .await

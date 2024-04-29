@@ -8,8 +8,10 @@ anyhow = { workspace = true }
 essential-constraint-vm = { workspace = true }
 essential-state-read-vm = { workspace = true }
 essential-types = { workspace = true }
+futures = { workspace = true }
 storage = { workspace = true }
 tokio = { workspace = true }
+transaction-storage = { workspace = true }
 utils = { workspace = true }
 
 [dev-dependencies]

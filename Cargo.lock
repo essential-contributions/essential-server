@@ -395,10 +395,12 @@ dependencies = [
  "essential-constraint-vm",
  "essential-state-read-vm",
  "essential-types",
+ "futures",
  "memory-storage",
  "storage",
  "test-utils",
  "tokio",
+ "transaction-storage",
  "utils",
 ]
 
@@ -1701,10 +1703,13 @@ name = "transaction-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "essential-state-read-vm",
  "essential-types",
+ "futures",
  "memory-storage",
  "storage",
  "test-utils",
+ "thiserror",
  "tokio",
  "utils",
 ]

@@ -3,6 +3,7 @@ use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
     StorageLayout, Word,
 };
+use solution::Output;
 use std::{ops::Range, sync::Arc, time::Duration};
 use storage::{state_write::StateWrite, Storage};
 
@@ -43,7 +44,7 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    pub async fn check_solution(&self, solution: Arc<Solution>) -> anyhow::Result<u64> {
+    pub async fn check_solution(&self, solution: Arc<Solution>) -> anyhow::Result<Output<S>> {
         solution::check_solution(&self.storage, solution).await
     }
 

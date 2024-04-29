@@ -1,23 +1,28 @@
 use self::validate::validate_solution_with_deps;
-use anyhow::Error;
 use essential_constraint_vm::{check_intent, exec_bytecode_iter};
 use essential_state_read_vm::{
     asm::Op, Access, GasLimit, SolutionAccess, StateRead, StateSlots, Vm,
 };
 use essential_types::{
     intent::{Directive, Intent},
-    solution::{Solution, StateMutation},
-    ContentAddress, Hash, IntentAddress, Signed, Word,
+    slots::state_len,
+    solution::Solution,
+    Hash, IntentAddress, Signed, Word,
 };
 use std::{collections::HashMap, sync::Arc};
-use storage::{state_write::StateWrite, Storage};
+use storage::{state_write::StateWrite, StateStorage, Storage};
 use tokio::task::JoinSet;
-use utils::Lock;
+use transaction_storage::{Transaction, TransactionStorage};
 
 mod read;
 #[cfg(test)]
 mod tests;
 mod validate;
+
+pub struct Output<S: StateStorage> {
+    transaction: TransactionStorage<S>,
+    utility: u64,
+}
 
 /// Validates a solution and submits it to storage.
 pub async fn submit_solution<S>(storage: &S, solution: Signed<Solution>) -> anyhow::Result<Hash>
@@ -36,9 +41,9 @@ where
 /// Checks a solution against state read VM and constraint VM after reading intents from storage.
 ///
 /// Returns utility score of solution.
-pub async fn check_solution<S>(storage: &S, solution: Arc<Solution>) -> anyhow::Result<u64>
+pub async fn check_solution<S>(storage: &S, solution: Arc<Solution>) -> anyhow::Result<Output<S>>
 where
-    S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
+    S: Storage + StateStorage + StateRead + StateWrite + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
     <S as StateWrite>::Future: Send,
@@ -62,82 +67,140 @@ pub async fn check_solution_with_intents<S>(
     storage: &S,
     solution: Arc<Solution>,
     intents: &HashMap<IntentAddress, Intent>,
-) -> anyhow::Result<u64>
+) -> anyhow::Result<Output<S>>
 where
-    S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
+    S: Storage + StateStorage + StateRead + StateWrite + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
     <S as StateWrite>::Future: Send,
     <S as StateWrite>::Error: Send,
 {
-    let utility = Arc::new(Lock::new(0));
-    let mut set = JoinSet::new();
-    // TODO: avoid clone here?
-    let state_mutations = Arc::new(solution.state_mutations.clone());
+    let mut transaction = storage.clone().transaction();
 
-    for (intent_index, data) in solution.data.iter().cloned().enumerate() {
+    // Read pre-state
+    let mut set: JoinSet<anyhow::Result<Vec<Option<Word>>>> = JoinSet::new();
+    let solution = solution.clone();
+    for (intent_index, data) in solution.data.iter().enumerate() {
         let Some(intent) = intents.get(&data.intent_to_solve).cloned() else {
             anyhow::bail!("Intent in solution data not found in intents set");
         };
-        let solution = solution.clone();
-        let utility = utility.clone();
-        let storage = storage.clone();
-        let state_mutations = state_mutations.clone();
-
-        set.spawn(async move {
-            for state_read in &intent.state_read {
-                // Pre-mutation state read.
-                let mut vm = Vm::default();
+        for state_read in intent.state_read {
+            let solution = solution.clone();
+            let storage = storage.clone();
+            let intent_state_len = state_len(&intent.slots.state).unwrap() as usize;
+            set.spawn(async move {
                 let solution_access =
                     SolutionAccess::new(&solution, intent_index.try_into().unwrap());
-                let mut access = Access {
+                let pre_slots: Vec<Option<Word>> = vec![None; intent_state_len];
+                let post_slots: Vec<Option<Word>> = vec![];
+                let mut vm = Vm::default();
+                let access = Access {
                     solution: solution_access,
-                    state_slots: StateSlots::EMPTY,
+                    state_slots: StateSlots {
+                        pre: &pre_slots,
+                        post: &post_slots,
+                    },
                 };
-                match read_state(&mut vm, state_read, access, &storage).await {
-                    Ok(_gas) => {
-                        // Apply state mutations.
-                        let relevant_state_mutations: Vec<StateMutation> = state_mutations
-                            .iter()
-                            .filter(|mutation| mutation.pathway == intent_index.try_into().unwrap())
-                            .cloned()
-                            .collect();
-
-                        // Set pre-mutation state slots.
-                        let pre_slots = apply_mutations(
-                            relevant_state_mutations,
-                            data.intent_to_solve.set.clone(),
-                            &storage,
-                        )
-                        .await
-                        .map_err(|e| anyhow::Error::msg(e.to_string()))?;
-                        access.state_slots.pre = &pre_slots;
-
-                        // Post-mutation state read.
-                        let mut vm = Vm::default();
-                        match read_state(&mut vm, state_read, access, &storage).await {
-                            Ok(_gas) => {
-                                // Set post-mutation state slots.
-                                let post_slots = vm.into_state_slots();
-                                access.state_slots.post = &post_slots;
-                                // Run constraint checks.
-                                check_constraints(&intent, access, Some(utility.clone()))?;
-                            }
-                            Err(e) => anyhow::bail!("State read VM execution failed: {}", e),
-                        }
-                    }
+                match read_state(&mut vm, &state_read, access, &storage).await {
+                    Ok(_gas) => {}
                     Err(e) => anyhow::bail!("State read VM execution failed: {}", e),
                 }
-            }
-            Ok(())
-        });
+                Ok(vm.into_state_slots())
+            });
+        }
+    }
+    let mut pre_slots = vec![];
+    while let Some(res) = set.join_next().await {
+        pre_slots.extend(res??);
     }
 
+    // Use transactional storage to simulate state changes
+    let mut set: JoinSet<anyhow::Result<()>> = JoinSet::new();
+    let solution = solution.clone();
+    for state_mutation in solution.state_mutations.iter() {
+        let intent = &solution
+            .data
+            .get(state_mutation.pathway as usize)
+            .unwrap()
+            .intent_to_solve
+            .set;
+        for mutation in state_mutation.mutations.iter() {
+            // TODO: spawn
+            transaction
+                .update_state(intent, &mutation.key, mutation.value)
+                .await?;
+        }
+    }
     while let Some(res) = set.join_next().await {
         res??;
     }
 
-    Ok(utility.inner())
+    // Read post-state
+    let mut set: JoinSet<anyhow::Result<Vec<Option<Word>>>> = JoinSet::new();
+    let pre_slots = pre_slots.clone();
+    for (intent_index, data) in solution.data.iter().enumerate() {
+        let Some(intent) = intents.get(&data.intent_to_solve).cloned() else {
+            anyhow::bail!("Intent in solution data not found in intents set");
+        };
+        for state_read in intent.state_read {
+            let solution = solution.clone();
+            let pre_slots = pre_slots.clone();
+            let intent_state_len = state_len(&intent.slots.state).unwrap() as usize;
+            let transaction = transaction.view();
+            set.spawn(async move {
+                let solution_access =
+                    SolutionAccess::new(&solution, intent_index.try_into().unwrap());
+                let mut vm = Vm::default();
+                let access = Access {
+                    solution: solution_access,
+                    state_slots: StateSlots {
+                        pre: &pre_slots,
+                        post: &vec![None; intent_state_len],
+                    },
+                };
+                read_state(&mut vm, &state_read, access, &transaction).await?;
+                Ok(vm.into_state_slots())
+            });
+        }
+    }
+    let mut post_slots = vec![];
+    while let Some(res) = set.join_next().await {
+        post_slots.extend(res??);
+    }
+
+    // Check constraints.
+    let mut set: JoinSet<anyhow::Result<u64>> = JoinSet::new();
+    for (intent_index, data) in solution.data.iter().enumerate() {
+        let Some(intent) = intents.get(&data.intent_to_solve).cloned() else {
+            anyhow::bail!("Intent in solution data not found in intents set");
+        };
+        let solution = solution.clone();
+        let pre_slots = pre_slots.clone();
+        let post_slots = post_slots.clone();
+        set.spawn_blocking(move || {
+            let solution_access = SolutionAccess::new(&solution, intent_index.try_into().unwrap());
+            let access = Access {
+                solution: solution_access,
+                state_slots: StateSlots {
+                    pre: &pre_slots,
+                    post: &post_slots,
+                },
+            };
+            check_constraints(&intent, access)
+        });
+    }
+    let mut utility = 0;
+    while let Some(res) = set.join_next().await {
+        utility += res??;
+    }
+
+    // Rollback changes
+    transaction.rollback();
+
+    Ok(Output {
+        transaction,
+        utility,
+    })
 }
 
 /// Reads state slots from storage using state read program.
@@ -166,46 +229,12 @@ where
     .map_err(|e| anyhow::Error::msg(e.to_string()))
 }
 
-/// Applies state mutations to storage for intent in solution.
-///
-/// Expects state mutations relevant to the intent as parameter.
-///
-/// Returns pre-mutation state slots for each intent in solution data.
-async fn apply_mutations<S>(
-    state_mutations: Vec<StateMutation>,
-    intent: ContentAddress,
-    storage: &S,
-) -> Result<Vec<Option<Word>>, <S as StateWrite>::Error>
-where
-    S: StateWrite,
-{
-    let mut updates = vec![];
-    for state_mutation in state_mutations.iter() {
-        for mutation in state_mutation.mutations.iter() {
-            updates.push((intent.clone(), mutation.key, mutation.value));
-        }
-    }
-    storage.update_state_batch(updates).await
-}
-
 /// Checks intent constraints against its state slots.
 ///
-/// If `utility` is `Some`, adds the utility of solution for intent to `utility`.
-fn check_constraints(
-    intent: &Intent,
-    access: Access,
-    utility: Option<Arc<Lock<u64>>>,
-) -> anyhow::Result<()> {
+/// Returns the utility of solution for intent.
+fn check_constraints(intent: &Intent, access: Access) -> anyhow::Result<u64> {
     match check_intent(&intent.constraints, access) {
-        Ok(()) => {
-            if let Some(utility) = utility {
-                utility.apply(|i| {
-                    *i += calculate_utility(&intent.directive, access)?;
-                    Ok::<(), Error>(())
-                })?;
-            }
-            Ok::<(), Error>(())
-        }
+        Ok(()) => Ok(calculate_utility(&intent.directive, access)?),
         Err(e) => {
             anyhow::bail!("Constraint VM execution failed: {}", e)
         }

@@ -23,4 +23,5 @@ tokio = { version = "1.36.0", features = ["full"] }
 memory-storage = { path = "crates/memory-storage" }
 storage = { path = "crates/storage" }
 test-utils = { path = "crates/test_utils" }
+transaction-storage = { path = "crates/transaction-storage" }
 utils = { path = "crates/utils" }
