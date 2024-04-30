@@ -21,6 +21,12 @@ where
     storage: S,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct CheckSolutionOutput {
+    pub utility: f64,
+    pub gas: u64,
+}
+
 impl<S> Essential<S>
 where
     S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
@@ -44,8 +50,21 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    pub async fn check_solution(&self, solution: Arc<Solution>) -> anyhow::Result<Output<S>> {
-        solution::check_solution(&self.storage, solution).await
+    pub async fn check_solution(
+        &self,
+        solution: Signed<Solution>,
+    ) -> anyhow::Result<CheckSolutionOutput> {
+        let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        let Output {
+            transaction: _,
+            utility,
+            gas_used,
+        } = solution::check_solution_with_intents(&self.storage, Arc::new(solution.data), &intents)
+            .await?;
+        Ok(CheckSolutionOutput {
+            utility,
+            gas: gas_used,
+        })
     }
 
     pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
