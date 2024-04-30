@@ -1,4 +1,4 @@
-use crate::utils::deploy_empty_intent;
+use crate::test_utils::deploy_empty_intent;
 use essential_types::intent::Intent;
 use storage::Storage;
 use test_utils::empty::Empty;

@@ -1,6 +1,8 @@
 use crate::{
     solution::validate::validate_solution_with_deps,
-    utils::{deploy_empty_intent_and_get_solution, deploy_partial_solution_with_data_to_storage},
+    test_utils::{
+        deploy_empty_intent_and_get_solution, deploy_partial_solution_with_data_to_storage,
+    },
 };
 use essential_types::{
     solution::{PartialSolutionData, Solution},

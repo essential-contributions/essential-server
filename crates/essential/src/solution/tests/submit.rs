@@ -1,4 +1,4 @@
-use crate::{solution::submit_solution, utils::deploy_empty_intent_and_get_solution};
+use crate::{solution::submit_solution, test_utils::deploy_empty_intent_and_get_solution};
 use storage::Storage;
 use test_utils::sign_with_random_keypair;
 

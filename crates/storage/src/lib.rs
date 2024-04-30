@@ -119,29 +119,28 @@ pub trait Storage: StateStorage {
     async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()>;
 }
 
-// TODO: Maybe this warning is right,
-// we will find out when we try to use this trait
-// with tokio.
-#[allow(async_fn_in_trait)]
 /// Storage trait just for state reads and writes.
 pub trait StateStorage {
     /// Update the state of a content address.
-    async fn update_state(
+    fn update_state(
         &self,
         address: &ContentAddress,
         key: &Key,
         value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>>;
+    ) -> impl std::future::Future<Output = anyhow::Result<Option<Word>>> + Send;
 
     /// Update a batch of state in one transaction.
-    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
+    fn update_state_batch<U>(
+        &self,
+        updates: U,
+    ) -> impl std::future::Future<Output = anyhow::Result<Vec<Option<Word>>>> + Send
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)>;
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send;
 
     /// Query the state of a content address.
-    async fn query_state(
+    fn query_state(
         &self,
         address: &ContentAddress,
         key: &Key,
-    ) -> anyhow::Result<Option<Word>>;
+    ) -> impl std::future::Future<Output = anyhow::Result<Option<Word>>> + Send;
 }

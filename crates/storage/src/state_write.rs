@@ -12,5 +12,5 @@ pub trait StateWrite {
     /// associated with the given intent set address.
     fn update_state_batch<U>(&self, updates: U) -> Self::Future
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send + 'static;
+        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send;
 }

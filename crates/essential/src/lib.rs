@@ -3,6 +3,7 @@ use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
     StorageLayout, Word,
 };
+use solution::Output;
 use std::{ops::Range, sync::Arc, time::Duration};
 use storage::{state_write::StateWrite, Storage};
 
@@ -10,7 +11,7 @@ mod deploy;
 mod run;
 mod solution;
 #[cfg(test)]
-mod utils;
+mod test_utils;
 
 #[derive(Clone)]
 pub struct Essential<S>
@@ -18,6 +19,12 @@ where
     S: Storage + Clone,
 {
     storage: S,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct CheckSolutionOutput {
+    pub utility: f64,
+    pub gas: u64,
 }
 
 impl<S> Essential<S>
@@ -43,8 +50,21 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    pub async fn check_solution(&self, solution: Arc<Solution>) -> anyhow::Result<u64> {
-        solution::check_solution(&self.storage, solution).await
+    pub async fn check_solution(
+        &self,
+        solution: Signed<Solution>,
+    ) -> anyhow::Result<CheckSolutionOutput> {
+        let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        let Output {
+            transaction: _,
+            utility,
+            gas_used,
+        } = solution::check_solution_with_intents(&self.storage, Arc::new(solution.data), &intents)
+            .await?;
+        Ok(CheckSolutionOutput {
+            utility,
+            gas: gas_used,
+        })
     }
 
     pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
