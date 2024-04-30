@@ -1,10 +1,10 @@
+use crate::solution::{check_solution_with_intents, read::read_intents_from_storage};
 use essential_state_read_vm::StateRead;
 use essential_types::{solution::Solution, Signed};
 use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, state_write::StateWrite, Storage};
+use transaction_storage::Transaction;
 use utils::hash;
-
-use crate::solution::{check_solution_with_intents, validate::validate_solution_with_deps};
 
 #[cfg(test)]
 pub mod tests;
@@ -22,11 +22,7 @@ where
     <S as StateWrite>::Future: Send,
     <S as StateWrite>::Error: Send,
 {
-    let solutions = get_filtered_solutions(storage).await?;
-
-    // TODO: search for best batch of solutions
-    // update solutions.valid_solutions that will make up the block
-    // and update solutions.failed_solutions that will be moved to failed solutions pool
+    let solutions = build_block(storage).await?;
 
     let failed_solutions: Vec<([u8; 32], SolutionFailReason)> = solutions
         .failed_solutions
@@ -55,7 +51,7 @@ where
     Ok(())
 }
 
-async fn get_filtered_solutions<S>(storage: &S) -> anyhow::Result<Solutions>
+async fn build_block<S>(storage: &S) -> anyhow::Result<Solutions>
 where
     S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -64,29 +60,27 @@ where
     <S as StateWrite>::Error: Send,
 {
     let solutions = storage.list_solutions_pool().await?;
+    let mut transaction = storage.clone().transaction();
 
     let mut valid_solutions: Vec<(Signed<Solution>, f64)> = vec![];
     let mut failed_solutions: Vec<(Signed<Solution>, SolutionFailReason)> = vec![];
 
     for solution in solutions.iter() {
-        // TODO: use tokio tasks
-        match validate_solution_with_deps(solution, storage).await {
-            Ok(intents) => {
-                match check_solution_with_intents(
-                    storage,
-                    Arc::new(solution.data.clone()),
-                    &intents,
-                )
-                .await
-                {
-                    Ok(output) => valid_solutions.push((solution.to_owned(), output.utility)),
-                    Err(_e) => {
-                        failed_solutions
-                            .push((solution.to_owned(), SolutionFailReason::ConstraintsFailed));
-                    }
-                }
+        let intents = read_intents_from_storage(&solution.data, storage).await?;
+        match check_solution_with_intents(
+            &transaction.storage(),
+            Arc::new(solution.clone().data),
+            &intents,
+        )
+        .await
+        {
+            Ok(output) => {
+                transaction = output.transaction;
+                valid_solutions.push((solution.to_owned(), output.utility));
+                // TODO: check composability
             }
             Err(_e) => {
+                transaction.rollback();
                 failed_solutions.push((solution.to_owned(), SolutionFailReason::ConstraintsFailed));
             }
         }

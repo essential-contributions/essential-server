@@ -121,6 +121,15 @@ where
         }))
     }
 
+    // TODO: or we can make the fields `pub`
+    /// Get a clone of this transaction's storage.
+    pub fn storage(&self) -> S
+    where
+        S: Clone,
+    {
+        self.storage.clone()
+    }
+
     /// Commit the transaction.
     pub async fn commit(&mut self) -> anyhow::Result<()> {
         let updates = self.state.iter().flat_map(|(address, m)| {

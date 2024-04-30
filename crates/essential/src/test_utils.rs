@@ -3,8 +3,8 @@ use essential_types::{
     intent::Intent,
     slots::{Slots, StateSlot},
     solution::{
-        DecisionVariable, Mutation, PartialSolution, PartialSolutionData, Solution, SolutionData,
-        StateMutation,
+        DecisionVariable, DecisionVariableIndex, Mutation, PartialSolution, PartialSolutionData,
+        Solution, SolutionData, StateMutation,
     },
     ContentAddress, IntentAddress,
 };
@@ -12,21 +12,34 @@ use memory_storage::MemoryStorage;
 use storage::Storage;
 use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
 
+// TODO: replace `MemoryStorage`s with `S: Storage` objects
+
 // Sign and deploy given intent to newly created memory storage.
 pub async fn deploy_intent(intent: Intent) -> (IntentAddress, MemoryStorage) {
-    let storage = MemoryStorage::default();
-    (deploy_intent_to_storage(&storage, intent).await, storage)
+    deploy_intent_to_storage(MemoryStorage::default(), intent).await
 }
 
-// Sign and deploy empty intent to newly created memory storage.
-pub async fn deploy_empty_intent() -> (IntentAddress, MemoryStorage) {
-    deploy_intent(Intent::empty()).await
+// Sign and deploy given intent to newly created memory storage.
+pub async fn deploy_intent_to_storage(
+    storage: MemoryStorage,
+    intent: Intent,
+) -> (IntentAddress, MemoryStorage) {
+    let intent_hash = ContentAddress(utils::hash(&intent));
+    let intent = sign_with_random_keypair(vec![intent]);
+    let result = deploy(&storage, intent).await.unwrap();
+    (
+        IntentAddress {
+            set: result,
+            intent: intent_hash,
+        },
+        storage.clone(),
+    )
 }
 
 // Sign an empty intent and deploy it to newly created memory storage,
 // create a solution with the signed intent address.
 pub async fn deploy_empty_intent_and_get_solution() -> (Solution, IntentAddress, MemoryStorage) {
-    let (intent_address, storage) = deploy_empty_intent().await;
+    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
     let mut solution = Solution::empty();
     let mut solution_data = SolutionData::empty();
     solution_data.intent_to_solve = intent_address.clone();
@@ -54,17 +67,6 @@ pub async fn deploy_partial_solution_with_data_to_storage<S: Storage>(
     (partial_solution_address, solution.to_owned())
 }
 
-// Sign given intent and deploy it to given storage.
-pub async fn deploy_intent_to_storage<S: Storage>(storage: &S, intent: Intent) -> IntentAddress {
-    let intent_hash = ContentAddress(utils::hash(&intent));
-    let intent = sign_with_random_keypair(vec![intent]);
-    let result = deploy(storage, intent).await.unwrap();
-    IntentAddress {
-        set: result,
-        intent: intent_hash,
-    }
-}
-
 // Sign given partial solution and deploy it to given storage.
 pub async fn deploy_partial_solution_to_storage<S: Storage>(
     storage: &S,
@@ -85,12 +87,11 @@ pub async fn sanity_solution() -> (Solution, MemoryStorage) {
     (solution, storage)
 }
 
-// Solution that satisfies an intent with state read and constraint programs.
-pub async fn solution_with_deps() -> (Solution, MemoryStorage) {
+pub fn test_intent(decision_variables: u32) -> Intent {
     // Intent that expects the value of previously unset state slot with index 0 to be 42.
     let mut intent = Intent::empty();
     intent.slots = Slots {
-        decision_variables: 1, // Expects one decision variable.
+        decision_variables,
         state: vec![StateSlot {
             index: 0,
             amount: 1,
@@ -125,11 +126,28 @@ pub async fn solution_with_deps() -> (Solution, MemoryStorage) {
         essential_constraint_vm::asm::Pred::And.into(),
     ])
     .collect()];
-    let (intent_address, storage) = deploy_intent(intent).await;
+    intent
+}
+
+// Solution that satisfies an intent with state read and constraint programs.
+pub async fn test_solution(
+    storage: Option<MemoryStorage>,
+    decision_variables: u32,
+) -> (Solution, MemoryStorage) {
+    let (intent_address, storage) =
+        deploy_intent_to_storage(storage.unwrap_or_default(), test_intent(decision_variables))
+            .await;
     let mut solution = Solution::empty();
+    let transient_dec_var = DecisionVariable::Transient(DecisionVariableIndex {
+        solution_data_index: 0,
+        variable_index: 0,
+    });
+    let mut solution_decision_variables =
+        vec![transient_dec_var; decision_variables.try_into().unwrap()];
+    solution_decision_variables[0] = DecisionVariable::Inline(42);
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
-        decision_variables: vec![DecisionVariable::Inline(42)],
+        decision_variables: solution_decision_variables,
     }];
     // State mutation to satisfy the intent.
     solution.state_mutations = vec![StateMutation {
