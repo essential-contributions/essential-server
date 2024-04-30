@@ -8,8 +8,11 @@ use essential_types::{
     solution::{PartialSolution, Solution},
     Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
+use failed_solution::{FailedSolution, SolutionFailReason};
 use std::{ops::Range, time::Duration};
 
+/// Module for failed solution struct.
+pub mod failed_solution;
 /// Module for state write trait.
 pub mod state_write;
 
@@ -39,6 +42,12 @@ pub trait Storage: StateStorage {
 
     /// Move these solutions from the pool to the solved state.
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()>;
+
+    /// Move these solutions from the pool to the failed state.
+    async fn move_solutions_to_failed(
+        &self,
+        solutions: &[(Hash, SolutionFailReason)],
+    ) -> anyhow::Result<()>;
 
     /// Move these partial solutions from the pool to the solved state.
     async fn move_partial_solutions_to_solved(
@@ -81,6 +90,9 @@ pub trait Storage: StateStorage {
     /// List all solutions in the pool.
     async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>>;
 
+    /// List all failed solutions in the pool.
+    async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>>;
+
     /// List all partial solutions in the pool.
     async fn list_partial_solutions_pool(&self) -> anyhow::Result<Vec<Signed<PartialSolution>>>;
 
@@ -96,6 +108,15 @@ pub trait Storage: StateStorage {
         &self,
         address: &ContentAddress,
     ) -> anyhow::Result<Option<StorageLayout>>;
+
+    /// Get failed solution and its failing reason.
+    async fn get_failed_solution(
+        &self,
+        solution_hash: Hash,
+    ) -> anyhow::Result<Option<FailedSolution>>;
+
+    /// Prune failed solutions that failed before the provided duration.
+    async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()>;
 }
 
 /// Storage trait just for state reads and writes.

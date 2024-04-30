@@ -7,12 +7,16 @@ use essential_types::{
 };
 use futures::future::FutureExt;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     pin::Pin,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use storage::{state_write::StateWrite, StateStorage, Storage};
+use storage::{
+    failed_solution::{FailedSolution, SolutionFailReason},
+    state_write::StateWrite,
+    StateStorage, Storage,
+};
 use thiserror::Error;
 use utils::{next_key, Lock};
 
@@ -39,6 +43,8 @@ struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
     intent_time_index: BTreeMap<Duration, ContentAddress>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
+    failed_solution_pool: HashMap<Hash, FailedSolution>,
+    failed_solution_time_index: HashMap<Duration, Vec<Hash>>,
     partial_solution_pool: HashMap<Hash, Signed<PartialSolution>>,
     partial_solution_solved: HashMap<ContentAddress, Signed<PartialSolution>>,
     /// Solved batches ordered by the time they were solved.
@@ -202,6 +208,35 @@ impl Storage for MemoryStorage {
         })
     }
 
+    async fn move_solutions_to_failed(
+        &self,
+        solutions: &[(Hash, SolutionFailReason)],
+    ) -> anyhow::Result<()> {
+        let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+        self.inner.apply(|i| {
+            let solutions = solutions
+                .iter()
+                .filter_map(|(h, r)| i.solution_pool.remove(h).map(|s| (*h, s, r.to_owned())));
+            for (hash, solution, reason) in solutions {
+                let contains = i
+                    .failed_solution_pool
+                    .insert(hash, FailedSolution { solution, reason });
+                if contains.is_none() {
+                    match i.failed_solution_time_index.entry(time) {
+                        Entry::Occupied(mut occupied_entry) => {
+                            occupied_entry.get_mut().push(hash);
+                        }
+                        Entry::Vacant(vacant_entry) => {
+                            vacant_entry.insert(vec![hash]);
+                        }
+                    }
+                }
+            }
+
+            Ok(())
+        })
+    }
+
     async fn move_partial_solutions_to_solved(
         &self,
         partial_solutions: &[Hash],
@@ -314,6 +349,12 @@ impl Storage for MemoryStorage {
             .apply(|i| i.solution_pool.values().cloned().collect()))
     }
 
+    async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>> {
+        Ok(self
+            .inner
+            .apply(|i| i.failed_solution_pool.values().cloned().collect()))
+    }
+
     async fn list_partial_solutions_pool(
         &self,
     ) -> anyhow::Result<Vec<Signed<essential_types::solution::PartialSolution>>> {
@@ -343,6 +384,30 @@ impl Storage for MemoryStorage {
             Some(set.storage_layout.clone())
         });
         Ok(v)
+    }
+
+    async fn get_failed_solution(
+        &self,
+        solution_hash: Hash,
+    ) -> anyhow::Result<Option<FailedSolution>> {
+        Ok(self
+            .inner
+            .apply(|i| i.failed_solution_pool.get(&solution_hash).cloned()))
+    }
+
+    async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()> {
+        self.inner.apply(|i| {
+            i.failed_solution_time_index.retain(|timestamp, hash| {
+                let retain = *timestamp >= older_than;
+                if !retain {
+                    for hash in hash {
+                        i.failed_solution_pool.remove(hash);
+                    }
+                }
+                retain
+            });
+            Ok(())
+        })
     }
 }
 

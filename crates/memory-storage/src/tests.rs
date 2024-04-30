@@ -73,6 +73,7 @@ async fn test_solutions() {
     let solution = sign_with_random_keypair(solution_with_decision_variables(0));
     let solution2 = sign_with_random_keypair(solution_with_decision_variables(1));
     let solution3 = sign_with_random_keypair(solution_with_decision_variables(2));
+    let solution4 = sign_with_random_keypair(solution_with_decision_variables(3));
 
     // Idempotent insert
     storage
@@ -115,9 +116,36 @@ async fn test_solutions() {
         .unwrap();
 
     storage
+        .insert_solution_into_pool(solution4.clone())
+        .await
+        .unwrap();
+
+    storage
         .move_solutions_to_solved(&[hash(&solution2.data), hash(&solution3.data)])
         .await
         .unwrap();
+
+    let result = storage.list_solutions_pool().await.unwrap();
+    assert_eq!(result.len(), 1);
+    assert!(result.contains(&solution4));
+
+    let solution4_hash = hash(&solution4.data);
+    let solution4_fail_reason = SolutionFailReason::NotComposable;
+    storage
+        .move_solutions_to_failed(&[(solution4_hash, solution4_fail_reason.clone())])
+        .await
+        .unwrap();
+
+    let result = storage.list_failed_solutions_pool().await.unwrap();
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].solution, solution4);
+
+    let result = storage
+        .get_failed_solution(solution4_hash)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(result.reason, solution4_fail_reason);
 
     let result = storage.list_solutions_pool().await.unwrap();
     assert!(result.is_empty());
@@ -129,6 +157,18 @@ async fn test_solutions() {
         result[1].batch.solutions,
         vec![solution2.clone(), solution3.clone()]
     );
+
+    storage
+        .prune_failed_solutions(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let result = storage.list_failed_solutions_pool().await.unwrap();
+    assert!(result.is_empty());
 }
 
 #[tokio::test]
