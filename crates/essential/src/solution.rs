@@ -68,11 +68,7 @@ where
     <S as StateWrite>::Error: Send,
 {
     // Read intents from storage.
-    let intents = read::read_intents_from_storage(&solution, storage)
-        .await?
-        .into_iter()
-        .map(|(k, v)| (k, Arc::new(v)))
-        .collect();
+    let intents = read::read_intents_from_storage(&solution, storage).await?;
     check_solution_with_intents(storage, solution, &intents).await
 }
 
