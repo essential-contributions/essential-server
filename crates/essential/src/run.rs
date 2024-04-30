@@ -1,7 +1,7 @@
 use crate::solution::{check_solution_with_intents, read::read_intents_from_storage};
 use essential_state_read_vm::StateRead;
 use essential_types::{solution::Solution, Signed};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use storage::{failed_solution::SolutionFailReason, state_write::StateWrite, Storage};
 use transaction_storage::{Transaction, TransactionStorage};
 use utils::hash;
@@ -22,6 +22,10 @@ where
     <S as StateWrite>::Future: Send,
     <S as StateWrite>::Error: Send,
 {
+    let _result = storage
+        .prune_failed_solutions(Duration::from_secs(604800))
+        .await;
+
     let (solutions, mut transaction) = build_block(storage).await?;
 
     let storage = transaction.storage();
