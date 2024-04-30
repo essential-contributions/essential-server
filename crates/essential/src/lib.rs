@@ -54,12 +54,13 @@ where
         &self,
         solution: Signed<Solution>,
     ) -> anyhow::Result<CheckSolutionOutput> {
-        solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
         let Output {
             transaction: _,
             utility,
             gas_used,
-        } = solution::check_solution(&self.storage, Arc::new(solution.data)).await?;
+        } = solution::check_solution_with_intents(&self.storage, Arc::new(solution.data), &intents)
+            .await?;
         Ok(CheckSolutionOutput {
             utility,
             gas: gas_used,

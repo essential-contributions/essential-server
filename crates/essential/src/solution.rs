@@ -10,7 +10,7 @@ use essential_types::{
     Hash, IntentAddress, Signed, Word,
 };
 use std::{collections::HashMap, sync::Arc};
-use storage::{state_write::StateWrite, StateStorage, Storage};
+use storage::{StateStorage, Storage};
 use tokio::task::JoinSet;
 use transaction_storage::{Transaction, TransactionStorage};
 
@@ -56,22 +56,6 @@ where
     }
 }
 
-/// Checks a solution against state read VM and constraint VM after reading intents from storage.
-///
-/// Returns utility score of solution.
-pub async fn check_solution<S>(storage: &S, solution: Arc<Solution>) -> anyhow::Result<Output<S>>
-where
-    S: Storage + StateStorage + StateRead + StateWrite + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-    <S as StateWrite>::Future: Send,
-    <S as StateWrite>::Error: Send,
-{
-    // Read intents from storage.
-    let intents = read::read_intents_from_storage(&solution, storage).await?;
-    check_solution_with_intents(storage, solution, &intents).await
-}
-
 /// Checks a solution against state read VM and constraint VM.
 ///
 /// For each state read program of intents in each solution data, applies state mutations
@@ -87,11 +71,9 @@ pub async fn check_solution_with_intents<S>(
     intents: &HashMap<IntentAddress, Arc<Intent>>,
 ) -> anyhow::Result<Output<S>>
 where
-    S: Storage + StateStorage + StateRead + StateWrite + Clone + Send + Sync + 'static,
+    S: StateStorage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
-    <S as StateWrite>::Future: Send,
-    <S as StateWrite>::Error: Send,
 {
     // Create a transaction from storage.
     let mut transaction = storage.clone().transaction();

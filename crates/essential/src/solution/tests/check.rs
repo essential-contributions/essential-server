@@ -1,11 +1,23 @@
 use crate::{
-    solution::check_solution,
+    solution::{check_solution_with_intents, read::read_intents_from_storage, Output},
     test_utils::{deploy_intent, sanity_solution, solution_with_deps},
 };
-use essential_types::intent::Intent;
+use essential_state_read_vm::StateRead;
+use essential_types::{intent::Intent, solution::Solution};
 use std::sync::Arc;
+use storage::{StateStorage, Storage};
 use test_utils::{empty::Empty, solution_with_intent};
 
+async fn check_solution<S>(storage: &S, solution: Arc<Solution>) -> anyhow::Result<Output<S>>
+where
+    S: Storage + StateStorage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    // Read intents from storage.
+    let intents = read_intents_from_storage(&solution, storage).await?;
+    check_solution_with_intents(storage, solution, &intents).await
+}
 #[tokio::test]
 async fn test_check_empty_solution() {
     let (solution, storage) = sanity_solution().await;
