@@ -56,7 +56,7 @@ fn test_fail_state_slots_length_too_large() {
         decision_variables: Default::default(),
         state: vec![StateSlot {
             index: Default::default(),
-            amount: MAX_STATE_LEN as u32 + 1,
+            amount: MAX_STATE_LEN + 1,
             program_index: Default::default(),
         }],
     };

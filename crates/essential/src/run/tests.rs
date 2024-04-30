@@ -1,4 +1,4 @@
-use crate::{run::run, utils::solution_with_deps};
+use crate::{run::run, test_utils::solution_with_deps};
 use storage::Storage;
 use test_utils::sign_with_random_keypair;
 use utils::hash;

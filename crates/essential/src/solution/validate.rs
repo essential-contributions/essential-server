@@ -5,7 +5,10 @@ use essential_types::{
     solution::{DecisionVariable, DecisionVariableIndex, PartialSolution, Solution},
     ContentAddress, IntentAddress, Signed,
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use storage::Storage;
 use utils::verify;
 
@@ -82,7 +85,7 @@ pub fn validate_solution(solution: &Signed<Solution>) -> anyhow::Result<()> {
 /// - All decision variables in the solution are valid.
 pub fn validate_intents_against_solution(
     solution: &Solution,
-    intents: &HashMap<IntentAddress, Intent>,
+    intents: &HashMap<IntentAddress, Arc<Intent>>,
 ) -> anyhow::Result<()> {
     let data = &solution.data;
 
@@ -204,7 +207,7 @@ pub fn validate_partial_solutions_against_solution(
 pub async fn validate_solution_with_deps<S>(
     solution: &Signed<Solution>,
     storage: &S,
-) -> anyhow::Result<HashMap<IntentAddress, Intent>>
+) -> anyhow::Result<HashMap<IntentAddress, Arc<Intent>>>
 where
     S: Storage,
 {

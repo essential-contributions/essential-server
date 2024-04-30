@@ -10,7 +10,7 @@ use crate::solution::{check_solution_with_intents, validate::validate_solution_w
 pub mod tests;
 
 struct Solutions {
-    valid_solutions: Vec<(Signed<Solution>, u64)>,
+    valid_solutions: Vec<(Signed<Solution>, f64)>,
     failed_solutions: Vec<(Signed<Solution>, SolutionFailReason)>,
 }
 
@@ -65,7 +65,7 @@ where
 {
     let solutions = storage.list_solutions_pool().await?;
 
-    let mut valid_solutions: Vec<(Signed<Solution>, u64)> = vec![];
+    let mut valid_solutions: Vec<(Signed<Solution>, f64)> = vec![];
     let mut failed_solutions: Vec<(Signed<Solution>, SolutionFailReason)> = vec![];
 
     for solution in solutions.iter() {
@@ -79,7 +79,7 @@ where
                 )
                 .await
                 {
-                    Ok(utility) => valid_solutions.push((solution.to_owned(), utility)),
+                    Ok(output) => valid_solutions.push((solution.to_owned(), output.utility)),
                     Err(_e) => {
                         failed_solutions
                             .push((solution.to_owned(), SolutionFailReason::ConstraintsFailed));
