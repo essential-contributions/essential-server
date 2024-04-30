@@ -18,7 +18,7 @@ async fn test_check_empty_solution() {
 async fn test_check_solution_with_deps() {
     let (solution, storage) = solution_with_deps().await;
     let result = check_solution(&storage, Arc::new(solution)).await.unwrap();
-    assert_eq!(result.utility, 100);
+    assert_eq!(result.utility, 1.0);
 }
 
 #[tokio::test]

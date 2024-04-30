@@ -178,6 +178,30 @@ where
         }
     }
 
+    /// Apply state changes without returning the previous value.
+    pub fn apply_state(&mut self, address: &ContentAddress, key: &Key, value: Option<Word>) {
+        let m = self.state.entry(address.clone()).or_default();
+        let entry = m.entry(*key);
+        match entry {
+            std::collections::hash_map::Entry::Occupied(mut v) => match value {
+                Some(value) => {
+                    v.insert(Mutation::Insert(value));
+                }
+                None => {
+                    v.insert(Mutation::Delete);
+                }
+            },
+            std::collections::hash_map::Entry::Vacant(v) => match value {
+                Some(value) => {
+                    v.insert(Mutation::Insert(value));
+                }
+                None => {
+                    v.insert(Mutation::Delete);
+                }
+            },
+        }
+    }
+
     /// Query the state of this transaction.
     pub async fn query_state(
         &self,
