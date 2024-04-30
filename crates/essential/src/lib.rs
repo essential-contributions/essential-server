@@ -1,16 +1,17 @@
-use std::{ops::Range, time::Duration};
-
+use essential_state_read_vm::StateRead;
 use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
     StorageLayout, Word,
 };
-use storage::Storage;
+use solution::Output;
+use std::{ops::Range, sync::Arc, time::Duration};
+use storage::{state_write::StateWrite, Storage};
 
 mod deploy;
 mod run;
 mod solution;
 #[cfg(test)]
-mod utils;
+mod test_utils;
 
 #[derive(Clone)]
 pub struct Essential<S>
@@ -20,9 +21,19 @@ where
     storage: S,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct CheckSolutionOutput {
+    pub utility: f64,
+    pub gas: u64,
+}
+
 impl<S> Essential<S>
 where
-    S: Storage + Clone,
+    S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+    <S as StateWrite>::Future: Send,
+    <S as StateWrite>::Error: Send,
 {
     pub fn new(storage: S) -> Self {
         Self { storage }
@@ -39,8 +50,21 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    pub async fn check_solution(&self, solution: Solution) -> anyhow::Result<f64> {
-        solution::check_solution(&self.storage, solution).await
+    pub async fn check_solution(
+        &self,
+        solution: Signed<Solution>,
+    ) -> anyhow::Result<CheckSolutionOutput> {
+        let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        let Output {
+            transaction: _,
+            utility,
+            gas_used,
+        } = solution::check_solution_with_intents(&self.storage, Arc::new(solution.data), &intents)
+            .await?;
+        Ok(CheckSolutionOutput {
+            utility,
+            gas: gas_used,
+        })
     }
 
     pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {

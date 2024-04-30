@@ -5,7 +5,10 @@ use essential_types::{
     solution::{DecisionVariable, DecisionVariableIndex, PartialSolution, Solution},
     ContentAddress, IntentAddress, Signed,
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use storage::Storage;
 use utils::verify;
 
@@ -82,13 +85,9 @@ pub fn validate_solution(solution: &Signed<Solution>) -> anyhow::Result<()> {
 /// - All decision variables in the solution are valid.
 pub fn validate_intents_against_solution(
     solution: &Solution,
-    intents: &HashMap<IntentAddress, Intent>,
+    intents: &HashMap<IntentAddress, Arc<Intent>>,
 ) -> anyhow::Result<()> {
-    let Solution {
-        data,
-        state_mutations,
-        partial_solutions,
-    } = solution;
+    let data = &solution.data;
 
     // Ensure that all intents that solution data solves are retrieved from the storage.
     ensure!(
@@ -100,7 +99,7 @@ pub fn validate_intents_against_solution(
 
     // Validate decision variables.
     // Checking that there are no cycles is performed by the constraint VM.
-    for (data_index, data) in solution.data.iter().enumerate() {
+    for data in data.iter() {
         // Ensure that the number of decision variables in each solution data is
         // equal to the number of decision variables in the intent it solves.
         ensure!(
@@ -160,7 +159,7 @@ pub fn validate_partial_solutions_against_solution(
 
     // Validate partial solution data.
     for (
-        partial_solution_address,
+        _,
         PartialSolution {
             data: partial_data,
             state_mutations: partial_state_mutations,
@@ -208,7 +207,7 @@ pub fn validate_partial_solutions_against_solution(
 pub async fn validate_solution_with_deps<S>(
     solution: &Signed<Solution>,
     storage: &S,
-) -> anyhow::Result<()>
+) -> anyhow::Result<HashMap<IntentAddress, Arc<Intent>>>
 where
     S: Storage,
 {
@@ -216,14 +215,12 @@ where
     validate_solution(solution)?;
     let solution = &solution.data;
     // Validation of intents being read from storage.
-    validate_intents_against_solution(
-        solution,
-        &read_intents_from_storage(solution, storage).await?,
-    )?;
+    let intents = read_intents_from_storage(solution, storage).await?;
+    validate_intents_against_solution(solution, &intents)?;
     // Validation of partial solutions being read from storage.
     validate_partial_solutions_against_solution(
         solution,
         &read_partial_solutions_from_storage(solution, storage).await?,
     )?;
-    Ok(())
+    Ok(intents)
 }
