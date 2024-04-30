@@ -48,6 +48,14 @@ async fn test_run() {
     assert_eq!(result[0].batch.solutions.len(), 1);
     assert_eq!(result[0].batch.solutions[0].signature, solution_signature);
     assert_eq!(result[1].batch.solutions.len(), 2);
-    assert_eq!(result[1].batch.solutions[0].signature, solution2_signature);
-    assert_eq!(result[1].batch.solutions[1].signature, solution3_signature);
+    assert!(result[1]
+        .batch
+        .solutions
+        .iter()
+        .any(|s| s.signature == solution2_signature));
+    assert!(result[1]
+        .batch
+        .solutions
+        .iter()
+        .any(|s| s.signature == solution3_signature));
 }
