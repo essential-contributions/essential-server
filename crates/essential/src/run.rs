@@ -3,7 +3,7 @@ use essential_state_read_vm::StateRead;
 use essential_types::{solution::Solution, Signed};
 use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, state_write::StateWrite, Storage};
-use transaction_storage::Transaction;
+use transaction_storage::{Transaction, TransactionStorage};
 use utils::hash;
 
 #[cfg(test)]
@@ -22,8 +22,9 @@ where
     <S as StateWrite>::Future: Send,
     <S as StateWrite>::Error: Send,
 {
-    let solutions = build_block(storage).await?;
+    let (solutions, mut transaction) = build_block(storage).await?;
 
+    let storage = transaction.storage();
     let failed_solutions: Vec<([u8; 32], SolutionFailReason)> = solutions
         .failed_solutions
         .iter()
@@ -48,10 +49,12 @@ where
         .move_partial_solutions_to_solved(&solved_partial_solutions)
         .await?;
 
+    transaction.commit().await?;
+
     Ok(())
 }
 
-async fn build_block<S>(storage: &S) -> anyhow::Result<Solutions>
+async fn build_block<S>(storage: &S) -> anyhow::Result<(Solutions, TransactionStorage<S>)>
 where
     S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -86,8 +89,11 @@ where
         }
     }
 
-    Ok(Solutions {
-        valid_solutions,
-        failed_solutions,
-    })
+    Ok((
+        Solutions {
+            valid_solutions,
+            failed_solutions,
+        },
+        transaction,
+    ))
 }
