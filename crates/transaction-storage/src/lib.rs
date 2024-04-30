@@ -6,7 +6,8 @@
 use essential_state_read_vm::StateRead;
 use essential_types::{ContentAddress, Key, Word};
 use futures::future::FutureExt;
-use std::{collections::HashMap, pin::Pin, sync::Arc};
+use imbl::HashMap;
+use std::{pin::Pin, sync::Arc};
 use storage::StateStorage;
 use thiserror::Error;
 use utils::next_key;
@@ -154,11 +155,11 @@ where
         let m = self.state.entry(address.clone()).or_default();
         let entry = m.entry(*key);
         let mutation = match entry {
-            std::collections::hash_map::Entry::Occupied(mut v) => match value {
+            imbl::hashmap::Entry::Occupied(mut v) => match value {
                 Some(value) => Some(v.insert(Mutation::Insert(value))),
                 None => Some(v.insert(Mutation::Delete)),
             },
-            std::collections::hash_map::Entry::Vacant(v) => {
+            imbl::hashmap::Entry::Vacant(v) => {
                 match value {
                     Some(value) => {
                         v.insert(Mutation::Insert(value));
@@ -183,7 +184,7 @@ where
         let m = self.state.entry(address.clone()).or_default();
         let entry = m.entry(*key);
         match entry {
-            std::collections::hash_map::Entry::Occupied(mut v) => match value {
+            imbl::hashmap::Entry::Occupied(mut v) => match value {
                 Some(value) => {
                     v.insert(Mutation::Insert(value));
                 }
@@ -191,7 +192,7 @@ where
                     v.insert(Mutation::Delete);
                 }
             },
-            std::collections::hash_map::Entry::Vacant(v) => match value {
+            imbl::hashmap::Entry::Vacant(v) => match value {
                 Some(value) => {
                     v.insert(Mutation::Insert(value));
                 }
