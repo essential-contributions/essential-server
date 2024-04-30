@@ -97,6 +97,15 @@ pub fn validate_intents_against_solution(
         "All intents must be in the set"
     );
 
+    // Ensure that at least one intent has a non-empty constraint program.
+    ensure!(
+        data.iter().any(|d| {
+            let constraints = &intents.get(&d.intent_to_solve).unwrap().constraints;
+            !constraints.is_empty() && !constraints[0].is_empty()
+        }),
+        "At least one intent must have a constraint program"
+    );
+
     // Validate decision variables.
     // Checking that there are no cycles is performed by the constraint VM.
     for data in data.iter() {
