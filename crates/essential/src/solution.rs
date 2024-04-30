@@ -1,5 +1,5 @@
 use anyhow::ensure;
-use essential_constraint_vm::{check_intent, exec_bytecode_iter};
+use essential_constraint_vm::{eval_bytecode_iter, exec_bytecode_iter};
 use essential_state_read_vm::{
     asm::Op, Access, GasLimit, SolutionAccess, StateRead, StateSlots, Vm,
 };
@@ -180,18 +180,14 @@ where
             }
 
             // Check constraints.
-            let utility = tokio::task::spawn_blocking(move || {
-                let solution_access = SolutionAccess::new(&solution, solution_data_index);
-                let access = Access {
-                    solution: solution_access,
-                    state_slots: StateSlots {
-                        pre: &pre_slots,
-                        post: &post_slots,
-                    },
-                };
-                check_constraints(&intent, access)
-            })
-            .await??;
+            let utility = check_constraints(
+                intent.clone(),
+                pre_slots,
+                post_slots,
+                solution,
+                solution_data_index,
+            )
+            .await?;
             Ok((utility, total_gas))
         });
     }
@@ -334,27 +330,174 @@ where
 /// Checks intent constraints against its state slots.
 ///
 /// Returns the utility of solution for intent.
-fn check_constraints(intent: &Intent, access: Access) -> anyhow::Result<f64> {
-    match check_intent(&intent.constraints, access) {
-        Ok(()) => Ok(calculate_utility(intent.directive.clone(), access)?),
+async fn check_constraints(
+    intent: Arc<Intent>,
+    pre_slots: Vec<Option<Word>>,
+    post_slots: Vec<Option<Word>>,
+    solution: Arc<Solution>,
+    solution_data_index: SolutionDataIndex,
+) -> anyhow::Result<f64> {
+    let pre_slots = Arc::new(pre_slots);
+    let post_slots = Arc::new(post_slots);
+    match check_intent(
+        intent.clone(),
+        pre_slots.clone(),
+        post_slots.clone(),
+        solution.clone(),
+        solution_data_index,
+    )
+    .await
+    {
+        Ok(()) => Ok(calculate_utility(
+            intent.clone(),
+            pre_slots,
+            post_slots,
+            solution,
+            solution_data_index,
+        )
+        .await?),
         Err(e) => {
             anyhow::bail!("Constraint VM execution failed: {}", e)
         }
     }
 }
 
+/// Check intents in parallel without sleeping
+/// any threads.
+async fn check_intent(
+    intent: Arc<Intent>,
+    pre_slots: Arc<Vec<Option<Word>>>,
+    post_slots: Arc<Vec<Option<Word>>>,
+    solution: Arc<Solution>,
+    solution_data_index: SolutionDataIndex,
+) -> anyhow::Result<()> {
+    let mut handles = Vec::with_capacity(intent.constraints.len());
+
+    // Spawn each constraint onto a rayon thread and
+    // check them in parallel.
+    for i in 0..intent.constraints.len() {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        handles.push(rx);
+
+        // These are all cheap Arc clones.
+        let solution = solution.clone();
+        let pre_slots = pre_slots.clone();
+        let post_slots = post_slots.clone();
+        let intent = intent.clone();
+
+        // Spawn this sync code onto a rayon thread.
+        // This is a non-blocking operation.
+        rayon::spawn(move || {
+            let solution_access = SolutionAccess::new(&solution, solution_data_index);
+            let access = Access {
+                solution: solution_access,
+                state_slots: StateSlots {
+                    pre: &pre_slots,
+                    post: &post_slots,
+                },
+            };
+            let res = eval_bytecode_iter(
+                intent
+                    .constraints
+                    .get(i)
+                    .expect("Safe due to above len check")
+                    .iter()
+                    .copied(),
+                access,
+            );
+
+            // Send the result back to the main thread.
+            // Send errors are ignored as if the recv is gone there's no one to send to.
+            let _ = tx.send((i, res));
+        })
+    }
+
+    // There's no way to know the size of these.
+    let mut failed = Vec::new();
+    let mut unsatisfied = Vec::new();
+
+    // Wait for all constraints to finish.
+    // The order of waiting on handles is not important as all
+    // constraints make progress independently.
+    for handle in handles {
+        // Get the index and result from the handle.
+        let (i, res): (usize, Result<bool, _>) = handle.await?;
+        match res {
+            // If the constraint failed, add it to the failed list.
+            Err(err) => failed.push((i, err)),
+            // If the constraint was unsatisfied, add it to the unsatisfied list.
+            Ok(b) if !b => unsatisfied.push(i),
+            // Otherwise, the constraint was satisfied.
+            _ => (),
+        }
+    }
+
+    // If there are any failed constraints, return an error.
+    if !failed.is_empty() {
+        return Err(essential_constraint_vm::error::ConstraintErrors(failed).into());
+    }
+
+    // If there are any unsatisfied constraints, return an error.
+    if !unsatisfied.is_empty() {
+        return Err(essential_constraint_vm::error::ConstraintsUnsatisfied(unsatisfied).into());
+    }
+    Ok(())
+}
+
 /// Calculates utility of solution for intent.
 ///
 /// Returns utility.
-fn calculate_utility(directive: Directive, access: Access) -> anyhow::Result<f64> {
-    match directive {
+async fn calculate_utility(
+    intent: Arc<Intent>,
+    pre_slots: Arc<Vec<Option<Word>>>,
+    post_slots: Arc<Vec<Option<Word>>>,
+    solution: Arc<Solution>,
+    solution_data_index: SolutionDataIndex,
+) -> anyhow::Result<f64> {
+    match &intent.directive {
         Directive::Satisfy => Ok(1.0),
-        Directive::Maximize(code) | Directive::Minimize(code) => {
-            let Ok(mut stack) = exec_bytecode_iter(code, access) else {
-                anyhow::bail!("Constraint VM execution failed processing directive");
-            };
-            let [start, end, value] = stack.pop3()?;
-            normalize(value, start, end)
+        Directive::Maximize(_) | Directive::Minimize(_) => {
+            // Spawn this sync code onto a rayon thread.
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            rayon::spawn(move || {
+                let solution_access = SolutionAccess::new(&solution, solution_data_index);
+                let access = Access {
+                    solution: solution_access,
+                    state_slots: StateSlots {
+                        pre: &pre_slots,
+                        post: &post_slots,
+                    },
+                };
+                // Extract the directive code.
+                let code = match intent.directive {
+                    Directive::Maximize(ref code) | Directive::Minimize(ref code) => code,
+                    _ => unreachable!("As this is already checked above"),
+                };
+
+                // Execute the directive code.
+                match exec_bytecode_iter(code.iter().copied(), access) {
+                    Ok(mut stack) => match stack.pop3() {
+                        Ok([start, end, value]) => {
+                            // Return the normalized value back to the main thread.
+                            // Send errors are ignored as if the recv is gone there's no one to send to.
+                            let _ = tx.send(normalize(value, start, end));
+                        }
+                        Err(e) => {
+                            // Return the error back to the main thread.
+                            // Send errors are ignored as if the recv is gone there's no one to send to.
+                            let _ = tx.send(Err(e.into()));
+                        }
+                    },
+                    Err(e) => {
+                        // Return the error back to the main thread.
+                        // Send errors are ignored as if the recv is gone there's no one to send to.
+                        let _ = tx.send(Err(e.into()));
+                    }
+                }
+            });
+
+            // Await the result of the utility calculation.
+            rx.await?
         }
     }
 }

@@ -403,6 +403,7 @@ dependencies = [
  "essential-types",
  "futures",
  "memory-storage",
+ "rayon",
  "serde",
  "storage",
  "test-utils",

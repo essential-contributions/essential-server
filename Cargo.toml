@@ -14,6 +14,7 @@ futures = "0.3.30"
 imbl = "3.0.0"
 postcard = { version = "1.0.8", default-featues = false, features = ["alloc"] }
 reqwest = "0.12.0"
+rayon = "1.10"
 secp256k1 = { version = "0.28.2", features = ["rand-std", "hashes-std"] }
 serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.114"
