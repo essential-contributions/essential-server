@@ -39,14 +39,22 @@ async fn test_check_solution_fail_state_read() {
 #[should_panic(expected = "Constraint VM execution failed: ")]
 async fn test_check_solution_fail_constraint() {
     let mut intent = Intent::empty();
+    intent.slots.state = vec![essential_types::slots::StateSlot {
+        index: 0,
+        amount: 1,
+        program_index: 0,
+    }];
     intent.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::Memory::Alloc.into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Memory::Push.into(),
         essential_state_read_vm::asm::ControlFlow::Halt.into(),
     ])
     .collect()];
     // State slot out of bounds
     intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
-        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Stack::Push(0).into(),
         essential_constraint_vm::asm::Access::State.into(),
     ])
