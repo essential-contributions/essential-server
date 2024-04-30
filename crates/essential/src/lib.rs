@@ -1,3 +1,4 @@
+use anyhow::bail;
 use essential_state_read_vm::StateRead;
 use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
@@ -5,7 +6,8 @@ use essential_types::{
 };
 use solution::Output;
 use std::{ops::Range, sync::Arc, time::Duration};
-use storage::{state_write::StateWrite, Storage};
+use storage::{failed_solution::SolutionFailReason, state_write::StateWrite, Storage};
+use utils::hash;
 
 mod deploy;
 mod run;
@@ -25,6 +27,11 @@ where
 pub struct CheckSolutionOutput {
     pub utility: f64,
     pub gas: u64,
+}
+
+pub enum SolutionOutcome {
+    Success(u64),
+    Fail(SolutionFailReason),
 }
 
 impl<S> Essential<S>
@@ -69,6 +76,28 @@ where
 
     pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
         solution::submit_solution(&self.storage, solution).await
+    }
+
+    pub async fn solution_outcome(&self, solution_hash: &Hash) -> anyhow::Result<SolutionOutcome> {
+        if let Some(solution) = self.storage.get_failed_solution(*solution_hash).await? {
+            Ok(SolutionOutcome::Fail(solution.reason))
+        } else {
+            // TODO: maybe limit searched blocks, e.g.:
+            // let time_now = SystemTime::now().duration_since(UNIX_EPOCH)?;
+            // let time_a_week_ago = Duration::sub(time_now, Duration::from_secs(604800));
+            // let time_range = Some(time_a_week_ago..time_now);
+            let blocks = self.storage.list_winning_blocks(None, None).await?;
+            let block = blocks.iter().find(|&b| {
+                b.batch
+                    .solutions
+                    .iter()
+                    .any(|s| &hash(&s.data) == solution_hash)
+            });
+            match block {
+                Some(block) => Ok(SolutionOutcome::Success(block.number)),
+                None => bail!("Solution does not exist"),
+            }
+        }
     }
 
     pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
