@@ -12,7 +12,7 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-use essential_server::{Essential, Storage};
+use essential_server::{Essential, StateRead, Storage};
 use essential_types::{
     convert::word_4_from_u8_32, intent::Intent, solution::Solution, Block, ContentAddress, Hash,
     IntentAddress, Signed, Word,
@@ -53,7 +53,9 @@ pub async fn run<S, A>(
 ) -> anyhow::Result<()>
 where
     A: ToSocketAddrs,
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     // Spawn essential and get the handle.
     let handle = essential.clone().spawn()?;
@@ -100,7 +102,9 @@ async fn deploy_intent_set<S>(
     Json(payload): Json<Signed<Vec<Intent>>>,
 ) -> Result<Json<ContentAddress>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let address = essential.deploy_intent_set(payload).await?;
     Ok(Json(address))
@@ -114,7 +118,9 @@ async fn submit_solution<S>(
     Json(payload): Json<Signed<Solution>>,
 ) -> Result<Json<Hash>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let hash = essential.submit_solution(payload).await?;
     Ok(Json(hash))
@@ -128,7 +134,9 @@ async fn get_intent_set<S>(
     Path(address): Path<String>,
 ) -> Result<Json<Option<Signed<Vec<Intent>>>>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let address = ContentAddress(
         URL_SAFE
@@ -149,7 +157,9 @@ async fn get_intent<S>(
     Path((set, address)): Path<(String, String)>,
 ) -> Result<Json<Option<Intent>>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let set = ContentAddress(
         URL_SAFE
@@ -176,7 +186,9 @@ async fn list_intent_sets<S>(
     page: Option<Query<Page>>,
 ) -> Result<Json<Vec<Vec<Intent>>>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let time_range =
         time_range.map(|range| Duration::from_secs(range.start)..Duration::from_secs(range.end));
@@ -196,7 +208,9 @@ async fn list_winning_blocks<S>(
     page: Option<Query<Page>>,
 ) -> Result<Json<Vec<Block>>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let time_range =
         time_range.map(|range| Duration::from_secs(range.start)..Duration::from_secs(range.end));
@@ -212,7 +226,9 @@ async fn list_solutions_pool<S>(
     State(essential): State<Essential<S>>,
 ) -> Result<Json<Vec<Signed<Solution>>>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let solutions = essential.list_solutions_pool().await?;
     Ok(Json(solutions))
@@ -229,7 +245,9 @@ async fn query_state<S>(
     Path((address, key)): Path<(String, String)>,
 ) -> Result<Json<Option<Word>>, Error>
 where
-    S: Storage + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
 {
     let address = ContentAddress(
         URL_SAFE
