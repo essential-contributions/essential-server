@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests;
 
-use essential_types::{Hash, Key, Signature, Signed, Word};
+use essential_types::{Hash, Signature, Signed};
 use secp256k1::{
     ecdsa::{RecoverableSignature, RecoveryId},
     Message, PublicKey, Secp256k1, SecretKey,
@@ -83,17 +83,4 @@ pub fn recover_from_message(message: Message, signature: &Signature) -> anyhow::
     let secp = Secp256k1::new();
     let public_key = secp.recover_ecdsa(&message, &recoverable_signature)?;
     Ok(public_key)
-}
-
-pub fn next_key(mut key: Key) -> Option<Key> {
-    for w in key.iter_mut().rev() {
-        match *w {
-            Word::MAX => *w = Word::MIN,
-            _ => {
-                *w += 1;
-                return Some(key);
-            }
-        }
-    }
-    None
 }

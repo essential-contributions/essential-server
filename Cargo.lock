@@ -1257,7 +1257,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.0",
+ "essential-state-read-vm",
  "essential-types",
+ "futures",
  "postcard",
  "reqwest",
  "rusqlite",
@@ -1265,6 +1267,7 @@ dependencies = [
  "serde_json",
  "storage",
  "test-utils",
+ "thiserror",
  "tokio",
  "utils",
 ]
