@@ -8,7 +8,7 @@ use essential_types::{ContentAddress, Key, Word};
 use futures::future::FutureExt;
 use imbl::HashMap;
 use std::{pin::Pin, sync::Arc};
-use storage::{word_range, StateStorage};
+use storage::{word_range, QueryState, StateStorage};
 use thiserror::Error;
 
 #[cfg(test)]
@@ -32,19 +32,14 @@ where
 }
 
 /// Wrapper around a state storage that provides transactional semantics.
-pub struct TransactionStorage<S>
-where
-    S: StateStorage,
-{
+pub struct TransactionStorage<S> {
     state: HashMap<ContentAddress, HashMap<Key, Mutation>>,
     storage: S,
 }
 
 /// View of a transaction.
 #[derive(Clone)]
-pub struct TransactionView<S>(Arc<TransactionStorage<S>>)
-where
-    S: StateStorage;
+pub struct TransactionView<S>(Arc<TransactionStorage<S>>);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Mutation {
@@ -70,15 +65,12 @@ where
         Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
 
     fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
-        let storage = self.0.clone();
-        async move { word_range(&storage.storage, set_addr, key, num_words).await }.boxed()
+        let storage = self.clone();
+        async move { word_range(&storage, set_addr, key, num_words).await }.boxed()
     }
 }
 
-impl<S> TransactionStorage<S>
-where
-    S: StateStorage,
-{
+impl<S> TransactionStorage<S> {
     /// Create a new transaction storage around the given state storage.
     pub fn new(storage: S) -> Self {
         Self {
@@ -99,7 +91,10 @@ where
     }
 
     /// Commit the transaction.
-    pub async fn commit(&mut self) -> anyhow::Result<()> {
+    pub async fn commit(&mut self) -> anyhow::Result<()>
+    where
+        S: StateStorage,
+    {
         let updates = self.state.iter().flat_map(|(address, m)| {
             m.iter().map(move |(key, mutation)| {
                 (
@@ -128,7 +123,10 @@ where
         address: &ContentAddress,
         key: &Key,
         value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>> {
+    ) -> anyhow::Result<Option<Word>>
+    where
+        S: QueryState,
+    {
         let m = self.state.entry(address.clone()).or_default();
         let entry = m.entry(*key);
         let mutation = match entry {
@@ -185,12 +183,28 @@ where
         &self,
         address: &ContentAddress,
         key: &Key,
-    ) -> anyhow::Result<Option<Word>> {
+    ) -> anyhow::Result<Option<Word>>
+    where
+        S: QueryState,
+    {
         let mutation = self.state.get(address).and_then(|m| m.get(key)).copied();
         match mutation {
             Some(Mutation::Insert(v)) => Ok(Some(v)),
             Some(Mutation::Delete) => Ok(None),
             None => self.storage.query_state(address, key).await,
         }
+    }
+}
+
+impl<S> QueryState for TransactionView<S>
+where
+    S: QueryState + Clone + Send + Sync + 'static,
+{
+    async fn query_state(
+        &self,
+        address: &ContentAddress,
+        key: &Key,
+    ) -> anyhow::Result<Option<Word>> {
+        self.0.query_state(address, key).await
     }
 }

@@ -1,6 +1,6 @@
 use essential_types::{intent::Intent, StorageLayout};
 use memory_storage::MemoryStorage;
-use storage::Storage;
+use storage::{QueryState, Storage};
 use test_utils::{empty::Empty, sign_with_random_keypair};
 use utils::hash;
 

@@ -14,7 +14,7 @@ use std::{
 };
 use storage::{
     failed_solution::{FailedSolution, SolutionFailReason},
-    word_range, StateStorage, Storage,
+    word_range, QueryState, StateStorage, Storage,
 };
 use thiserror::Error;
 use utils::Lock;
@@ -103,7 +103,9 @@ impl StateStorage for MemoryStorage {
         });
         Ok(v)
     }
+}
 
+impl QueryState for MemoryStorage {
     async fn query_state(
         &self,
         address: &ContentAddress,

@@ -14,7 +14,7 @@ use futures::FutureExt;
 use std::{pin::Pin, time::Duration};
 use storage::{
     failed_solution::{FailedSolution, SolutionFailReason},
-    word_range, StateStorage, Storage,
+    word_range, QueryState, StateStorage, Storage,
 };
 use thiserror::Error;
 use utils::hash;
@@ -271,7 +271,9 @@ impl StateStorage for RqliteStorage {
         let queries = self.execute_query(&sql).await?;
         Ok(values::map_execute_to_words(queries))
     }
+}
 
+impl QueryState for RqliteStorage {
     async fn query_state(
         &self,
         address: &essential_types::ContentAddress,

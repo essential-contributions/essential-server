@@ -118,7 +118,7 @@ pub trait Storage: StateStorage {
 }
 
 /// Storage trait just for state reads and writes.
-pub trait StateStorage {
+pub trait StateStorage: QueryState {
     /// Update the state of a content address.
     fn update_state(
         &self,
@@ -134,7 +134,10 @@ pub trait StateStorage {
     ) -> impl std::future::Future<Output = anyhow::Result<Vec<Option<Word>>>> + Send
     where
         U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send;
+}
 
+/// Storage trait for reading state.
+pub trait QueryState {
     /// Query the state of a content address.
     fn query_state(
         &self,
@@ -142,11 +145,6 @@ pub trait StateStorage {
         key: &Key,
     ) -> impl std::future::Future<Output = anyhow::Result<Option<Word>>> + Send;
 }
-
-// /// Storage trait for reading state.
-// pub trait QueryState {
-
-// }
 
 /// Get a range of words from the state.
 pub async fn word_range<S, E>(
@@ -156,7 +154,7 @@ pub async fn word_range<S, E>(
     num_words: usize,
 ) -> Result<Vec<Option<Word>>, E>
 where
-    S: StateStorage + Send,
+    S: QueryState + Send,
     E: From<anyhow::Error>,
 {
     let mut words = vec![];
