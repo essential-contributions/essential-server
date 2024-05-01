@@ -90,13 +90,15 @@ impl<S> TransactionStorage<S> {
         }))
     }
 
-    // TODO: or we can make the fields `pub`
-    /// Get a clone of this transaction's storage.
-    pub fn storage(&self) -> S
+    /// Take a snapshow of this transaction.
+    pub fn snapshot(&self) -> Self
     where
         S: Clone,
     {
-        self.storage.clone()
+        Self {
+            state: self.state.clone(),
+            storage: self.storage.clone(),
+        }
     }
 
     /// Commit the transaction.
