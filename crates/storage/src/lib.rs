@@ -13,8 +13,6 @@ use std::{ops::Range, time::Duration};
 
 /// Module for failed solution struct.
 pub mod failed_solution;
-/// Module for state write trait.
-pub mod state_write;
 
 // TODO: Maybe this warning is right,
 // we will find out when we try to use this trait
@@ -120,7 +118,7 @@ pub trait Storage: StateStorage {
 }
 
 /// Storage trait just for state reads and writes.
-pub trait StateStorage {
+pub trait StateStorage: QueryState {
     /// Update the state of a content address.
     fn update_state(
         &self,
@@ -136,11 +134,47 @@ pub trait StateStorage {
     ) -> impl std::future::Future<Output = anyhow::Result<Vec<Option<Word>>>> + Send
     where
         U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send;
+}
 
+/// Storage trait for reading state.
+pub trait QueryState {
     /// Query the state of a content address.
     fn query_state(
         &self,
         address: &ContentAddress,
         key: &Key,
     ) -> impl std::future::Future<Output = anyhow::Result<Option<Word>>> + Send;
+}
+
+/// Get a range of words from the state.
+pub async fn word_range<S, E>(
+    storage: &S,
+    set_addr: ContentAddress,
+    mut key: Key,
+    num_words: usize,
+) -> Result<Vec<Option<Word>>, E>
+where
+    S: QueryState + Send,
+    E: From<anyhow::Error>,
+{
+    let mut words = vec![];
+    for _ in 0..num_words {
+        let opt = storage.query_state(&set_addr, &key).await?;
+        words.push(opt);
+        key = next_key(key).ok_or_else(|| anyhow::anyhow!("Failed to find next key"))?
+    }
+    Ok(words)
+}
+
+fn next_key(mut key: Key) -> Option<Key> {
+    for w in key.iter_mut().rev() {
+        match *w {
+            Word::MAX => *w = Word::MIN,
+            _ => {
+                *w += 1;
+                return Some(key);
+            }
+        }
+    }
+    None
 }
