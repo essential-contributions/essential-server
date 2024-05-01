@@ -87,6 +87,7 @@ pub async fn sanity_solution() -> (Solution, MemoryStorage) {
     (solution, storage)
 }
 
+// `decision_variables` acts like salt
 pub fn test_intent(decision_variables: u32) -> Intent {
     // Intent that expects the value of previously unset state slot with index 0 to be 42.
     let mut intent = Intent::empty();
@@ -121,7 +122,7 @@ pub fn test_intent(decision_variables: u32) -> Intent {
         essential_constraint_vm::asm::Stack::Push(0).into(), // slot
         essential_constraint_vm::asm::Stack::Push(1).into(), // post
         essential_constraint_vm::asm::Access::State.into(),
-        essential_state_read_vm::asm::Stack::Push(42).into(),
+        essential_constraint_vm::asm::Stack::Push(42).into(),
         essential_constraint_vm::asm::Pred::Eq.into(),
         essential_constraint_vm::asm::Pred::And.into(),
     ])
@@ -158,4 +159,68 @@ pub async fn test_solution(
         }],
     }];
     (solution, storage)
+}
+
+pub fn counter_intent(decision_variables: u32) -> Intent {
+    let mut intent = Intent::empty();
+    intent.slots = Slots {
+        decision_variables,
+        state: vec![StateSlot {
+            index: 0,
+            amount: 1,
+            program_index: 0,
+        }],
+    };
+    intent.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::Memory::Alloc.into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::StateRead::WordRange,
+        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+    ])
+    .collect()];
+    intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Access::State.into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
+        essential_constraint_vm::asm::Alu::Add.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
+        essential_constraint_vm::asm::Access::State.into(),
+        essential_constraint_vm::asm::Pred::Eq.into(),
+    ])
+    .collect()];
+    intent
+}
+
+pub async fn counter_solution(
+    intent_address: IntentAddress,
+    decision_variables: u32,
+    final_value: u32,
+) -> Solution {
+    let mut solution = Solution::empty();
+    let transient_dec_var = DecisionVariable::Transient(DecisionVariableIndex {
+        solution_data_index: 0,
+        variable_index: 0,
+    });
+    let mut solution_decision_variables =
+        vec![transient_dec_var; decision_variables.try_into().unwrap()];
+    solution_decision_variables[0] = DecisionVariable::Inline(final_value.into());
+    solution.data = vec![SolutionData {
+        intent_to_solve: intent_address.clone(),
+        decision_variables: solution_decision_variables,
+    }];
+    solution.state_mutations = vec![StateMutation {
+        pathway: 0,
+        mutations: vec![Mutation {
+            key: [0, 0, 0, 0],
+            value: Some(final_value.into()),
+        }],
+    }];
+    solution
 }
