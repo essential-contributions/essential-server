@@ -1,7 +1,10 @@
-use crate::solution::{check_solution_with_intents, read::read_intents_from_storage};
+use crate::{
+    solution::{check_solution_with_intents, read::read_intents_from_storage},
+    PRUNE_FAILED_STORAGE_OLDER_THAN,
+};
 use essential_state_read_vm::StateRead;
 use essential_types::{solution::Solution, Signed};
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, Storage};
 use transaction_storage::{Transaction, TransactionStorage};
 use utils::hash;
@@ -21,7 +24,7 @@ where
     <S as StateRead>::Error: Send,
 {
     let _result = storage
-        .prune_failed_solutions(Duration::from_secs(604800))
+        .prune_failed_solutions(PRUNE_FAILED_STORAGE_OLDER_THAN)
         .await;
 
     let (solutions, mut transaction) = build_block(storage).await?;

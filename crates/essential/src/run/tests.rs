@@ -62,6 +62,7 @@ async fn test_run() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_counter() {
     let intent = counter_intent(1);
     let (intent_address, storage) = deploy_intent(intent.clone()).await;

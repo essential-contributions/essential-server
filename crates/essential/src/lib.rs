@@ -5,7 +5,7 @@ use essential_types::{
     StorageLayout, Word,
 };
 use solution::Output;
-use std::{ops::Range, sync::Arc, time::Duration};
+use std::{cmp::min, ops::Range, sync::Arc, time::Duration};
 use storage::{failed_solution::SolutionFailReason, Storage};
 use transaction_storage::Transaction;
 use utils::hash;
@@ -34,6 +34,9 @@ pub enum SolutionOutcome {
     Success(u64),
     Fail(SolutionFailReason),
 }
+
+const PRUNE_FAILED_STORAGE_OLDER_THAN: Duration = Duration::from_secs(604800); // one week
+const MAX_BLOCKS_TO_SEARCH: usize = 100;
 
 impl<S> Essential<S>
 where
@@ -78,21 +81,23 @@ where
         solution::submit_solution(&self.storage, solution).await
     }
 
-    pub async fn solution_outcome(&self, solution_hash: &Hash) -> anyhow::Result<SolutionOutcome> {
+    pub async fn solution_outcome(
+        &self,
+        solution_hash: &Hash,
+        start_block: usize,
+    ) -> anyhow::Result<SolutionOutcome> {
         if let Some(solution) = self.storage.get_failed_solution(*solution_hash).await? {
             Ok(SolutionOutcome::Fail(solution.reason))
         } else {
-            // TODO: maybe limit searched blocks, e.g.:
-            // let time_now = SystemTime::now().duration_since(UNIX_EPOCH)?;
-            // let time_a_week_ago = Duration::sub(time_now, Duration::from_secs(604800));
-            // let time_range = Some(time_a_week_ago..time_now);
             let blocks = self.storage.list_winning_blocks(None, None).await?;
-            let block = blocks.iter().find(|&b| {
-                b.batch
-                    .solutions
-                    .iter()
-                    .any(|s| &hash(&s.data) == solution_hash)
-            });
+            let block = blocks[start_block..min(start_block + MAX_BLOCKS_TO_SEARCH, blocks.len())]
+                .iter()
+                .find(|&b| {
+                    b.batch
+                        .solutions
+                        .iter()
+                        .any(|s| &hash(&s.data) == solution_hash)
+                });
             match block {
                 Some(block) => Ok(SolutionOutcome::Success(block.number)),
                 None => bail!("Solution does not exist"),
