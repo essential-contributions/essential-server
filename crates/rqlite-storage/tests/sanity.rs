@@ -5,7 +5,7 @@ use essential_types::{
 };
 use rqlite_storage::RqliteStorage;
 use std::vec;
-use storage::{StateStorage, Storage};
+use storage::{QueryState, StateStorage, Storage};
 use test_utils::{empty::Empty, intent_with_decision_variables, sign_with_random_keypair};
 use utils::hash;
 

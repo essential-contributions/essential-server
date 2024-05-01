@@ -12,7 +12,7 @@ use essential_types::{
 use std::{collections::HashMap, sync::Arc};
 use storage::{StateStorage, Storage};
 use tokio::task::JoinSet;
-use transaction_storage::{Transaction, TransactionStorage};
+use transaction_storage::TransactionStorage;
 
 pub use validate::validate_solution_with_deps;
 
@@ -66,7 +66,7 @@ where
 ///
 /// Returns utility score of solution.
 pub async fn check_solution_with_intents<S>(
-    storage: &S,
+    mut transaction: TransactionStorage<S>,
     solution: Arc<Solution>,
     intents: &HashMap<IntentAddress, Arc<Intent>>,
 ) -> anyhow::Result<Output<S>>
@@ -75,8 +75,8 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    // Create a transaction from storage.
-    let mut transaction = storage.clone().transaction();
+    // Create a view of the transaction before state mutations.
+    let pre_state = transaction.view();
 
     // Apply state mutations.
     for state_mutation in &solution.state_mutations {
@@ -91,10 +91,8 @@ where
         }
     }
 
-    // Create a view of the transaction.
-    // TODO: This involves a single clone of the transaction.
-    // Find a way to avoid this.
-    let view = transaction.view();
+    // Create a view of the transaction after state mutations.
+    let post_state = transaction.view();
 
     // Read pre and post states then check constraints.
     let mut set: JoinSet<anyhow::Result<_>> = JoinSet::new();
@@ -103,8 +101,8 @@ where
             anyhow::bail!("Intent in solution data not found in intents set");
         };
         let solution = solution.clone();
-        let view = view.clone();
-        let storage = storage.clone();
+        let pre_state = pre_state.clone();
+        let post_state = post_state.clone();
         let solution_data_index: SolutionDataIndex = solution_data_index.try_into()?;
 
         set.spawn(async move {
@@ -134,7 +132,7 @@ where
                 };
                 total_gas += read_state_for(
                     solution_access,
-                    &storage,
+                    &pre_state,
                     state_read,
                     slots,
                     &intent.slots.state,
@@ -152,7 +150,7 @@ where
                 };
                 total_gas += read_state_for(
                     solution_access,
-                    &view,
+                    &post_state,
                     state_read,
                     slots,
                     &intent.slots.state,
