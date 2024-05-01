@@ -6,14 +6,17 @@
 
 use anyhow::{bail, ensure};
 use base64::Engine;
+use essential_state_read_vm::StateRead;
 use essential_types::{
-    solution::PartialSolution, Block, ContentAddress, Hash, Signed, StorageLayout, Word,
+    solution::PartialSolution, Block, ContentAddress, Hash, Key, Signed, StorageLayout, Word,
 };
-use std::time::Duration;
+use futures::FutureExt;
+use std::{pin::Pin, time::Duration};
 use storage::{
     failed_solution::{FailedSolution, SolutionFailReason},
-    StateStorage, Storage,
+    word_range, StateStorage, Storage,
 };
+use thiserror::Error;
 use utils::hash;
 
 use values::{single_value, QueryValues};
@@ -592,5 +595,25 @@ impl Storage for RqliteStorage {
 
     async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()> {
         todo!()
+    }
+}
+
+/// Error for rqlite read.
+#[derive(Debug, Error)]
+pub enum RqliteError {
+    /// Error during read
+    #[error("failed to read")]
+    ReadError(#[from] anyhow::Error),
+}
+
+impl StateRead for RqliteStorage {
+    type Error = RqliteError;
+
+    type Future =
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
+
+    fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+        let storage = self.clone();
+        async move { word_range(&storage, set_addr, key, num_words).await }.boxed()
     }
 }

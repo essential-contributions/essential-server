@@ -8,9 +8,8 @@ use essential_types::{ContentAddress, Key, Word};
 use futures::future::FutureExt;
 use imbl::HashMap;
 use std::{pin::Pin, sync::Arc};
-use storage::StateStorage;
+use storage::{word_range, StateStorage};
 use thiserror::Error;
-use utils::next_key;
 
 #[cfg(test)]
 mod tests;
@@ -47,17 +46,23 @@ pub struct TransactionView<S>(Arc<TransactionStorage<S>>)
 where
     S: StateStorage;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum Mutation {
+    Insert(Word),
+    Delete,
+}
+
 /// Error for transaction view.
 #[derive(Debug, Error)]
 pub enum TransactionViewError {
     /// Error during read
     #[error("failed to read")]
-    ReadError,
+    ReadError(#[from] anyhow::Error),
 }
 
 impl<S> StateRead for TransactionView<S>
 where
-    S: StateRead + StateStorage + Clone + Send + Sync + 'static,
+    S: StateStorage + Clone + Send + Sync + 'static,
 {
     type Error = TransactionViewError;
 
@@ -65,37 +70,9 @@ where
         Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
 
     fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
-        let storage = self.clone();
-        async move { transaction_view_word_range(storage, set_addr, key, num_words).await }.boxed()
+        let storage = self.0.clone();
+        async move { word_range(&storage.storage, set_addr, key, num_words).await }.boxed()
     }
-}
-
-async fn transaction_view_word_range<S>(
-    storage: TransactionView<S>,
-    set_addr: ContentAddress,
-    mut key: Key,
-    num_words: usize,
-) -> Result<Vec<Option<Word>>, TransactionViewError>
-where
-    S: StateStorage + Send,
-{
-    let mut words = vec![];
-    for _ in 0..num_words {
-        let opt = storage
-            .0
-            .query_state(&set_addr, &key)
-            .await
-            .map_err(|_| TransactionViewError::ReadError)?;
-        words.push(opt);
-        key = next_key(key).ok_or(TransactionViewError::ReadError)?
-    }
-    Ok(words)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum Mutation {
-    Insert(Word),
-    Delete,
 }
 
 impl<S> TransactionStorage<S>

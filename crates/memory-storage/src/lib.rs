@@ -14,11 +14,10 @@ use std::{
 };
 use storage::{
     failed_solution::{FailedSolution, SolutionFailReason},
-    state_write::StateWrite,
-    StateStorage, Storage,
+    word_range, StateStorage, Storage,
 };
 use thiserror::Error;
-use utils::{next_key, Lock};
+use utils::Lock;
 
 #[cfg(test)]
 mod tests;
@@ -64,25 +63,6 @@ impl MemoryStorage {
         Self {
             inner: Arc::new(Lock::new(Inner::default())),
         }
-    }
-
-    pub async fn word_range(
-        &self,
-        set_addr: ContentAddress,
-        mut key: Key,
-        num_words: usize,
-    ) -> Result<Vec<Option<Word>>, MemoryStorageError> {
-        let mut words = vec![];
-        for _ in 0..num_words {
-            let opt = self
-                .query_state(&set_addr, &key)
-                .await
-                .map_err(|_| MemoryStorageError::ReadError)?;
-            words.push(opt);
-            key = next_key(key).ok_or(MemoryStorageError::KeyRangeError)?
-        }
-
-        Ok(words)
     }
 }
 
@@ -414,9 +394,7 @@ impl Storage for MemoryStorage {
 #[derive(Debug, Error)]
 pub enum MemoryStorageError {
     #[error("failed to read from memory storage")]
-    ReadError,
-    #[error("failed to write to memory storage")]
-    WriteError,
+    ReadError(#[from] anyhow::Error),
     #[error("invalid key range")]
     KeyRangeError,
 }
@@ -429,27 +407,6 @@ impl StateRead for MemoryStorage {
 
     fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { storage.word_range(set_addr, key, num_words).await }.boxed()
-    }
-}
-
-impl StateWrite for MemoryStorage {
-    type Error = MemoryStorageError;
-
-    type Future =
-        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
-
-    fn update_state_batch<U>(&self, updates: U) -> Self::Future
-    where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send,
-    {
-        let storage = self.clone();
-        let updates = updates.into_iter().collect::<Vec<_>>();
-        async move {
-            StateStorage::update_state_batch(&storage, updates)
-                .await
-                .map_err(|_| MemoryStorageError::WriteError)
-        }
-        .boxed()
+        async move { word_range(&storage, set_addr, key, num_words).await }.boxed()
     }
 }

@@ -5,7 +5,7 @@ use essential_types::{
 };
 use solution::Output;
 use std::{ops::Range, sync::Arc, time::Duration};
-use storage::{state_write::StateWrite, Storage};
+use storage::Storage;
 use transaction_storage::Transaction;
 
 mod deploy;
@@ -30,11 +30,9 @@ pub struct CheckSolutionOutput {
 
 impl<S> Essential<S>
 where
-    S: Storage + StateRead + StateWrite + Clone + Send + Sync + 'static,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
-    <S as StateWrite>::Future: Send,
-    <S as StateWrite>::Error: Send,
 {
     pub fn new(storage: S) -> Self {
         Self { storage }
