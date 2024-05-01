@@ -13,7 +13,7 @@ use essential_types::{
 use futures::FutureExt;
 use std::{pin::Pin, time::Duration};
 use storage::{
-    failed_solution::{FailedSolution, SolutionFailReason},
+    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
     word_range, QueryState, StateStorage, Storage,
 };
 use thiserror::Error;
@@ -588,10 +588,7 @@ impl Storage for RqliteStorage {
         }
     }
 
-    async fn get_failed_solution(
-        &self,
-        solution_hash: Hash,
-    ) -> anyhow::Result<Option<FailedSolution>> {
+    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
         todo!()
     }
 
