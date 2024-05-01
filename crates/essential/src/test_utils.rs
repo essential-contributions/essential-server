@@ -12,23 +12,11 @@ use memory_storage::MemoryStorage;
 use storage::Storage;
 use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
 
-// Empty valid intent that only has a constraint program.
-// A solution fails validation if it does not contain at least one intent with a constraint program.
-pub fn sanity_intent() -> Intent {
-    let mut intent = Intent::empty();
-    intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
-        essential_constraint_vm::asm::Stack::Push(0).into(),
-        essential_constraint_vm::asm::Pred::Not.into(),
-    ])
-    .collect()];
-    intent
-}
-
 // Empty valid solution.
 // Sign an empty valid intent and deploy it to newly created memory storage,
 // create a solution with the signed intent address.
 pub async fn sanity_solution() -> (Solution, MemoryStorage) {
-    let (intent_address, storage) = deploy_intent(sanity_intent()).await;
+    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
     let solution = solution_with_intent(intent_address);
     (solution, storage)
 }

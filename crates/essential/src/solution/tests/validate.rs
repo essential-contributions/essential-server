@@ -9,8 +9,7 @@ use crate::{
     },
     test_utils::{
         deploy_intent, deploy_partial_solution_to_storage,
-        deploy_partial_solution_with_data_to_storage, sanity_intent, sanity_solution,
-        solution_with_deps,
+        deploy_partial_solution_with_data_to_storage, sanity_solution, solution_with_deps,
     },
 };
 use essential_types::{
@@ -63,7 +62,7 @@ fn test_all_state_mutations_must_have_an_intent_in_the_set() {
 
 #[tokio::test]
 async fn test_transient_decision_variable() {
-    let mut intent = sanity_intent();
+    let mut intent = Intent::empty();
     intent.slots.decision_variables = 1;
     let (intent_address, storage) = deploy_intent(intent).await;
     let mut solution = Solution::empty();
@@ -93,6 +92,16 @@ fn test_fail_invalid_signature() {
     validate_solution(&solution).unwrap();
 }
 
+#[tokio::test]
+#[should_panic(expected = "Must be at least one solution data")]
+async fn test_fail_no_solution_data() {
+    let solution = Solution::empty();
+    let solution = sign_with_random_keypair(solution);
+    validate_solution_with_deps(&solution, &MemoryStorage::new())
+        .await
+        .unwrap();
+}
+
 #[test]
 #[should_panic(expected = "Too many solution data")]
 fn test_fail_too_many_solution_data() {
@@ -117,10 +126,10 @@ fn test_fail_too_many_decision_variables() {
     validate_solution(&solution).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Too many state mutations")]
-fn test_fail_too_many_state_mutations() {
-    let mut solution = Solution::empty();
+async fn test_fail_too_many_state_mutations() {
+    let (mut solution, _) = sanity_solution().await;
     solution.state_mutations = (0..MAX_STATE_MUTATIONS + 1)
         .map(|_| StateMutation::empty())
         .collect();
@@ -128,22 +137,22 @@ fn test_fail_too_many_state_mutations() {
     validate_solution(&solution).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "All state mutations must have an intent in the set")]
-fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
-    let mut solution = Solution::empty();
+async fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
+    let (mut solution, _) = sanity_solution().await;
     solution.state_mutations = vec![StateMutation {
-        pathway: 0,
+        pathway: 1,
         mutations: Default::default(),
     }];
     let solution = sign_with_random_keypair(solution);
     validate_solution(&solution).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Too many partial solutions")]
-fn test_fail_too_many_partial_solutions() {
-    let mut solution = Solution::empty();
+async fn test_fail_too_many_partial_solutions() {
+    let (mut solution, _) = sanity_solution().await;
     solution.partial_solutions = (0..MAX_STATE_MUTATIONS + 1)
         .map(|_| sign_with_random_keypair(ContentAddress::empty()))
         .collect();
@@ -151,10 +160,10 @@ fn test_fail_too_many_partial_solutions() {
     validate_solution(&solution).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Invalid partial solution signature")]
-fn test_fail_partial_solution_signature() {
-    let mut solution = Solution::empty();
+async fn test_fail_partial_solution_signature() {
+    let (mut solution, _) = sanity_solution().await;
     solution.partial_solutions = vec![sign_corrupted(ContentAddress::empty())];
     let solution = sign_with_random_keypair(solution);
     validate_solution(&solution).unwrap();
@@ -172,20 +181,9 @@ async fn test_fail_not_all_intents_in_set() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "At least one intent must have a constraint program")]
-async fn test_fail_at_least_one_constraint() {
-    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
-    let solution = solution_with_intent(intent_address);
-    let solution = sign_with_random_keypair(solution);
-    validate_solution_with_deps(&solution, &storage)
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
 #[should_panic(expected = "Decision variables mismatch")]
 async fn test_fail_decision_variables_mismatch() {
-    let (intent_address, storage) = deploy_intent(sanity_intent()).await;
+    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
     let mut solution = Solution::empty();
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address,
@@ -200,7 +198,7 @@ async fn test_fail_decision_variables_mismatch() {
 #[tokio::test]
 #[should_panic(expected = "Invalid transient decision variable")]
 async fn test_fail_invalid_transient_decision_variable() {
-    let mut intent = sanity_intent();
+    let mut intent = Intent::empty();
     intent.slots.decision_variables = 1;
     let (intent_address, storage) = deploy_intent(intent).await;
     let mut solution = solution_with_intent(intent_address);
@@ -255,7 +253,7 @@ async fn test_fail_partial_solution_data_must_be_in_the_set() {
 #[tokio::test]
 #[should_panic(expected = "Partial solution decision variables mismatch with solution data")]
 async fn test_fail_decision_variables_must_be_in_solution_data() {
-    let mut intent = sanity_intent();
+    let mut intent = Intent::empty();
     intent.slots.decision_variables = 1;
     let (intent_address, storage) = deploy_intent(intent).await;
     let (_, mut solution) = deploy_partial_solution_with_data_to_storage(
