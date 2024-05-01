@@ -60,9 +60,23 @@ where
             .await
         {
             Ok(output) => {
-                transaction = output.transaction;
-                valid_solutions.push((solution.to_owned(), output.utility));
-                // TODO: check composability
+                match output.transaction.updates().iter().any(|(address, keys)| {
+                    snapshot
+                        .updates()
+                        .get(address)
+                        .map(|set| !set.to_owned().is_disjoint(keys))
+                        .unwrap_or_default()
+                }) {
+                    true => {
+                        transaction = snapshot;
+                        failed_solutions
+                            .push((solution.to_owned(), SolutionFailReason::NotComposable));
+                    }
+                    false => {
+                        transaction = output.transaction;
+                        valid_solutions.push((solution.to_owned(), output.utility));
+                    }
+                }
             }
             Err(_e) => {
                 transaction = snapshot;
