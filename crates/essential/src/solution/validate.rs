@@ -32,6 +32,11 @@ pub fn validate_solution(solution: &Signed<Solution>) -> anyhow::Result<()> {
     let solution = &solution.data;
 
     // Validate solution data.
+    // Ensure that at solution has at least one solution data.
+    ensure!(
+        !solution.data.is_empty(),
+        "Must be at least one solution data"
+    );
     // Ensure that solution data length is below limit length.
     ensure!(
         solution.data.len() <= MAX_SOLUTION_DATA,
@@ -95,15 +100,6 @@ pub fn validate_intents_against_solution(
             .map(|d| &d.intent_to_solve)
             .all(|address| intents.contains_key(address)),
         "All intents must be in the set"
-    );
-
-    // Ensure that at least one intent has a non-empty constraint program.
-    ensure!(
-        data.iter().any(|d| {
-            let constraints = &intents.get(&d.intent_to_solve).unwrap().constraints;
-            !constraints.is_empty() && !constraints[0].is_empty()
-        }),
-        "At least one intent must have a constraint program"
     );
 
     // Validate decision variables.
