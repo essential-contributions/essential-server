@@ -7,6 +7,7 @@ use essential_types::{intent::Intent, solution::Solution};
 use std::sync::Arc;
 use storage::{StateStorage, Storage};
 use test_utils::{empty::Empty, solution_with_intent};
+use transaction_storage::Transaction;
 
 async fn check_solution<S>(storage: &S, solution: Arc<Solution>) -> anyhow::Result<Output<S>>
 where
@@ -16,7 +17,8 @@ where
 {
     // Read intents from storage.
     let intents = read_intents_from_storage(&solution, storage).await?;
-    check_solution_with_intents(storage, solution, &intents).await
+    let transaction = storage.clone().transaction();
+    check_solution_with_intents(transaction, solution, &intents).await
 }
 #[tokio::test]
 async fn test_check_empty_solution() {

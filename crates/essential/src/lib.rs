@@ -6,6 +6,7 @@ use essential_types::{
 use solution::Output;
 use std::{ops::Range, sync::Arc, time::Duration};
 use storage::{state_write::StateWrite, Storage};
+use transaction_storage::Transaction;
 
 mod deploy;
 mod run;
@@ -55,11 +56,12 @@ where
         solution: Signed<Solution>,
     ) -> anyhow::Result<CheckSolutionOutput> {
         let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        let transaction = self.storage.clone().transaction();
         let Output {
             transaction: _,
             utility,
             gas_used,
-        } = solution::check_solution_with_intents(&self.storage, Arc::new(solution.data), &intents)
+        } = solution::check_solution_with_intents(transaction, Arc::new(solution.data), &intents)
             .await?;
         Ok(CheckSolutionOutput {
             utility,
