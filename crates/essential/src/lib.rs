@@ -1,4 +1,3 @@
-use essential_state_read_vm::StateRead;
 use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
     StorageLayout, Word,
@@ -6,9 +5,10 @@ use essential_types::{
 use run::{Handle, Shutdown};
 use solution::Output;
 use std::{ops::Range, sync::Arc, time::Duration};
-use transaction_storage::Transaction;
 
+pub use essential_state_read_vm::StateRead;
 pub use storage::Storage;
+use transaction_storage::Transaction;
 
 mod deploy;
 mod run;
