@@ -6,7 +6,7 @@ use essential_types::{solution::Solution, Signed};
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SolutionFailReason {
     /// Constraint check failed.
-    ConstraintsFailed,
+    ConstraintsFailed(String),
     /// Not composable with other solutions to build a batch.
     NotComposable,
 }
@@ -40,7 +40,9 @@ pub struct SolutionOutcome {
 impl Display for SolutionFailReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SolutionFailReason::ConstraintsFailed => write!(f, "ConstraintsFailed"),
+            SolutionFailReason::ConstraintsFailed(reason) => {
+                write!(f, "ConstraintsFailed: {}", reason)
+            }
             SolutionFailReason::NotComposable => write!(f, "NotComposable"),
         }
     }

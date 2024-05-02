@@ -101,28 +101,18 @@ impl<S> TransactionStorage<S> {
         }
     }
 
-    /// See uncommited updates.
-    pub fn updates(
-        &self,
-    ) -> std::collections::HashMap<ContentAddress, std::collections::HashSet<Key>> {
-        self.state
-            .iter()
-            .map(|(address, m)| (address.clone(), m.iter().map(|(key, _)| *key).collect()))
-            .collect()
-    }
-
     /// Commit the transaction.
     pub async fn commit(&mut self) -> anyhow::Result<()>
     where
         S: StateStorage,
     {
-        let updates = self.state.iter().flat_map(|(address, m)| {
-            m.iter().map(move |(key, mutation)| {
+        let updates = self.state.clone().into_iter().flat_map(|(address, m)| {
+            m.into_iter().map(move |(key, mutation)| {
                 (
                     address.clone(),
-                    *key,
+                    key,
                     match mutation {
-                        Mutation::Insert(v) => Some(*v),
+                        Mutation::Insert(v) => Some(v),
                         Mutation::Delete => None,
                     },
                 )

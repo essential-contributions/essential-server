@@ -8,7 +8,7 @@ use crate::{
         },
     },
     test_utils::{
-        deploy_intent, deploy_partial_solution_to_storage,
+        counter_intent, counter_solution, deploy_intent, deploy_partial_solution_to_storage,
         deploy_partial_solution_with_data_to_storage, sanity_solution, test_solution,
     },
 };
@@ -148,6 +148,22 @@ async fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
     }];
     let solution = sign_with_random_keypair(solution);
     validate_solution(&solution).unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "Multiple mutations found for state slot")]
+async fn test_no_more_than_one_state_mutation_for_the_same_slot() {
+    let intent = counter_intent(1);
+    let (intent_address, storage) = deploy_intent(intent.clone()).await;
+    let unsigned_solution = counter_solution(intent_address.clone(), 1, 1).await;
+    let mut solution = unsigned_solution.clone();
+    solution
+        .state_mutations
+        .push(solution.state_mutations[0].clone());
+    let solution = sign_with_random_keypair(solution);
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

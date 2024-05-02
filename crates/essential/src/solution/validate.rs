@@ -137,6 +137,20 @@ pub fn validate_intents_against_solution(
         );
     }
 
+    // Ensure that there are not multiple mutations for a single state slot.
+    let mut mut_keys = HashSet::new();
+    for state_mutation in &solution.state_mutations {
+        let intent_addr = &solution.data[state_mutation.pathway as usize].intent_to_solve;
+        for mutation in &state_mutation.mutations {
+            let collision = !mut_keys.insert((intent_addr, &mutation.key));
+            ensure!(
+                !collision,
+                "Multiple mutations found for state slot {:?} of intent {intent_addr:?}",
+                mutation.key,
+            );
+        }
+    }
+
     Ok(())
 }
 
