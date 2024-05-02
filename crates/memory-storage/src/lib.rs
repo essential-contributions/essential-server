@@ -54,6 +54,7 @@ struct Inner {
     state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
 }
 
+#[derive(Debug)]
 struct IntentSet {
     storage_layout: StorageLayout,
     order: Vec<ContentAddress>,

@@ -106,13 +106,13 @@ impl<S> TransactionStorage<S> {
     where
         S: StateStorage,
     {
-        let updates = self.state.iter().flat_map(|(address, m)| {
-            m.iter().map(move |(key, mutation)| {
+        let updates = self.state.clone().into_iter().flat_map(|(address, m)| {
+            m.into_iter().map(move |(key, mutation)| {
                 (
                     address.clone(),
-                    *key,
+                    key,
                     match mutation {
-                        Mutation::Insert(v) => Some(*v),
+                        Mutation::Insert(v) => Some(v),
                         Mutation::Delete => None,
                     },
                 )
