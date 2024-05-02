@@ -3,7 +3,7 @@ use anyhow::ensure;
 use essential_types::{
     intent::Intent,
     solution::{DecisionVariable, DecisionVariableIndex, PartialSolution, Solution},
-    ContentAddress, IntentAddress, Key, Signed,
+    ContentAddress, IntentAddress, Signed,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -61,34 +61,6 @@ pub fn validate_solution(solution: &Signed<Solution>) -> anyhow::Result<()> {
             .map(|mutation| &mutation.pathway)
             .all(|pathway| solution.data.len() > *pathway as usize),
         "All state mutations must have an intent in the set"
-    );
-    // Ensure that all state mutations are for unique slots.
-    ensure!(
-        solution
-            .state_mutations
-            .iter()
-            .enumerate()
-            .all(|(index, mutations)| {
-                let keys_set = &mutations
-                    .mutations
-                    .iter()
-                    .map(|m| m.key)
-                    .collect::<HashSet<Key>>();
-                solution
-                    .state_mutations
-                    .iter()
-                    .enumerate()
-                    .filter(|(index2, mutations2)| {
-                        index != *index2 && mutations.pathway == mutations2.pathway
-                    })
-                    .all(|(_, mutations3)| {
-                        !mutations3
-                            .mutations
-                            .iter()
-                            .any(|m| keys_set.contains(&m.key))
-                    })
-            }),
-        "More than one state mutation for the same slot"
     );
 
     // Validate partial solutions.
@@ -159,6 +131,23 @@ pub fn validate_intents_against_solution(
             "Invalid transient decision variable"
         );
     }
+
+    // Ensure that all state mutations are for unique slots.
+    // TODO: Might be a more efficient way to do this.
+    let mut mutations: HashMap<_, HashSet<_>> = HashMap::new();
+    let mut collision = false;
+    'outer: for mutation in &solution.state_mutations {
+        for k in mutation.mutations.iter().map(|m| &m.key) {
+            collision = !mutations
+                .entry(&solution.data[mutation.pathway as usize].intent_to_solve)
+                .or_default()
+                .insert(k);
+            if collision {
+                break 'outer;
+            }
+        }
+    }
+    ensure!(!collision, "More than one state mutation for the same slot");
 
     Ok(())
 }

@@ -145,14 +145,16 @@ fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
 #[should_panic(expected = "More than one state mutation for the same slot")]
 async fn test_no_more_than_one_state_mutation_for_the_same_slot() {
     let intent = counter_intent(1);
-    let (intent_address, _) = deploy_intent(intent.clone()).await;
+    let (intent_address, storage) = deploy_intent(intent.clone()).await;
     let unsigned_solution = counter_solution(intent_address.clone(), 1, 1).await;
     let mut solution = unsigned_solution.clone();
     solution
         .state_mutations
         .push(solution.state_mutations[0].clone());
     let solution = sign_with_random_keypair(solution);
-    validate_solution(&solution).unwrap();
+    validate_solution_with_deps(&solution, &storage)
+        .await
+        .unwrap();
 }
 
 #[test]

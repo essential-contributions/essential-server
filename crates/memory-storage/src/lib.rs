@@ -7,10 +7,11 @@ use essential_types::{
 };
 use futures::future::FutureExt;
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
     pin::Pin,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
+    vec,
 };
 use storage::{
     failed_solution::{FailedSolution, SolutionFailReason},
@@ -42,6 +43,7 @@ struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
     intent_time_index: BTreeMap<Duration, ContentAddress>,
     solution_pool: HashMap<Hash, Signed<Solution>>,
+    solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, FailedSolution>,
     failed_solution_time_index: HashMap<Duration, Vec<Hash>>,
     partial_solution_pool: HashMap<Hash, Signed<PartialSolution>>,
@@ -154,8 +156,16 @@ impl Storage for MemoryStorage {
     }
 
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
+        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
         let hash = utils::hash(&solution.data);
-        self.inner.apply(|i| i.solution_pool.insert(hash, solution));
+        self.inner.apply(|i| {
+            if i.solution_pool.insert(hash, solution).is_none() {
+                i.solution_time_index
+                    .entry(timestamp)
+                    .or_default()
+                    .push(hash);
+            }
+        });
         Ok(())
     }
 
@@ -170,6 +180,9 @@ impl Storage for MemoryStorage {
     }
 
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
+        if solutions.is_empty() {
+            return Ok(());
+        }
         let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
         self.inner.apply(|i| {
             if i.solved.contains_key(&timestamp) {
@@ -196,9 +209,15 @@ impl Storage for MemoryStorage {
     ) -> anyhow::Result<()> {
         let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
         self.inner.apply(|i| {
+            let hashes: HashSet<_> = solutions.iter().map(|(h, _)| h).collect();
             let solutions = solutions
                 .iter()
                 .filter_map(|(h, r)| i.solution_pool.remove(h).map(|s| (*h, s, r.to_owned())));
+            for v in i.solution_time_index.values_mut() {
+                v.retain(|h| !hashes.contains(h));
+            }
+            i.solution_time_index.retain(|_, v| !v.is_empty());
+
             for (hash, solution, reason) in solutions {
                 let contains = i
                     .failed_solution_pool
@@ -326,9 +345,14 @@ impl Storage for MemoryStorage {
     }
 
     async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
-        Ok(self
-            .inner
-            .apply(|i| i.solution_pool.values().cloned().collect()))
+        Ok(self.inner.apply(|i| {
+            i.solution_time_index
+                .values()
+                .flatten()
+                .filter_map(|h| i.solution_pool.get(h))
+                .cloned()
+                .collect()
+        }))
     }
 
     async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>> {

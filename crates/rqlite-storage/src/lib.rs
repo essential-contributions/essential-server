@@ -386,6 +386,9 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[essential_types::Hash],
     ) -> anyhow::Result<()> {
+        if solutions.is_empty() {
+            return Ok(());
+        }
         // Get the time this batch was created at.
         let created_at = std::time::SystemTime::now();
         let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;

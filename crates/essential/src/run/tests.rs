@@ -72,16 +72,26 @@ async fn test_counter() {
     let solution_signature = &solution.signature;
     let mutation_key = solution.data.state_mutations[0].mutations[0].key;
 
+    let solution_clone = solution.clone();
+
     let solution2 = counter_solution(intent_address.clone(), 1, 2).await;
     let solution2 = sign_with_random_keypair(solution2.clone());
     let solution2_signature = &solution2.signature;
 
-    let solution3 = sign_with_random_keypair(unsigned_solution);
+    let solution3 = counter_solution(intent_address.clone(), 1, 3).await;
+    let solution3 = sign_with_random_keypair(solution3.clone());
     let solution3_signature = &solution3.signature;
 
+    let solution4 = counter_solution(intent_address.clone(), 1, 4).await;
+    let solution4 = sign_with_random_keypair(solution4.clone());
+    let solution4_signature = &solution4.signature;
+
     submit_solution(&storage, solution.clone()).await.unwrap();
+    submit_solution(&storage, solution_clone.clone())
+        .await
+        .unwrap();
     submit_solution(&storage, solution2.clone()).await.unwrap();
-    submit_solution(&storage, solution3.clone()).await.unwrap();
+    submit_solution(&storage, solution4.clone()).await.unwrap();
 
     let pre_state = storage
         .query_state(&intent_address.set, &mutation_key)
@@ -96,18 +106,22 @@ async fn test_counter() {
         .await
         .unwrap();
     assert!(post_state.is_some());
-    assert_eq!(post_state.unwrap(), 1);
+    assert_eq!(post_state.unwrap(), 2);
 
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].batch.solutions.len(), 1);
-    let first_solution_signature = &blocks[0].batch.solutions[0].signature;
-    assert!(
-        (first_solution_signature == solution_signature)
-            || (first_solution_signature == solution3_signature)
-    );
+    assert_eq!(blocks[0].batch.solutions.len(), 2);
+    let signatures: Vec<&essential_types::Signature> = blocks[0]
+        .batch
+        .solutions
+        .iter()
+        .map(|s| &s.signature)
+        .collect();
+    assert!(signatures.contains(&solution_signature));
+    assert!(signatures.contains(&solution2_signature));
 
-    submit_solution(&storage, solution2.clone()).await.unwrap();
+    submit_solution(&storage, solution3.clone()).await.unwrap();
+    submit_solution(&storage, solution4.clone()).await.unwrap();
 
     run(&storage).await.unwrap();
 
@@ -116,10 +130,17 @@ async fn test_counter() {
         .await
         .unwrap();
     assert!(post_state.is_some());
-    assert_eq!(post_state.unwrap(), 2);
+    assert_eq!(post_state.unwrap(), 4);
 
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[1].batch.solutions.len(), 1);
-    assert_eq!(&blocks[1].batch.solutions[0].signature, solution2_signature);
+    assert_eq!(blocks[1].batch.solutions.len(), 2);
+    let signatures: Vec<&essential_types::Signature> = blocks[1]
+        .batch
+        .solutions
+        .iter()
+        .map(|s| &s.signature)
+        .collect();
+    assert!(signatures.contains(&solution3_signature));
+    assert!(signatures.contains(&solution4_signature));
 }
