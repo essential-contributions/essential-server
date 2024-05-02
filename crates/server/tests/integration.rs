@@ -9,7 +9,7 @@ use essential_types::{
 use reqwest::Client;
 use server::run;
 use storage::{StateStorage, Storage};
-use test_utils::{empty::Empty, sign_with_random_keypair};
+use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_decision_variables};
 
 static SERVER: &str = "localhost:0";
 static CLIENT: &str = "http://localhost";
@@ -125,14 +125,29 @@ async fn test_deploy_intent_set() {
 
 #[tokio::test]
 async fn test_submit_solution() {
+    let mut intent = Intent::empty();
+    intent.slots.decision_variables = 1;
+    let intent_address = ContentAddress(utils::hash(&intent));
+    let intent_set = sign_with_random_keypair(vec![intent]);
+    let set_address = ContentAddress(utils::hash(&intent_set.data));
+
+    let mem = memory_storage::MemoryStorage::new();
+    mem.insert_intent_set(StorageLayout {}, intent_set)
+        .await
+        .unwrap();
+
     let TestServer {
         client,
         url,
         shutdown,
         jh,
-    } = setup().await;
-
-    let solution = sign_with_random_keypair(Solution::empty());
+    } = setup_with_mem(mem).await;
+    let mut solution = solution_with_decision_variables(1);
+    solution.data[0].intent_to_solve = IntentAddress {
+        set: set_address,
+        intent: intent_address,
+    };
+    let solution = sign_with_random_keypair(solution);
     let response = client
         .post(url.join("/submit-solution").unwrap())
         .json(&solution)
