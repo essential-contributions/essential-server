@@ -608,11 +608,18 @@ impl Storage for RqliteStorage {
     }
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
-        todo!()
+        let hash = encode(&solution_hash);
+        let sql = &[include_sql!("query/get_solution.sql", hash)];
+        let queries = self.query_values(sql).await?;
+        values::get_solution(queries)
     }
 
     async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()> {
-        todo!()
+        let sql = &[include_sql!(
+            "update/prune_failed.sql",
+            older_than.as_secs()
+        )];
+        self.execute(&sql[..]).await
     }
 }
 
