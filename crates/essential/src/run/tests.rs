@@ -1,10 +1,27 @@
+use std::time::Duration;
+
 use crate::{
-    run::run,
     solution::submit_solution,
     test_utils::{counter_intent, counter_solution, deploy_intent, test_solution},
 };
+use essential_state_read_vm::StateRead;
 use storage::{QueryState, Storage};
 use test_utils::sign_with_random_keypair;
+
+async fn run<S>(storage: &S) -> anyhow::Result<()>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let shutdown = super::Shutdown(rx);
+    let s = storage.clone();
+    let jh = tokio::spawn(async move { super::run(&s, shutdown).await });
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    tx.send(()).unwrap();
+    jh.await?
+}
 
 #[tokio::test]
 async fn test_run() {

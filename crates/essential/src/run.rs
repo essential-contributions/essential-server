@@ -7,6 +7,8 @@ use tokio::sync::oneshot;
 use transaction_storage::{Transaction, TransactionStorage};
 use utils::hash;
 
+const RUN_LOOP_FREQUENCY: std::time::Duration = std::time::Duration::from_secs(10);
+
 #[cfg(test)]
 pub mod tests;
 
@@ -23,40 +25,48 @@ struct Solutions {
 }
 
 /// The main loop that builds blocks.
-pub async fn run<S>(storage: &S, shutdown: Shutdown) -> anyhow::Result<()>
+pub async fn run<S>(storage: &S, mut shutdown: Shutdown) -> anyhow::Result<()>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    // Build a block.
-    let (solutions, mut transaction) = build_block(storage).await?;
+    // Run the main loop on a fixed interval.
+    // The interval is immediately ready the first time.
+    let mut interval = tokio::time::interval(RUN_LOOP_FREQUENCY);
 
-    // FIXME: These 3 database commits should be atomic. If one fails they should all fail.
-    // We don't have transactions for storage yet so that will be required to implement this.
+    loop {
+        // Either wait for the interval to tick or the shutdown signal.
+        tokio::select! {
+            _ = interval.tick() => {},
+            _ = &mut shutdown.0 => return Ok(()),
+        }
 
-    // Move failed solutions.
-    let failed_solutions: Vec<(Hash, SolutionFailReason)> = solutions
-        .failed_solutions
-        .iter()
-        .map(|(solution, reason)| (hash(solution.as_ref()), reason.clone()))
-        .collect();
-    storage.move_solutions_to_failed(&failed_solutions).await?;
+        // Build a block.
+        let (solutions, mut transaction) = build_block(storage).await?;
 
-    // Move valid solutions.
-    let solved_solutions: Vec<Hash> = solutions
-        .valid_solutions
-        .iter()
-        .map(|s| hash(s.0.as_ref()))
-        .collect();
-    storage.move_solutions_to_solved(&solved_solutions).await?;
+        // FIXME: These 3 database commits should be atomic. If one fails they should all fail.
+        // We don't have transactions for storage yet so that will be required to implement this.
 
-    // Commit the state updates transaction.
-    transaction.commit().await?;
+        // Move failed solutions.
+        let failed_solutions: Vec<(Hash, SolutionFailReason)> = solutions
+            .failed_solutions
+            .iter()
+            .map(|(solution, reason)| (hash(solution.as_ref()), reason.clone()))
+            .collect();
+        storage.move_solutions_to_failed(&failed_solutions).await?;
 
-    shutdown.0.await?;
+        // Move valid solutions.
+        let solved_solutions: Vec<Hash> = solutions
+            .valid_solutions
+            .iter()
+            .map(|s| hash(s.0.as_ref()))
+            .collect();
+        storage.move_solutions_to_solved(&solved_solutions).await?;
 
-    Ok(())
+        // Commit the state updates transaction.
+        transaction.commit().await?;
+    }
 }
 
 /// Build a block from the solutions pool.
