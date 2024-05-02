@@ -1,7 +1,7 @@
 use anyhow::ensure;
 use essential_constraint_vm::{eval_bytecode_iter, exec_bytecode_iter};
 use essential_state_read_vm::{
-    asm::Op, Access, GasLimit, SolutionAccess, StateRead, StateSlots, Vm,
+    asm::Op, Access, BytecodeMapped, GasLimit, SolutionAccess, StateRead, StateSlots, Vm,
 };
 use essential_types::{
     intent::{Directive, Intent},
@@ -122,6 +122,10 @@ where
             for (state_read_index, state_read) in intent.state_read.iter().enumerate() {
                 let state_read_index: u16 = state_read_index.try_into()?;
 
+                // Map the bytecode ops ahead of execution to share the mapping
+                // between both pre and post state slot reads.
+                let state_read_mapped = BytecodeMapped::try_from(&state_read[..])?;
+
                 // Read pre state
                 let slots = SlotsRead {
                     slots: Slots {
@@ -133,7 +137,7 @@ where
                 total_gas += read_state_for(
                     solution_access,
                     &pre_state,
-                    state_read,
+                    &state_read_mapped,
                     slots,
                     &intent.slots.state,
                     state_read_index,
@@ -151,7 +155,7 @@ where
                 total_gas += read_state_for(
                     solution_access,
                     &post_state,
-                    state_read,
+                    &state_read_mapped,
                     slots,
                     &intent.slots.state,
                     state_read_index,
@@ -200,7 +204,7 @@ where
 async fn read_state_for<S>(
     solution_access: SolutionAccess<'_>,
     storage: &S,
-    state_read: &[u8],
+    state_read: &BytecodeMapped<&[u8]>,
     mut slots: SlotsRead<'_>,
     state_slots: &[StateSlot],
     state_read_index: u16,
@@ -289,15 +293,15 @@ fn write_slots(
 /// Returns gas used by VM.
 async fn read_state<S>(
     vm: &mut Vm,
-    state_read: &[u8],
+    state_read: &BytecodeMapped<&[u8]>,
     access: Access<'_>,
     storage: &S,
 ) -> anyhow::Result<u64>
 where
     S: StateRead,
 {
-    vm.exec_bytecode_iter(
-        state_read.iter().cloned(),
+    vm.exec_bytecode(
+        state_read,
         access,
         storage,
         &|_: &Op| 1,
