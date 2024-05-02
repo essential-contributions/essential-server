@@ -108,6 +108,7 @@ impl RqliteStorage {
             include_sql!("create/eoa.sql"),
             include_sql!("create/eoa_state.sql"),
             include_sql!("create/batch.sql"),
+            include_sql!("create/failed_solutions.sql"),
         ];
         self.execute(&creates[..]).await
     }
@@ -424,7 +425,19 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[(Hash, SolutionFailReason)],
     ) -> anyhow::Result<()> {
-        todo!()
+        let sql: Vec<_> = solutions
+            .iter()
+            .flat_map(|(hash, reason)| {
+                let hash = encode(hash);
+                let reason = encode(reason);
+                [include_sql!(owned "insert/copy_to_failed.sql", reason, hash)]
+            })
+            .collect();
+
+        // TODO: Is there a way to avoid this?
+        // Maybe create an owned version of execute.
+        let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| v.as_slice()).collect();
+        self.execute(&sql[..]).await
     }
 
     async fn move_partial_solutions_to_solved(
@@ -539,7 +552,10 @@ impl Storage for RqliteStorage {
     }
 
     async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>> {
-        todo!()
+        // TODO: Maybe we want to page this?
+        let sql = &[include_sql!("query/list_failed_solutions.sql")];
+        let queries = self.query_values(sql).await?;
+        values::list_failed_solutions(queries)
     }
 
     async fn list_partial_solutions_pool(&self) -> anyhow::Result<Vec<Signed<PartialSolution>>> {

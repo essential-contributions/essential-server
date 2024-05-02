@@ -159,6 +159,69 @@ fn test_insert_solutions() {
 }
 
 #[test]
+fn test_move_solutions_to_failed() {
+    let conn = Connection::open_in_memory().unwrap();
+    create_tables(&conn);
+
+    conn.execute(
+        include_sql!("insert", "solutions_pool"),
+        ["hash1", "solution1", "signature1"],
+    )
+    .unwrap();
+
+    conn.execute(
+        include_sql!("insert", "solutions_pool"),
+        ["hash2", "solution2", "signature2"],
+    )
+    .unwrap();
+
+    move_solutions_to_failed(&conn, &[("hash1", "reason1"), ("hash2", "reason2")]);
+
+    // pool is empty
+    let result = query(
+        &conn,
+        include_sql!("query", "list_solutions_pool"),
+        [],
+        |row| {
+            (
+                row.get::<_, String>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+            )
+        },
+    );
+    assert_eq!(result, vec![]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "list_failed_solutions"),
+        [],
+        |row| {
+            (
+                row.get::<_, String>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+                row.get::<_, String>(2).unwrap(),
+            )
+        },
+    );
+
+    assert_eq!(
+        result,
+        vec![
+            (
+                "signature1".to_string(),
+                "solution1".to_string(),
+                "reason1".to_string(),
+            ),
+            (
+                "signature2".to_string(),
+                "solution2".to_string(),
+                "reason2".to_string(),
+            ),
+        ]
+    );
+}
+
+#[test]
 fn test_insert_partial_solutions() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
@@ -614,6 +677,15 @@ fn move_solutions_to_solved(conn: &Connection, batch: usize, hashes: &[String], 
     .unwrap();
     for hash in hashes {
         conn.execute(include_sql!("insert", "copy_to_solved"), [hash])
+            .unwrap();
+        conn.execute(include_sql!("update", "delete_from_solutions_pool"), [hash])
+            .unwrap();
+    }
+}
+
+fn move_solutions_to_failed(conn: &Connection, hashes_reasons: &[(&str, &str)]) {
+    for (hash, reason) in hashes_reasons {
+        conn.execute(include_sql!("insert", "copy_to_failed"), [reason, hash])
             .unwrap();
         conn.execute(include_sql!("update", "delete_from_solutions_pool"), [hash])
             .unwrap();

@@ -1,5 +1,6 @@
 use super::*;
 use crate::encode;
+use storage::failed_solution::SolutionFailReason;
 use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[test]
@@ -8,40 +9,45 @@ fn test_empty_query() {
         queries: vec![None],
     };
 
-    assert!(list_solutions::<bool>(queries).unwrap().is_empty());
+    assert!(list_failed_solutions(queries).unwrap().is_empty());
 }
 
 #[test]
 fn test_invalid_query() {
     let queries = QueryValues { queries: vec![] };
 
-    list_solutions::<bool>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![None, None],
     };
 
-    list_solutions::<bool>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 }
 
 #[test]
 fn test_valid_query() {
-    let Signed { data, signature } = sign_with_random_keypair(true);
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let reason = SolutionFailReason::ConstraintsFailed;
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
                     Value::String(encode(&signature)),
                     Value::String(encode(&data)),
+                    Value::String(encode(&reason)),
                 ],
             }],
         })],
     };
 
-    let r = list_solutions::<bool>(queries).unwrap();
-    let expected = vec![Signed {
-        data,
-        signature: signature.clone(),
+    let r = list_failed_solutions(queries).unwrap();
+    let expected = vec![FailedSolution {
+        solution: Signed {
+            data: data.clone(),
+            signature: signature.clone(),
+        },
+        reason: reason.clone(),
     }];
     assert_eq!(r, expected);
 
@@ -52,25 +58,33 @@ fn test_valid_query() {
                     columns: vec![
                         Value::String(encode(&signature)),
                         Value::String(encode(&data)),
+                        Value::String(encode(&reason)),
                     ],
                 },
                 Columns {
                     columns: vec![
                         Value::String(encode(&signature)),
                         Value::String(encode(&data)),
+                        Value::String(encode(&reason)),
                     ],
                 },
             ],
         })],
     };
 
-    let r = list_solutions::<bool>(queries).unwrap();
+    let r = list_failed_solutions(queries).unwrap();
     let expected = vec![
-        Signed {
-            data,
-            signature: signature.clone(),
+        FailedSolution {
+            solution: Signed {
+                data: data.clone(),
+                signature: signature.clone(),
+            },
+            reason: reason.clone(),
         },
-        Signed { data, signature },
+        FailedSolution {
+            solution: Signed { data, signature },
+            reason,
+        },
     ];
     assert_eq!(r, expected);
 }
@@ -79,15 +93,20 @@ fn test_valid_query() {
 fn test_invalid_data() {
     let invalid = "xxxxxxx".to_string();
     let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let reason = SolutionFailReason::ConstraintsFailed;
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
-                columns: vec![Value::String(invalid.clone()), Value::String(encode(&data))],
+                columns: vec![
+                    Value::String(invalid.clone()),
+                    Value::String(encode(&data)),
+                    Value::String(encode(&reason)),
+                ],
             }],
         })],
     };
-    list_solutions::<Solution>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
@@ -95,29 +114,64 @@ fn test_invalid_data() {
                 columns: vec![
                     Value::String(encode(&signature)),
                     Value::String(invalid.clone()),
+                    Value::String(encode(&reason)),
                 ],
             }],
         })],
     };
-    list_solutions::<Solution>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
-                columns: vec![Value::Bool(true), Value::String(encode(&data))],
+                columns: vec![
+                    Value::String(encode(&signature)),
+                    Value::String(encode(&data)),
+                    Value::String(invalid.clone()),
+                ],
             }],
         })],
     };
-    list_solutions::<Solution>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
-                columns: vec![Value::String(encode(&signature)), Value::Bool(true)],
+                columns: vec![
+                    Value::Bool(true),
+                    Value::String(encode(&data)),
+                    Value::String(encode(&reason)),
+                ],
             }],
         })],
     };
-    list_solutions::<Solution>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
+
+    let queries = QueryValues {
+        queries: vec![Some(Rows {
+            rows: vec![Columns {
+                columns: vec![
+                    Value::String(encode(&signature)),
+                    Value::Bool(true),
+                    Value::String(encode(&reason)),
+                ],
+            }],
+        })],
+    };
+    list_failed_solutions(queries).unwrap_err();
+
+    let queries = QueryValues {
+        queries: vec![Some(Rows {
+            rows: vec![Columns {
+                columns: vec![
+                    Value::String(encode(&signature)),
+                    Value::String(encode(&data)),
+                    Value::Bool(true),
+                ],
+            }],
+        })],
+    };
+    list_failed_solutions(queries).unwrap_err();
 }
 
 #[test]
@@ -130,11 +184,12 @@ fn test_wrong_num_columns() {
                     Value::String(encode(&signature)),
                     Value::String(encode(&data)),
                     Value::String(encode(&signature)),
+                    Value::String(encode(&signature)),
                 ],
             }],
         })],
     };
-    list_solutions::<Solution>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
@@ -143,7 +198,7 @@ fn test_wrong_num_columns() {
             }],
         })],
     };
-    list_solutions::<Solution>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 }
 
 #[test]
@@ -151,5 +206,5 @@ fn test_wrong_num_rows() {
     let queries = QueryValues {
         queries: vec![Some(Rows { rows: vec![] })],
     };
-    list_solutions::<Solution>(queries).unwrap_err();
+    list_failed_solutions(queries).unwrap_err();
 }
