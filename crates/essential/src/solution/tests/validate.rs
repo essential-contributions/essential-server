@@ -8,7 +8,8 @@ use crate::{
         },
     },
     test_utils::{
-        deploy_intent, deploy_partial_solution_to_storage, deploy_partial_solution_with_data_to_storage, sanity_solution, test_solution
+        deploy_intent, deploy_partial_solution_to_storage,
+        deploy_partial_solution_with_data_to_storage, sanity_solution, test_solution,
     },
 };
 use essential_types::{

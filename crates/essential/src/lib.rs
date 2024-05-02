@@ -1,14 +1,12 @@
-use anyhow::bail;
 use essential_state_read_vm::StateRead;
 use essential_types::{
     intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
     StorageLayout, Word,
 };
 use solution::Output;
-use std::{cmp::min, ops::Range, sync::Arc, time::Duration};
-use storage::{failed_solution::SolutionFailReason, Storage};
+use std::{ops::Range, sync::Arc, time::Duration};
+use storage::{failed_solution::CheckOutcome, Storage};
 use transaction_storage::Transaction;
-use utils::hash;
 
 mod deploy;
 mod run;
@@ -30,13 +28,13 @@ pub struct CheckSolutionOutput {
     pub gas: u64,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum SolutionOutcome {
     Success(u64),
-    Fail(SolutionFailReason),
+    Fail(String),
 }
 
 const PRUNE_FAILED_STORAGE_OLDER_THAN: Duration = Duration::from_secs(604800); // one week
-const MAX_BLOCKS_TO_SEARCH: usize = 100;
 
 impl<S> Essential<S>
 where
@@ -84,25 +82,15 @@ where
     pub async fn solution_outcome(
         &self,
         solution_hash: &Hash,
-        start_block: usize,
-    ) -> anyhow::Result<SolutionOutcome> {
-        if let Some(solution) = self.storage.get_failed_solution(*solution_hash).await? {
-            Ok(SolutionOutcome::Fail(solution.reason))
-        } else {
-            let blocks = self.storage.list_winning_blocks(None, None).await?;
-            let block = blocks[start_block..min(start_block + MAX_BLOCKS_TO_SEARCH, blocks.len())]
-                .iter()
-                .find(|&b| {
-                    b.batch
-                        .solutions
-                        .iter()
-                        .any(|s| &hash(&s.data) == solution_hash)
-                });
-            match block {
-                Some(block) => Ok(SolutionOutcome::Success(block.number)),
-                None => bail!("Solution does not exist"),
-            }
-        }
+    ) -> anyhow::Result<Option<SolutionOutcome>> {
+        Ok(self
+            .storage
+            .get_solution(*solution_hash)
+            .await?
+            .map(|outcome| match outcome.outcome {
+                CheckOutcome::Success(block_number) => SolutionOutcome::Success(block_number),
+                CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
+            }))
     }
 
     pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
