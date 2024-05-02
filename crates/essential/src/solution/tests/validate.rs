@@ -151,7 +151,7 @@ async fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "More than one state mutation for the same slot")]
+#[should_panic(expected = "Multiple mutations found for state slot")]
 async fn test_no_more_than_one_state_mutation_for_the_same_slot() {
     let intent = counter_intent(1);
     let (intent_address, storage) = deploy_intent(intent.clone()).await;

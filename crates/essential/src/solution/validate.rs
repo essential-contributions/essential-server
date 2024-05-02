@@ -137,22 +137,19 @@ pub fn validate_intents_against_solution(
         );
     }
 
-    // Ensure that all state mutations are for unique slots.
-    // TODO: Might be a more efficient way to do this.
-    let mut mutations: HashMap<_, HashSet<_>> = HashMap::new();
-    let mut collision = false;
-    'outer: for mutation in &solution.state_mutations {
-        for k in mutation.mutations.iter().map(|m| &m.key) {
-            collision = !mutations
-                .entry(&solution.data[mutation.pathway as usize].intent_to_solve)
-                .or_default()
-                .insert(k);
-            if collision {
-                break 'outer;
-            }
+    // Ensure that there are not multiple mutations for a single state slot.
+    let mut mut_keys = HashSet::new();
+    for state_mutation in &solution.state_mutations {
+        let intent_addr = &solution.data[state_mutation.pathway as usize].intent_to_solve;
+        for mutation in &state_mutation.mutations {
+            let collision = !mut_keys.insert((intent_addr, &mutation.key));
+            ensure!(
+                !collision,
+                "Multiple mutations found for state slot {:?} of intent {intent_addr:?}",
+                mutation.key,
+            );
         }
     }
-    ensure!(!collision, "More than one state mutation for the same slot");
 
     Ok(())
 }

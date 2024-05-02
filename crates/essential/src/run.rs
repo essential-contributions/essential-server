@@ -1,6 +1,6 @@
 use crate::solution::{check_solution_with_intents, read::read_intents_from_storage};
 use essential_state_read_vm::StateRead;
-use essential_types::solution::Solution;
+use essential_types::{solution::Solution, Hash};
 use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, Storage};
 use transaction_storage::{Transaction, TransactionStorage};
@@ -28,7 +28,7 @@ where
     // We don't have transactions for storage yet so that will be required to implement this.
 
     // Move failed solutions.
-    let failed_solutions: Vec<([u8; 32], SolutionFailReason)> = solutions
+    let failed_solutions: Vec<(Hash, SolutionFailReason)> = solutions
         .failed_solutions
         .iter()
         .map(|(solution, reason)| (hash(solution.as_ref()), reason.clone()))
@@ -36,7 +36,7 @@ where
     storage.move_solutions_to_failed(&failed_solutions).await?;
 
     // Move valid solutions.
-    let solved_solutions: Vec<[u8; 32]> = solutions
+    let solved_solutions: Vec<Hash> = solutions
         .valid_solutions
         .iter()
         .map(|s| hash(s.0.as_ref()))
@@ -78,17 +78,15 @@ where
         // Get the intents for this solution.
         let intents = read_intents_from_storage(&solution, storage).await?;
 
-        // Take a snapshot of the transaction.
-        //
         // TODO: This snapshot means all state mutations will cause clones.
         // We should add a functionality to record which snapshots mutations are part of
         // then we can just record which index this snapshot is.
         // Then we can `rollback_to(snapshot)`.
         // This would also require returning the transaction on error.
-        let snapshot = transaction.snapshot();
-
+        //
         // Check the solution.
-        match check_solution_with_intents(transaction, solution.clone(), &intents).await {
+        match check_solution_with_intents(transaction.snapshot(), solution.clone(), &intents).await
+        {
             Ok(output) => {
                 // Set update the transaction.
                 transaction = output.transaction;
@@ -97,9 +95,6 @@ where
                 valid_solutions.push((solution, output.utility));
             }
             Err(e) => {
-                // Rollback the transaction to the last snapshot.
-                transaction = snapshot;
-
                 // Collect the failed solution with the reason.
                 failed_solutions.push((
                     solution,

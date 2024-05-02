@@ -211,8 +211,8 @@ impl Storage for MemoryStorage {
         solutions: &[(Hash, SolutionFailReason)],
     ) -> anyhow::Result<()> {
         let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+        let hashes: HashSet<_> = solutions.iter().map(|(h, _)| h).collect();
         self.inner.apply(|i| {
-            let hashes: HashSet<_> = solutions.iter().map(|(h, _)| h).collect();
             let solutions = solutions
                 .iter()
                 .filter_map(|(h, r)| i.solution_pool.remove(h).map(|s| (*h, s, r.to_owned())));
