@@ -219,6 +219,20 @@ fn test_move_solutions_to_failed() {
             ),
         ]
     );
+    
+    let result = query(
+        &conn,
+        include_sql!("query", "get_solution"),
+        ["hash1"],
+        |row| {
+            (
+                row.get::<_, String>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+                row.get::<_, Option<String>>(2).unwrap(),
+            )
+        },
+    );
+    dbg!(result);
 }
 
 #[test]

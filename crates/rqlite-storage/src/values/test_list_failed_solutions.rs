@@ -28,7 +28,7 @@ fn test_invalid_query() {
 #[test]
 fn test_valid_query() {
     let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
-    let reason = SolutionFailReason::ConstraintsFailed;
+    let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
@@ -93,7 +93,7 @@ fn test_valid_query() {
 fn test_invalid_data() {
     let invalid = "xxxxxxx".to_string();
     let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
-    let reason = SolutionFailReason::ConstraintsFailed;
+    let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
