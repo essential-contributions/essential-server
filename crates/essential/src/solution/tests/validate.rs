@@ -8,9 +8,8 @@ use crate::{
         },
     },
     test_utils::{
-        counter_intent, counter_solution, deploy_empty_intent_and_get_solution, deploy_intent,
-        deploy_partial_solution_to_storage, deploy_partial_solution_with_data_to_storage,
-        test_solution,
+        counter_intent, counter_solution, deploy_intent, deploy_partial_solution_to_storage,
+        deploy_partial_solution_with_data_to_storage, sanity_solution, test_solution,
     },
 };
 use essential_types::{
@@ -22,7 +21,7 @@ use essential_types::{
     ContentAddress, IntentAddress,
 };
 use memory_storage::MemoryStorage;
-use test_utils::{empty::Empty, sign_corrupted, sign_with_random_keypair};
+use test_utils::{empty::Empty, sign_corrupted, sign_with_random_keypair, solution_with_intent};
 
 #[test]
 fn test_validate_solution() {
@@ -94,6 +93,16 @@ fn test_fail_invalid_signature() {
     validate_solution(&solution).unwrap();
 }
 
+#[tokio::test]
+#[should_panic(expected = "Must be at least one solution data")]
+async fn test_fail_no_solution_data() {
+    let solution = Solution::empty();
+    let solution = sign_with_random_keypair(solution);
+    validate_solution_with_deps(&solution, &MemoryStorage::new())
+        .await
+        .unwrap();
+}
+
 #[test]
 #[should_panic(expected = "Too many solution data")]
 fn test_fail_too_many_solution_data() {
@@ -118,10 +127,10 @@ fn test_fail_too_many_decision_variables() {
     validate_solution(&solution).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Too many state mutations")]
-fn test_fail_too_many_state_mutations() {
-    let mut solution = Solution::empty();
+async fn test_fail_too_many_state_mutations() {
+    let (mut solution, _) = sanity_solution().await;
     solution.state_mutations = (0..MAX_STATE_MUTATIONS + 1)
         .map(|_| StateMutation::empty())
         .collect();
@@ -129,12 +138,12 @@ fn test_fail_too_many_state_mutations() {
     validate_solution(&solution).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "All state mutations must have an intent in the set")]
-fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
-    let mut solution = Solution::empty();
+async fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
+    let (mut solution, _) = sanity_solution().await;
     solution.state_mutations = vec![StateMutation {
-        pathway: 0,
+        pathway: 1,
         mutations: Default::default(),
     }];
     let solution = sign_with_random_keypair(solution);
@@ -157,10 +166,10 @@ async fn test_no_more_than_one_state_mutation_for_the_same_slot() {
         .unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Too many partial solutions")]
-fn test_fail_too_many_partial_solutions() {
-    let mut solution = Solution::empty();
+async fn test_fail_too_many_partial_solutions() {
+    let (mut solution, _) = sanity_solution().await;
     solution.partial_solutions = (0..MAX_STATE_MUTATIONS + 1)
         .map(|_| sign_with_random_keypair(ContentAddress::empty()))
         .collect();
@@ -168,10 +177,10 @@ fn test_fail_too_many_partial_solutions() {
     validate_solution(&solution).unwrap();
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Invalid partial solution signature")]
-fn test_fail_partial_solution_signature() {
-    let mut solution = Solution::empty();
+async fn test_fail_partial_solution_signature() {
+    let (mut solution, _) = sanity_solution().await;
     solution.partial_solutions = vec![sign_corrupted(ContentAddress::empty())];
     let solution = sign_with_random_keypair(solution);
     validate_solution(&solution).unwrap();
@@ -180,11 +189,11 @@ fn test_fail_partial_solution_signature() {
 #[tokio::test]
 #[should_panic(expected = "All intents must be in the set")]
 async fn test_fail_not_all_intents_in_set() {
-    let (solution, intent_address, storage) = deploy_empty_intent_and_get_solution().await;
+    let (solution, storage) = sanity_solution().await;
     let mut intents = read_intents_from_storage(&solution, &storage)
         .await
         .unwrap();
-    intents.remove(&intent_address);
+    intents.remove(&solution.data[0].intent_to_solve);
     validate_intents_against_solution(&solution, &intents).unwrap();
 }
 
@@ -209,14 +218,12 @@ async fn test_fail_invalid_transient_decision_variable() {
     let mut intent = Intent::empty();
     intent.slots.decision_variables = 1;
     let (intent_address, storage) = deploy_intent(intent).await;
-    let mut solution = Solution::empty();
-    solution.data = vec![SolutionData {
-        intent_to_solve: intent_address,
-        decision_variables: vec![DecisionVariable::Transient(DecisionVariableIndex {
+    let mut solution = solution_with_intent(intent_address);
+    solution.data[0].decision_variables =
+        vec![DecisionVariable::Transient(DecisionVariableIndex {
             solution_data_index: 1,
             variable_index: Default::default(),
-        })],
-    }];
+        })];
     let solution = sign_with_random_keypair(solution);
     validate_solution_with_deps(&solution, &storage)
         .await
@@ -244,13 +251,13 @@ async fn test_fail_not_all_partial_solutions_in_set() {
 #[tokio::test]
 #[should_panic(expected = "Partial solution intent to solve mismatch with solution data")]
 async fn test_fail_partial_solution_data_must_be_in_the_set() {
-    let storage = MemoryStorage::new();
+    let (mut solution, storage) = sanity_solution().await;
     let (_, solution) = deploy_partial_solution_with_data_to_storage(
         &storage,
-        &mut Solution::empty(),
+        &mut solution,
         PartialSolutionData {
             intent_to_solve: IntentAddress::empty(),
-            decision_variables: vec![],
+            decision_variables: Default::default(),
         },
     )
     .await;
@@ -288,10 +295,10 @@ async fn test_fail_decision_variables_must_be_in_solution_data() {
 #[tokio::test]
 #[should_panic(expected = "Partial solution state mutations mismatch with solution data")]
 async fn test_fail_state_mutations_must_be_in_solution() {
-    let (mut solution, intent_address, storage) = deploy_empty_intent_and_get_solution().await;
+    let (mut solution, storage) = sanity_solution().await;
     let partial_solution = PartialSolution {
         data: vec![PartialSolutionData {
-            intent_to_solve: intent_address.clone(),
+            intent_to_solve: solution.data[0].intent_to_solve.clone(),
             decision_variables: Default::default(),
         }],
         state_mutations: vec![StateMutation::empty()],

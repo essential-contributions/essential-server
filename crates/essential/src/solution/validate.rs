@@ -32,6 +32,11 @@ pub fn validate_solution(solution: &Signed<Solution>) -> anyhow::Result<()> {
     let solution = &solution.data;
 
     // Validate solution data.
+    // Ensure that at solution has at least one solution data.
+    ensure!(
+        !solution.data.is_empty(),
+        "Must be at least one solution data"
+    );
     // Ensure that solution data length is below limit length.
     ensure!(
         solution.data.len() <= MAX_SOLUTION_DATA,

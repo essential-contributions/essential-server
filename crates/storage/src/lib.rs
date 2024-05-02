@@ -8,7 +8,7 @@ use essential_types::{
     solution::{PartialSolution, Solution},
     Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
-use failed_solution::{FailedSolution, SolutionFailReason};
+use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome};
 use std::{ops::Range, time::Duration};
 
 /// Module for failed solution struct.
@@ -108,10 +108,7 @@ pub trait Storage: StateStorage {
     ) -> anyhow::Result<Option<StorageLayout>>;
 
     /// Get failed solution and its failing reason.
-    async fn get_failed_solution(
-        &self,
-        solution_hash: Hash,
-    ) -> anyhow::Result<Option<FailedSolution>>;
+    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>>;
 
     /// Prune failed solutions that failed before the provided duration.
     async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()>;

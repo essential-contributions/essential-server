@@ -17,3 +17,12 @@ pub struct FailedSolution {
     /// Reason why the solution failed.
     pub reason: SolutionFailReason,
 }
+
+/// A solution with its outcome.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SolutionOutcome {
+    /// The solution.
+    pub solution: Signed<Solution>,
+    /// The outcome of the solution.
+    pub outcome: Option<SolutionFailReason>,
+}

@@ -14,7 +14,7 @@ use std::{
     vec,
 };
 use storage::{
-    failed_solution::{FailedSolution, SolutionFailReason},
+    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
     word_range, QueryState, StateStorage, Storage,
 };
 use thiserror::Error;
@@ -50,6 +50,7 @@ struct Inner {
     partial_solution_solved: HashMap<ContentAddress, Signed<PartialSolution>>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
+    solution_block_time_index: HashMap<Hash, Duration>,
     state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
 }
 
@@ -188,6 +189,8 @@ impl Storage for MemoryStorage {
             if i.solved.contains_key(&timestamp) {
                 bail!("Two blocks created at the same time");
             }
+            i.solution_block_time_index
+                .extend(solutions.iter().map(|h| (*h, timestamp)));
             let solutions = solutions
                 .iter()
                 .filter_map(|h| i.solution_pool.remove(h))
@@ -392,13 +395,37 @@ impl Storage for MemoryStorage {
         Ok(v)
     }
 
-    async fn get_failed_solution(
-        &self,
-        solution_hash: Hash,
-    ) -> anyhow::Result<Option<FailedSolution>> {
-        Ok(self
-            .inner
-            .apply(|i| i.failed_solution_pool.get(&solution_hash).cloned()))
+    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
+        let r = self.inner.apply(|i| {
+            i.failed_solution_pool
+                .get(&solution_hash)
+                .cloned()
+                .map(Result::Err)
+                .or_else(|| {
+                    let time = i.solution_block_time_index.get(&solution_hash)?;
+                    Some(Result::Ok(i.solved.get(time).cloned()?))
+                })
+        });
+
+        let r = match r {
+            Some(Err(failed)) => Some(SolutionOutcome {
+                solution: failed.solution,
+                outcome: Some(failed.reason),
+            }),
+            // Do this find outside the lock to save the total amount of time the lock is held.
+            Some(Ok(success)) => success
+                .batch
+                .solutions
+                .iter()
+                .find(|s| utils::hash(&s.data) == solution_hash)
+                .cloned()
+                .map(|s| SolutionOutcome {
+                    solution: s,
+                    outcome: None,
+                }),
+            None => None,
+        };
+        Ok(r)
     }
 
     async fn prune_failed_solutions(&self, older_than: Duration) -> anyhow::Result<()> {

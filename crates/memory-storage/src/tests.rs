@@ -140,12 +140,8 @@ async fn test_solutions() {
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].solution, solution4);
 
-    let result = storage
-        .get_failed_solution(solution4_hash)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(result.reason, solution4_fail_reason);
+    let result = storage.get_solution(solution4_hash).await.unwrap().unwrap();
+    assert_eq!(result.outcome.unwrap(), solution4_fail_reason);
 
     let result = storage.list_solutions_pool().await.unwrap();
     assert!(result.is_empty());
