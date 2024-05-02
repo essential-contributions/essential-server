@@ -8,6 +8,7 @@ use essential_types::{
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
+use storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcome};
 
 use crate::{decode, RESULTS_KEY};
 
@@ -15,6 +16,10 @@ use crate::{decode, RESULTS_KEY};
 mod test_get_intent_set;
 #[cfg(test)]
 mod test_get_partial_solution;
+#[cfg(test)]
+mod test_get_solution;
+#[cfg(test)]
+mod test_list_failed_solutions;
 #[cfg(test)]
 mod test_list_intent_sets;
 #[cfg(test)]
@@ -125,6 +130,51 @@ pub fn get_partial_solution(
     }))
 }
 
+pub fn get_solution(
+    QueryValues { queries }: QueryValues,
+) -> Result<Option<SolutionOutcome>, anyhow::Error> {
+    let rows = match &queries[..] {
+        [Some(Rows { rows })] => rows,
+        [None] => return Ok(None),
+        _ => bail!("expected a single query {:?}", queries),
+    };
+
+    let [Columns { columns }] = &rows[..] else {
+        bail!("expected a single row");
+    };
+
+    match &columns[..] {
+        [Value::String(solution), Value::String(signature), Value::Number(block_number), Value::Null] =>
+        {
+            let solution = decode(solution)?;
+            let signature = decode(signature)?;
+            let block_number = block_number
+                .as_u64()
+                .ok_or_else(|| anyhow::anyhow!("failed to parse block_number"))?;
+            Ok(Some(SolutionOutcome {
+                solution: Signed {
+                    data: solution,
+                    signature,
+                },
+                outcome: CheckOutcome::Success(block_number),
+            }))
+        }
+        [Value::String(solution), Value::String(signature), Value::Null, Value::String(reason)] => {
+            let solution = decode(solution)?;
+            let signature = decode(signature)?;
+            let reason = decode(reason)?;
+            Ok(Some(SolutionOutcome {
+                solution: Signed {
+                    data: solution,
+                    signature,
+                },
+                outcome: CheckOutcome::Fail(reason),
+            }))
+        }
+        _ => bail!("unexpected columns: {:?}", columns),
+    }
+}
+
 pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Vec<Intent>>> {
     // Only expecting a single query.
     let rows = match &queries[..] {
@@ -210,6 +260,50 @@ where
                 Ok(Signed {
                     data: solution,
                     signature,
+                })
+            }
+            _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
+        })
+        .collect()
+}
+
+pub fn list_failed_solutions(
+    QueryValues { queries }: QueryValues,
+) -> anyhow::Result<Vec<FailedSolution>> {
+    // Only expecting a single query.
+    let rows = match &queries[..] {
+        [Some(Rows { rows })] => rows,
+        [None] => return Ok(Vec::with_capacity(0)),
+        _ => bail!("expected a single query {:?}", queries),
+    };
+
+    // If the query isn't empty there should be at least one row.
+    if rows.is_empty() {
+        bail!("expected at least one row")
+    }
+
+    // Decode signature and solution from each row.
+    rows.iter()
+        .map(|Columns { columns }| match &columns[..] {
+            [signature, solution, reason] => {
+                let signature = match signature {
+                    serde_json::Value::String(signature) => decode(signature)?,
+                    _ => bail!("unexpected column type {:?} for signature", signature),
+                };
+                let solution = match solution {
+                    serde_json::Value::String(solution) => decode(solution)?,
+                    _ => bail!("unexpected column type {:?} for solution", solution),
+                };
+                let reason = match reason {
+                    serde_json::Value::String(reason) => decode(reason)?,
+                    _ => bail!("unexpected column type {:?} for reason", reason),
+                };
+                Ok(FailedSolution {
+                    solution: Signed {
+                        data: solution,
+                        signature,
+                    },
+                    reason,
                 })
             }
             _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),

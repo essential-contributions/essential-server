@@ -134,7 +134,7 @@ fn test_wrong_num_columns() {
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_solutions::<Solution>(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
@@ -143,7 +143,7 @@ fn test_wrong_num_columns() {
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_solutions::<Solution>(queries).unwrap_err();
 }
 
 #[test]
@@ -151,5 +151,5 @@ fn test_wrong_num_rows() {
     let queries = QueryValues {
         queries: vec![Some(Rows { rows: vec![] })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_solutions::<Solution>(queries).unwrap_err();
 }

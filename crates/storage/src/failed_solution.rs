@@ -1,9 +1,10 @@
 use std::fmt::Display;
 
 use essential_types::{solution::Solution, Signed};
+use serde::{Deserialize, Serialize};
 
 /// Reasons why a solution failed.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SolutionFailReason {
     /// Constraint check failed.
     ConstraintsFailed(String),
