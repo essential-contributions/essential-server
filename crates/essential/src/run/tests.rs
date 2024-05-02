@@ -1,5 +1,6 @@
 use crate::{
     run::run,
+    solution::submit_solution,
     test_utils::{counter_intent, counter_solution, deploy_intent, test_solution},
 };
 use storage::{QueryState, Storage};
@@ -18,7 +19,7 @@ async fn test_run() {
         .set
         .clone();
 
-    storage.insert_solution_into_pool(solution).await.unwrap();
+    submit_solution(&storage, solution).await.unwrap();
 
     let pre_state = storage
         .query_state(&mutation_address, &mutation_key)
@@ -46,8 +47,8 @@ async fn test_run() {
     let solution3 = sign_with_random_keypair(solution3);
     let solution3_signature = solution3.signature.clone();
 
-    storage.insert_solution_into_pool(solution2).await.unwrap();
-    storage.insert_solution_into_pool(solution3).await.unwrap();
+    submit_solution(&storage, solution2).await.unwrap();
+    submit_solution(&storage, solution3).await.unwrap();
 
     run(&storage).await.unwrap();
 
@@ -68,22 +69,19 @@ async fn test_counter() {
 
     let unsigned_solution = counter_solution(intent_address.clone(), 1, 1).await;
     let solution = sign_with_random_keypair(unsigned_solution.clone());
-    let solution_signature = solution.signature.clone();
+    let solution_signature = &solution.signature;
     let mutation_key = solution.data.state_mutations[0].mutations[0].key;
 
     let solution2 = counter_solution(intent_address.clone(), 1, 2).await;
     let solution2 = sign_with_random_keypair(solution2.clone());
-    let solution2_signature = solution2.signature.clone();
+    let solution2_signature = &solution2.signature;
 
     let solution3 = sign_with_random_keypair(unsigned_solution);
-    let solution3_signature = solution3.signature.clone();
+    let solution3_signature = &solution3.signature;
 
-    storage.insert_solution_into_pool(solution).await.unwrap();
-    storage
-        .insert_solution_into_pool(solution2.clone())
-        .await
-        .unwrap();
-    storage.insert_solution_into_pool(solution3).await.unwrap();
+    submit_solution(&storage, solution.clone()).await.unwrap();
+    submit_solution(&storage, solution2.clone()).await.unwrap();
+    submit_solution(&storage, solution3.clone()).await.unwrap();
 
     let pre_state = storage
         .query_state(&intent_address.set, &mutation_key)
@@ -103,19 +101,13 @@ async fn test_counter() {
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].batch.solutions.len(), 1);
+    let first_solution_signature = &blocks[0].batch.solutions[0].signature;
     assert!(
-        (blocks[0].batch.solutions[0].signature == solution_signature)
-            || (blocks[0].batch.solutions[0].signature == solution3_signature)
+        (first_solution_signature == solution_signature)
+            || (first_solution_signature == solution3_signature)
     );
 
-    storage.insert_solution_into_pool(solution2).await.unwrap();
-
-    let pre_state = storage
-        .query_state(&intent_address.set, &mutation_key)
-        .await
-        .unwrap();
-    assert!(pre_state.is_some());
-    assert_eq!(post_state.unwrap(), 1);
+    submit_solution(&storage, solution2.clone()).await.unwrap();
 
     run(&storage).await.unwrap();
 
@@ -129,5 +121,5 @@ async fn test_counter() {
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[1].batch.solutions.len(), 1);
-    assert_eq!(blocks[1].batch.solutions[0].signature, solution2_signature);
+    assert_eq!(&blocks[1].batch.solutions[0].signature, solution2_signature);
 }

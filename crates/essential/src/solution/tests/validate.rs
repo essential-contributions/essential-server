@@ -8,8 +8,9 @@ use crate::{
         },
     },
     test_utils::{
-        deploy_empty_intent_and_get_solution, deploy_intent, deploy_partial_solution_to_storage,
-        deploy_partial_solution_with_data_to_storage, test_solution,
+        counter_intent, counter_solution, deploy_empty_intent_and_get_solution, deploy_intent,
+        deploy_partial_solution_to_storage, deploy_partial_solution_with_data_to_storage,
+        test_solution,
     },
 };
 use essential_types::{
@@ -136,6 +137,20 @@ fn test_fail_all_state_mutations_must_have_an_intent_in_the_set() {
         pathway: 0,
         mutations: Default::default(),
     }];
+    let solution = sign_with_random_keypair(solution);
+    validate_solution(&solution).unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "More than one state mutation for the same slot")]
+async fn test_no_more_than_one_state_mutation_for_the_same_slot() {
+    let intent = counter_intent(1);
+    let (intent_address, _) = deploy_intent(intent.clone()).await;
+    let unsigned_solution = counter_solution(intent_address.clone(), 1, 1).await;
+    let mut solution = unsigned_solution.clone();
+    solution
+        .state_mutations
+        .push(solution.state_mutations[0].clone());
     let solution = sign_with_random_keypair(solution);
     validate_solution(&solution).unwrap();
 }
