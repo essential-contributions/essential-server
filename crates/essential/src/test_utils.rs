@@ -12,26 +12,19 @@ use memory_storage::MemoryStorage;
 use storage::Storage;
 use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
 
+// Empty valid solution.
+// Sign an empty valid intent and deploy it to newly created memory storage,
+// create a solution with the signed intent address.
+pub async fn sanity_solution() -> (Solution, MemoryStorage) {
+    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
+    let solution = solution_with_intent(intent_address);
+    (solution, storage)
+}
+
 // Sign and deploy given intent to newly created memory storage.
 pub async fn deploy_intent(intent: Intent) -> (IntentAddress, MemoryStorage) {
     let storage = MemoryStorage::default();
     (deploy_intent_to_storage(&storage, intent).await, storage)
-}
-
-// Sign and deploy empty intent to newly created memory storage.
-pub async fn deploy_empty_intent() -> (IntentAddress, MemoryStorage) {
-    deploy_intent(Intent::empty()).await
-}
-
-// Sign an empty intent and deploy it to newly created memory storage,
-// create a solution with the signed intent address.
-pub async fn deploy_empty_intent_and_get_solution() -> (Solution, IntentAddress, MemoryStorage) {
-    let (intent_address, storage) = deploy_empty_intent().await;
-    let mut solution = Solution::empty();
-    let mut solution_data = SolutionData::empty();
-    solution_data.intent_to_solve = intent_address.clone();
-    solution.data.push(solution_data);
-    (solution, intent_address, storage)
 }
 
 // Create a partial solution with given data,
@@ -76,13 +69,6 @@ pub async fn deploy_partial_solution_to_storage<S: Storage>(
         .await
         .unwrap();
     ContentAddress(utils::hash(&partial_solution.data))
-}
-
-// Empty solution with empty intent.
-pub async fn sanity_solution() -> (Solution, MemoryStorage) {
-    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
-    let solution = solution_with_intent(intent_address);
-    (solution, storage)
 }
 
 // Solution that satisfies an intent with state read and constraint programs.
