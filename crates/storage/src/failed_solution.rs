@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use essential_types::{solution::Solution, Signed};
 
 /// Reasons why a solution failed.
@@ -18,11 +20,30 @@ pub struct FailedSolution {
     pub reason: SolutionFailReason,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+/// Outcome of a solution check.
+pub enum CheckOutcome {
+    /// The solution was successful in this block.
+    Success(u64),
+    /// The solution failed.
+    Fail(SolutionFailReason),
+}
 /// A solution with its outcome.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SolutionOutcome {
     /// The solution.
     pub solution: Signed<Solution>,
     /// The outcome of the solution.
-    pub outcome: Option<SolutionFailReason>,
+    pub outcome: CheckOutcome,
+}
+
+impl Display for SolutionFailReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SolutionFailReason::ConstraintsFailed(reason) => {
+                write!(f, "ConstraintsFailed: {}", reason)
+            }
+            SolutionFailReason::NotComposable => write!(f, "NotComposable"),
+        }
+    }
 }

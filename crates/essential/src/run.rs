@@ -1,4 +1,7 @@
-use crate::solution::{check_solution_with_intents, read::read_intents_from_storage};
+use crate::{
+    solution::{check_solution_with_intents, read::read_intents_from_storage},
+    PRUNE_FAILED_STORAGE_OLDER_THAN,
+};
 use essential_state_read_vm::StateRead;
 use essential_types::{solution::Solution, Hash};
 use std::sync::Arc;
@@ -66,6 +69,10 @@ where
 
         // Commit the state updates transaction.
         transaction.commit().await?;
+
+        let _result = storage
+            .prune_failed_solutions(PRUNE_FAILED_STORAGE_OLDER_THAN)
+            .await;
     }
 }
 

@@ -14,7 +14,7 @@ use std::{
     vec,
 };
 use storage::{
-    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
+    failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcome},
     word_range, QueryState, StateStorage, Storage,
 };
 use thiserror::Error;
@@ -411,7 +411,7 @@ impl Storage for MemoryStorage {
         let r = match r {
             Some(Err(failed)) => Some(SolutionOutcome {
                 solution: failed.solution,
-                outcome: Some(failed.reason),
+                outcome: CheckOutcome::Fail(failed.reason),
             }),
             // Do this find outside the lock to save the total amount of time the lock is held.
             Some(Ok(success)) => success
@@ -422,7 +422,7 @@ impl Storage for MemoryStorage {
                 .cloned()
                 .map(|s| SolutionOutcome {
                     solution: s,
-                    outcome: None,
+                    outcome: CheckOutcome::Success(success.number),
                 }),
             None => None,
         };
