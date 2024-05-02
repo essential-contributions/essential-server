@@ -1,6 +1,6 @@
 use crate::{
     solution::{check_solution_with_intents, read::read_intents_from_storage, Output},
-    test_utils::{deploy_intent, sanity_solution, solution_with_deps},
+    test_utils::{deploy_intent, sanity_solution, test_solution},
 };
 use essential_state_read_vm::StateRead;
 use essential_types::{intent::Intent, solution::Solution};
@@ -30,7 +30,7 @@ async fn test_check_empty_solution() {
 
 #[tokio::test]
 async fn test_check_solution_with_deps() {
-    let (solution, storage) = solution_with_deps().await;
+    let (solution, storage) = test_solution(None, 1).await;
     let result = check_solution(&storage, Arc::new(solution)).await.unwrap();
     assert_eq!(result.utility, 1.0);
 }

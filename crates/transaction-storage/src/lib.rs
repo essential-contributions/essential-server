@@ -90,6 +90,17 @@ impl<S> TransactionStorage<S> {
         }))
     }
 
+    /// Take a snapshow of this transaction.
+    pub fn snapshot(&self) -> Self
+    where
+        S: Clone,
+    {
+        Self {
+            state: self.state.clone(),
+            storage: self.storage.clone(),
+        }
+    }
+
     /// Commit the transaction.
     pub async fn commit(&mut self) -> anyhow::Result<()>
     where

@@ -16,10 +16,10 @@ use transaction_storage::TransactionStorage;
 
 pub use validate::validate_solution_with_deps;
 
-mod read;
+pub(crate) mod read;
 #[cfg(test)]
 mod tests;
-mod validate;
+pub(crate) mod validate;
 
 pub struct Output<S: StateStorage> {
     pub transaction: TransactionStorage<S>,
@@ -56,10 +56,10 @@ where
     }
 }
 
-/// Checks a solution against state read VM and constraint VM.
+/// Checks constraints of a solution.
 ///
-/// For each state read program of intents in each solution data, applies state mutations
-/// and then check constraints on pre-mutation and post-mutation state.
+/// Simulates state mutations proposed by the solution and performs constraint checks
+/// over pre-mutation and post-mutation state.
 ///
 /// Unlike `check_solution`, this function takes a set of intents to check against.
 /// This is useful when intents have already been read from storage, e.g. during solution validation.
