@@ -12,10 +12,12 @@ use axum::{
     Json, Router,
 };
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-use essential_server::{Essential, StateRead, Storage};
+use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_types::{
-    convert::word_4_from_u8_32, intent::Intent, solution::Solution, Block, ContentAddress, Hash,
-    IntentAddress, Signed, Word,
+    convert::word_4_from_u8_32,
+    intent::Intent,
+    solution::{PartialSolution, Solution},
+    Block, ContentAddress, Hash, IntentAddress, Signed, Word,
 };
 use serde::Deserialize;
 use tokio::{
@@ -37,6 +39,13 @@ struct TimeRange {
 struct Page {
     /// The page number to start from.
     page: u64,
+}
+
+#[derive(Deserialize)]
+struct CheckSolution {
+    solution: Signed<Solution>,
+    partial_solutions: Vec<PartialSolution>,
+    intents: Vec<Intent>,
 }
 
 /// Run the server.
@@ -70,6 +79,9 @@ where
         .route("/list-solutions-pool", get(list_solutions_pool))
         .route("/query-state/:address/:key", get(query_state))
         .route("/list-winning-blocks", get(list_winning_blocks))
+        .route("/solution-outcome/:hash", get(solution_outcome))
+        .route("/check-solution", post(check_solution))
+        .route("/check-solution-with-data", post(check_solution_with_data))
         .with_state(essential.clone());
 
     // Bind to the address.
@@ -265,6 +277,62 @@ where
 
     let state = essential.query_state(&address, &key).await?;
     Ok(Json(state))
+}
+
+/// The solution outcome get endpoint.
+///
+/// Takes a solution hash as a path parameter.
+///
+/// The solution hash is a 32 byte array encoded as base64.
+async fn solution_outcome<S>(
+    State(essential): State<Essential<S>>,
+    Path(hash): Path<String>,
+) -> Result<Json<Option<SolutionOutcome>>, Error>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let hash: Hash = URL_SAFE
+        .decode(hash)?
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Hash is wrong size"))?;
+    let outcome = essential.solution_outcome(&hash).await?;
+    Ok(Json(outcome))
+}
+
+/// The check solution post endpoint.
+///
+/// Takes a signed solution as a json payload.
+async fn check_solution<S>(
+    State(essential): State<Essential<S>>,
+    Json(payload): Json<Signed<Solution>>,
+) -> Result<Json<CheckSolutionOutput>, Error>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let outcome = essential.check_solution(payload).await?;
+    Ok(Json(outcome))
+}
+
+/// The check solution with data post endpoint.
+///
+/// Takes a signed solution, a list of partial solutions, and a list of intents as a json payload.
+async fn check_solution_with_data<S>(
+    State(essential): State<Essential<S>>,
+    Json(payload): Json<CheckSolution>,
+) -> Result<Json<CheckSolutionOutput>, Error>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let outcome = essential
+        .check_solution_with_data(payload.solution, payload.partial_solutions, payload.intents)
+        .await?;
+    Ok(Json(outcome))
 }
 
 /// Shutdown the server manually or on ctrl-c.

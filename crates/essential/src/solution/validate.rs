@@ -157,7 +157,7 @@ pub fn validate_intents_against_solution(
 /// Validate partial solutions retrieved from storage against solution.
 pub fn validate_partial_solutions_against_solution(
     solution: &Solution,
-    partial_solutions: &HashMap<ContentAddress, PartialSolution>,
+    partial_solutions: &HashMap<ContentAddress, Arc<PartialSolution>>,
 ) -> anyhow::Result<()> {
     // Ensure that all partial solutions in the solution have been read from the storage.
     ensure!(
@@ -177,13 +177,10 @@ pub fn validate_partial_solutions_against_solution(
     let state_mutations: HashSet<_> = solution.state_mutations.iter().collect();
 
     // Validate partial solution data.
-    for (
-        _,
-        PartialSolution {
-            data: partial_data,
-            state_mutations: partial_state_mutations,
-        },
-    ) in partial_solutions.iter()
+    for PartialSolution {
+        data: partial_data,
+        state_mutations: partial_state_mutations,
+    } in partial_solutions.iter().map(|(_, ps)| ps.as_ref())
     {
         for pd in partial_data.iter() {
             // Ensure that intent solved by partial solution matches the one is in solution data.
@@ -242,4 +239,20 @@ where
         &read_partial_solutions_from_storage(solution, storage).await?,
     )?;
     Ok(intents)
+}
+
+/// Validate solution fully, with intents and partial solutions from storage.
+pub fn validate_solution_with_data(
+    solution: &Signed<Solution>,
+    partial_solutions: &HashMap<ContentAddress, Arc<PartialSolution>>,
+    intents: &HashMap<IntentAddress, Arc<Intent>>,
+) -> anyhow::Result<()> {
+    // Pre-storage read validations.
+    validate_solution(solution)?;
+    let solution = &solution.data;
+    // Validation of intents being read from storage.
+    validate_intents_against_solution(solution, intents)?;
+    // Validation of partial solutions being read from storage.
+    validate_partial_solutions_against_solution(solution, partial_solutions)?;
+    Ok(())
 }

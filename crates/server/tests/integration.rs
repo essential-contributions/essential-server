@@ -2,9 +2,12 @@ use std::{time::Duration, vec};
 
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use essential_rest_server as server;
+use essential_server::{CheckSolutionOutput, SolutionOutcome};
 use essential_types::{
-    convert::u8_32_from_word_4, intent::Intent, solution::Solution, Block, ContentAddress,
-    IntentAddress, Signed, StorageLayout, Word,
+    convert::u8_32_from_word_4,
+    intent::Intent,
+    solution::{PartialSolution, Solution, SolutionData},
+    Block, ContentAddress, IntentAddress, Signed, StorageLayout, Word,
 };
 use reqwest::Client;
 use server::run;
@@ -232,6 +235,146 @@ async fn test_list_winning_blocks() {
     let blocks = response.json::<Vec<Block>>().await.unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(utils::hash(&blocks[0].batch.solutions[0].data), hash);
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn test_solution_outcome() {
+    let solution = sign_with_random_keypair(Solution::empty());
+    let hash = utils::hash(&solution.data);
+
+    let mem = memory_storage::MemoryStorage::new();
+    mem.insert_solution_into_pool(solution).await.unwrap();
+    mem.move_solutions_to_solved(&[hash]).await.unwrap();
+
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup_with_mem(mem).await;
+
+    let a = url
+        .join(&format!("/solution-outcome/{}", URL_SAFE.encode(hash),))
+        .unwrap();
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let value = response
+        .json::<Option<SolutionOutcome>>()
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(value, SolutionOutcome::Success(0));
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn test_check_solution() {
+    let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
+    let mem = memory_storage::MemoryStorage::new();
+    mem.insert_intent_set(StorageLayout {}, intent_set.clone())
+        .await
+        .unwrap();
+
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup_with_mem(mem).await;
+
+    let set = ContentAddress(utils::hash(&intent_set.data));
+    let address = ContentAddress(utils::hash(&intent_set.data[0]));
+    let mut solution = Solution::empty();
+    solution.data.push(SolutionData {
+        intent_to_solve: IntentAddress {
+            set,
+            intent: address,
+        },
+        decision_variables: vec![],
+    });
+    let solution = sign_with_random_keypair(solution);
+    let response = client
+        .post(url.join("/check-solution").unwrap())
+        .json(&solution)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let value = response
+        .json::<Option<CheckSolutionOutput>>()
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        value,
+        CheckSolutionOutput {
+            utility: 1.0,
+            gas: 0
+        }
+    );
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn test_check_solution_with_data() {
+    #[derive(serde::Serialize)]
+    struct CheckSolution {
+        solution: Signed<Solution>,
+        partial_solutions: Vec<PartialSolution>,
+        intents: Vec<Intent>,
+    }
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup().await;
+
+    let intent_set = vec![Intent::empty()];
+    let set = ContentAddress(utils::hash(&intent_set));
+    let address = ContentAddress(utils::hash(&intent_set[0]));
+    let mut solution = Solution::empty();
+    solution.data.push(SolutionData {
+        intent_to_solve: IntentAddress {
+            set,
+            intent: address,
+        },
+        decision_variables: vec![],
+    });
+    let input = CheckSolution {
+        solution: sign_with_random_keypair(solution),
+        partial_solutions: vec![],
+        intents: intent_set,
+    };
+    let response = client
+        .post(url.join("/check-solution-with-data").unwrap())
+        .json(&input)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    let value = response
+        .json::<Option<CheckSolutionOutput>>()
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        value,
+        CheckSolutionOutput {
+            utility: 1.0,
+            gas: 0
+        }
+    );
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();

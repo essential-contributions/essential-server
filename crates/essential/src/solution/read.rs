@@ -31,15 +31,15 @@ where
 pub async fn read_partial_solutions_from_storage<S>(
     solution: &Solution,
     storage: &S,
-) -> anyhow::Result<HashMap<ContentAddress, PartialSolution>>
+) -> anyhow::Result<HashMap<ContentAddress, Arc<PartialSolution>>>
 where
     S: Storage,
 {
-    let mut partial_solutions: HashMap<ContentAddress, PartialSolution> = HashMap::new();
+    let mut partial_solutions: HashMap<_, _> = HashMap::new();
     for ps_address in &solution.partial_solutions {
         if let Ok(Some(ps)) = storage.get_partial_solution(&ps_address.data).await {
             ensure!(verify(&ps));
-            partial_solutions.insert(ps_address.data.clone(), ps.data);
+            partial_solutions.insert(ps_address.data.clone(), Arc::new(ps.data));
         } else {
             anyhow::bail!("Failed to retrieve partial solution from storage");
         }
