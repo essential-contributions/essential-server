@@ -100,3 +100,58 @@ Returns: `Vec<Block>` as JSON
 ```bash
 curl -X GET -H "Content-Type: application/json" "http://localhost:59498/list-winning-blocks?start=0&end=1&page=0"
 ```
+### GET `/solution-outcome/:hash`
+Parameters: 
+- `:hash` = `[u8; 32]` as base64 string. This is the hash of the solution.
+
+Returns: `Option<SolutionOutcome>` as JSON
+```rust
+pub enum SolutionOutcome {
+    Success(u64),
+    Fail(String),
+}
+```
+
+**Example:**
+```bash
+curl -X GET -H "Content-Type: application/json" "http://localhost:59498/solution-outcome/NsFZ12tS4D5JY2NgfFlAIn9i9OBI3zRLBQFZvJe7o9c="
+```
+### Post `/check-solution`
+Check a solution against deployed intents without changing state.\
+This is a dry run of the solution.\
+Body: `Signed<Solution>` as JSON \
+Returns: `CheckSolutionOutput` as JSON
+```rust
+pub struct CheckSolutionOutput {
+    pub utility: f64,
+    pub gas: u64,
+}
+```
+
+**Example:**
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[],"partial_solutions":[]},"signature":[[]]}' http://localhost:59498/check-solution
+```
+### Post `/check-solution-with-data`
+Check a solution with all partial solutions and intents without changing state.\
+This is a dry run of the solution.\
+Body: `CheckSolution` as JSON \
+```rust
+struct CheckSolution {
+    solution: Signed<Solution>,
+    partial_solutions: Vec<PartialSolution>,
+    intents: Vec<Intent>,
+}
+```
+Returns: `CheckSolutionOutput` as JSON
+```rust
+pub struct CheckSolutionOutput {
+    pub utility: f64,
+    pub gas: u64,
+}
+```
+
+**Example:**
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"solution": {"data":{"data":[],"state_mutations":[],"partial_solutions":[]},"signature":[[]]}, "partial_solutions: [], intents: [{"slots":{"decision_variables":0,"state":[]},"state_read":[],"constraints":[],"directive":"Satisfy"}]}' http://localhost:59498/check-solution-with-data
+```

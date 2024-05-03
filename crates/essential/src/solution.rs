@@ -14,6 +14,7 @@ use storage::{StateStorage, Storage};
 use tokio::task::JoinSet;
 use transaction_storage::TransactionStorage;
 
+pub use validate::validate_solution_with_data;
 pub use validate::validate_solution_with_deps;
 
 pub(crate) mod read;

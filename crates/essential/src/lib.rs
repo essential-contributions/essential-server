@@ -1,10 +1,11 @@
 use essential_types::{
-    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
-    StorageLayout, Word,
+    intent::Intent,
+    solution::{PartialSolution, Solution},
+    Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
 use run::{Handle, Shutdown};
 use solution::Output;
-use std::{ops::Range, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 use storage::failed_solution::CheckOutcome;
 
 pub use essential_state_read_vm::StateRead;
@@ -75,6 +76,50 @@ where
         solution: Signed<Solution>,
     ) -> anyhow::Result<CheckSolutionOutput> {
         let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        let transaction = self.storage.clone().transaction();
+        let Output {
+            transaction: _,
+            utility,
+            gas_used,
+        } = solution::check_solution_with_intents(transaction, Arc::new(solution.data), &intents)
+            .await?;
+        Ok(CheckSolutionOutput {
+            utility,
+            gas: gas_used,
+        })
+    }
+
+    pub async fn check_solution_with_data(
+        &self,
+        solution: Signed<Solution>,
+        partial_solutions: Vec<PartialSolution>,
+        intents: Vec<Intent>,
+    ) -> anyhow::Result<CheckSolutionOutput> {
+        let set = ContentAddress(utils::hash(&intents));
+        let partial_solutions = partial_solutions
+            .into_iter()
+            .map(|partial_solution| {
+                (
+                    ContentAddress(utils::hash(&partial_solution)),
+                    Arc::new(partial_solution),
+                )
+            })
+            .collect();
+        let intents: HashMap<_, _> = intents
+            .into_iter()
+            .map(|intent| {
+                (
+                    IntentAddress {
+                        set: set.clone(),
+                        intent: ContentAddress(utils::hash(&intent)),
+                    },
+                    Arc::new(intent),
+                )
+            })
+            .collect();
+
+        solution::validate_solution_with_data(&solution, &partial_solutions, &intents)?;
+
         let transaction = self.storage.clone().transaction();
         let Output {
             transaction: _,
