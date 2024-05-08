@@ -1,9 +1,7 @@
-use crate::{
-    solution::{check_solution_with_intents, read::read_intents_from_storage},
-    PRUNE_FAILED_STORAGE_OLDER_THAN,
-};
+use crate::{solution::read::read_intents_from_storage, PRUNE_FAILED_STORAGE_OLDER_THAN};
+use essential_check as check;
 use essential_state_read_vm::StateRead;
-use essential_types::{solution::Solution, Hash};
+use essential_types::{solution::Solution, Hash, IntentAddress};
 use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, Storage};
 use tokio::sync::oneshot;
@@ -112,14 +110,20 @@ where
         // This would also require returning the transaction on error.
         //
         // Check the solution.
-        match check_solution_with_intents(transaction.snapshot(), solution.clone(), &intents).await
+        let mut post_state = transaction.clone();
+        crate::apply_mutations(&mut post_state, &solution)?;
+        let pre = transaction.view();
+        let post = post_state.view();
+        let get_intent = |addr: &IntentAddress| intents[addr].clone();
+        let config = Default::default();
+        match check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config)
+            .await
         {
-            Ok(output) => {
-                // Set update the transaction.
-                transaction = output.transaction;
-
+            Ok((util, _gas)) => {
+                // Update the transaction to the post state.
+                transaction = post_state;
                 // Collect the valid solution.
-                valid_solutions.push((solution, output.utility));
+                valid_solutions.push((solution, util));
             }
             Err(e) => {
                 // Collect the failed solution with the reason.
