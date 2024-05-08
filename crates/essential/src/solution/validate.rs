@@ -114,7 +114,7 @@ pub fn validate_solution_with_data(
     check::solution::check_signed(solution)?;
 
     // Validate what we can of the solution's intents without execution.
-    contains_all_intents(&solution.data, &intents)?;
+    contains_all_intents(&solution.data, intents)?;
     check::solution::check_decision_variable_lengths(&solution.data, |addr| intents[addr].clone())
         .map_err(|(ix, err)| anyhow::anyhow!("solution data at {ix} invalid: {err}"))?;
 
