@@ -1,8 +1,7 @@
 use essential_types::{solution::Solution, Hash, Signed};
 use storage::Storage;
 
-pub use validate::validate_solution_with_data;
-pub use validate::validate_solution_with_deps;
+pub use validate::{validate_solution_with_data, validate_solution_with_deps};
 
 pub(crate) mod read;
 #[cfg(test)]

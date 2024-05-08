@@ -90,6 +90,9 @@ where
 
     // Validation of intents being read from storage.
     let intents = read_intents_from_storage(&solution.data, storage).await?;
+
+    // Validate what we can of the solution's intents without execution.
+    contains_all_intents(&solution.data, &intents)?;
     check::solution::check_decision_variable_lengths(&solution.data, |addr| intents[addr].clone())
         .map_err(|(ix, err)| anyhow::anyhow!("solution data at {ix} invalid: {err}"))?;
 
@@ -110,7 +113,8 @@ pub fn validate_solution_with_data(
     // Pre-storage read validations.
     check::solution::check_signed(solution)?;
 
-    // Validation of intents being read from storage.
+    // Validate what we can of the solution's intents without execution.
+    contains_all_intents(&solution.data, &intents)?;
     check::solution::check_decision_variable_lengths(&solution.data, |addr| intents[addr].clone())
         .map_err(|(ix, err)| anyhow::anyhow!("solution data at {ix} invalid: {err}"))?;
 
@@ -118,5 +122,20 @@ pub fn validate_solution_with_data(
     // TODO: Do this in `essential-check`.
     validate_partial_solutions_against_solution(&solution.data, partial_solutions)?;
 
+    Ok(())
+}
+
+/// Ensure that all intents referred to by the solution have been read from the storage.
+pub fn contains_all_intents(
+    solution: &Solution,
+    intents: &HashMap<IntentAddress, Arc<Intent>>,
+) -> anyhow::Result<()> {
+    ensure!(
+        solution
+            .data
+            .iter()
+            .all(|data| intents.contains_key(&data.intent_to_solve)),
+        "All intents must be in the set"
+    );
     Ok(())
 }
