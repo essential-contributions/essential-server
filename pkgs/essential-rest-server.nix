@@ -3,6 +3,8 @@
 , stdenv
 , rustPlatform
 , darwin
+, openssl
+, pkg-config
 }:
 let
   src = ../.;
@@ -15,7 +17,12 @@ rustPlatform.buildRustPackage {
   pname = "essential-rest-server";
   version = (builtins.fromTOML (builtins.readFile crateTOML)).package.version;
 
+  nativeBuildInputs = [
+    pkg-config
+  ];
+
   buildInputs = [
+    openssl
   ] ++ lib.optionals stdenv.isDarwin [
     darwin.apple_sdk.frameworks.SystemConfiguration
   ];

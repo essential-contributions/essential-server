@@ -47,7 +47,13 @@ async fn main() {
             }
         }
     });
-    let local_addr = local_addr_rx.await.expect("Failed to get local address");
-    println!("Listening on: {}", local_addr);
+    match local_addr_rx.await {
+        Ok(local_addr) => {
+            println!("Listening on: {}", local_addr);
+        }
+        Err(_e) => {
+            eprintln!("Failed to get local address");
+        }
+    }
     jh.await.expect("Server failed").expect("Server Error");
 }
