@@ -1,14 +1,14 @@
-use essential_check as check;
+use essential_check::{self as check, solution::Utility};
+pub use essential_state_read_vm::{Gas, StateRead};
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
     Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
 use run::{Handle, Shutdown};
+use solution::read::{read_intents_from_storage, read_partial_solutions_from_storage};
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 use storage::failed_solution::CheckOutcome;
-
-pub use essential_state_read_vm::StateRead;
 pub use storage::Storage;
 use transaction_storage::{Transaction, TransactionStorage};
 
@@ -75,18 +75,15 @@ where
         &self,
         solution: Signed<Solution>,
     ) -> anyhow::Result<CheckSolutionOutput> {
-        let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        check::solution::check_signed(&solution)?;
+        let intents = read_intents_from_storage(&solution.data, &self.storage).await?;
+        let _partial_solutions =
+            read_partial_solutions_from_storage(&solution.data, &self.storage).await?;
         let transaction = self.storage.clone().transaction();
-        let mut post_state = transaction.clone();
-        apply_mutations(&mut post_state, &solution.data)?;
-        let pre = transaction.view();
-        let post = post_state.view();
-        let get_intent = |addr: &IntentAddress| intents[addr].clone();
         let config = Default::default();
-        let solution = Arc::new(solution.data.clone());
-        let (utility, gas) =
-            check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config)
-                .await?;
+        let solution = Arc::new(solution.data);
+        let (_post_state, utility, gas) =
+            checked_state_transition(&transaction, solution, &intents, config).await?;
         Ok(CheckSolutionOutput { utility, gas })
     }
 
@@ -97,7 +94,7 @@ where
         intents: Vec<Intent>,
     ) -> anyhow::Result<CheckSolutionOutput> {
         let set = ContentAddress(essential_hash::hash(&intents));
-        let partial_solutions = partial_solutions
+        let _partial_solutions: HashMap<_, _> = partial_solutions
             .into_iter()
             .map(|partial_solution| {
                 (
@@ -119,18 +116,13 @@ where
             })
             .collect();
 
-        solution::validate_solution_with_data(&solution, &partial_solutions, &intents)?;
+        check::solution::check_signed(&solution)?;
+
         let transaction = self.storage.clone().transaction();
-        let mut post_state = transaction.clone();
-        apply_mutations(&mut post_state, &solution.data)?;
-        let pre = transaction.view();
-        let post = post_state.view();
-        let get_intent = |addr: &IntentAddress| intents[addr].clone();
         let config = Default::default();
-        let solution = Arc::new(solution.data.clone());
-        let (utility, gas) =
-            check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config)
-                .await?;
+        let solution = Arc::new(solution.data);
+        let (_post_state, utility, gas) =
+            checked_state_transition(&transaction, solution, &intents, config).await?;
         Ok(CheckSolutionOutput { utility, gas })
     }
 
@@ -199,25 +191,34 @@ where
     }
 }
 
-/// Apply mutations proposed by the given solution to storage.
-// TODO: TransactionStorage should implement StateStorage, and this should take `S`.
-pub(crate) fn apply_mutations<S>(
-    storage: &mut TransactionStorage<S>,
-    solution: &Solution,
-) -> anyhow::Result<()>
+/// Performs the three main steps of producing a state transition.
+///
+/// 1. Validates the given `intents` against the given `solution` prior to execution.
+/// 2. Clones the `pre_state` storage transaction and creates the proposed `post_state`.
+/// 3. Checks that the solution's data satisfies all constraints.
+///
+/// In the success case, returns the post state, utility and total gas used.
+pub(crate) async fn checked_state_transition<S>(
+    pre_state: &TransactionStorage<S>,
+    solution: Arc<Solution>,
+    intents: &HashMap<IntentAddress, Arc<Intent>>,
+    config: Arc<check::solution::CheckIntentConfig>,
+) -> anyhow::Result<(TransactionStorage<S>, Utility, Gas)>
 where
-    S: storage::StateStorage,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
 {
-    for state_mutation in &solution.state_mutations {
-        let set = &solution
-            .data
-            .get(state_mutation.pathway as usize)
-            .ok_or(anyhow::anyhow!("Intent in solution data not found"))?
-            .intent_to_solve
-            .set;
-        for mutation in state_mutation.mutations.iter() {
-            storage.apply_state(set, &mutation.key, mutation.value);
-        }
-    }
-    Ok(())
+    // Pre-execution validation.
+    solution::validate_intents(&solution, intents)?;
+    let get_intent = |addr: &IntentAddress| intents[addr].clone();
+
+    // Create the post state for constraint checking.
+    let post_state = solution::create_post_state(pre_state, &solution)?;
+
+    // We only need read-only access to pre and post state during validation.
+    let pre = pre_state.view();
+    let post = post_state.view();
+    let (util, gas) =
+        check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config).await?;
+
+    Ok((post_state, util, gas))
 }

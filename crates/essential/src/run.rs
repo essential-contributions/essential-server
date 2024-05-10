@@ -1,8 +1,7 @@
 use crate::{solution::read::read_intents_from_storage, PRUNE_FAILED_STORAGE_OLDER_THAN};
-use essential_check as check;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
-use essential_types::{solution::Solution, Hash, IntentAddress};
+use essential_types::{solution::Solution, Hash};
 use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, Storage};
 use tokio::sync::oneshot;
@@ -81,8 +80,6 @@ where
 async fn build_block<S>(storage: &S) -> anyhow::Result<(Solutions, TransactionStorage<S>)>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
 {
     // Get all solutions from the pool.
     // This returns the solutions in FIFO order.
@@ -103,23 +100,13 @@ where
         // Get the intents for this solution.
         let intents = read_intents_from_storage(&solution, storage).await?;
 
-        // TODO: This snapshot means all state mutations will cause clones.
-        // We should add a functionality to record which snapshots mutations are part of
-        // then we can just record which index this snapshot is.
-        // Then we can `rollback_to(snapshot)`.
-        // This would also require returning the transaction on error.
-        //
-        // Check the solution.
-        let mut post_state = transaction.clone();
-        crate::apply_mutations(&mut post_state, &solution)?;
-        let pre = transaction.view();
-        let post = post_state.view();
-        let get_intent = |addr: &IntentAddress| intents[addr].clone();
+        // Apply the proposed mutations, check the intents and return the result.
         let config = Default::default();
-        match check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config)
+
+        match crate::checked_state_transition(&transaction, solution.clone(), &intents, config)
             .await
         {
-            Ok((util, _gas)) => {
+            Ok((post_state, util, _gas)) => {
                 // Update the transaction to the post state.
                 transaction = post_state;
                 // Collect the valid solution.
