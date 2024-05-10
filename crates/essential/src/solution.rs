@@ -19,9 +19,8 @@ where
     let intents = read::read_intents_from_storage(&solution.data, storage).await?;
     validate_intents(&solution.data, &intents)?;
 
-    // validate_solution_with_deps(&solution, storage).await?;
+    // Insert the solution into the pool.
     let solution_hash = essential_hash::hash(&solution.data);
-
     match storage.insert_solution_into_pool(solution).await {
         Ok(()) => Ok(solution_hash),
         Err(e) => anyhow::bail!("Failed to submit solution: {}", e),
@@ -29,7 +28,6 @@ where
 }
 
 /// Apply mutations proposed by the given `solution` to the given `storage`.
-// TODO: TransactionStorage should implement StateStorage, and this should take `S`.
 pub(crate) fn apply_mutations<S>(
     storage: &mut TransactionStorage<S>,
     solution: &Solution,

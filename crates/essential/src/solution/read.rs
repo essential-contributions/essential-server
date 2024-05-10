@@ -1,4 +1,3 @@
-use anyhow::ensure;
 use essential_sign::verify;
 use essential_types::{
     intent::Intent,
@@ -38,7 +37,7 @@ where
     let mut partial_solutions: HashMap<_, _> = HashMap::new();
     for ps_address in &solution.partial_solutions {
         if let Ok(Some(ps)) = storage.get_partial_solution(&ps_address.data).await {
-            ensure!(verify(&ps).is_ok());
+            verify(&ps)?;
             partial_solutions.insert(ps_address.data.clone(), Arc::new(ps.data));
         } else {
             anyhow::bail!("Failed to retrieve partial solution from storage");
