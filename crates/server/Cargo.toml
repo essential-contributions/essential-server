@@ -17,6 +17,7 @@ serde = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]
+essential-hash = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde_json = { workspace = true }
 storage = { workspace = true }

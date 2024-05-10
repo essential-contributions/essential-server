@@ -131,10 +131,10 @@ impl Storage for MemoryStorage {
         intent: Signed<Vec<Intent>>,
     ) -> anyhow::Result<()> {
         let Signed { data, signature } = intent;
-        let hash = ContentAddress(utils::hash(&data));
+        let hash = ContentAddress(essential_hash::hash(&data));
         let order: Vec<_> = data
             .iter()
-            .map(|i| ContentAddress(utils::hash(i)))
+            .map(|i| ContentAddress(essential_hash::hash(i)))
             .collect();
         let map = order.iter().cloned().zip(data.into_iter()).collect();
         let set = IntentSet {
@@ -159,7 +159,7 @@ impl Storage for MemoryStorage {
 
     async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
         let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-        let hash = utils::hash(&solution.data);
+        let hash = essential_hash::hash(&solution.data);
         self.inner.apply(|i| {
             if i.solution_pool.insert(hash, solution).is_none() {
                 i.solution_time_index
@@ -175,7 +175,7 @@ impl Storage for MemoryStorage {
         &self,
         solution: Signed<essential_types::solution::PartialSolution>,
     ) -> anyhow::Result<()> {
-        let hash = utils::hash(&solution.data);
+        let hash = essential_hash::hash(&solution.data);
         self.inner
             .apply(|i| i.partial_solution_pool.insert(hash, solution));
         Ok(())
@@ -418,7 +418,7 @@ impl Storage for MemoryStorage {
                 .batch
                 .solutions
                 .iter()
-                .find(|s| utils::hash(&s.data) == solution_hash)
+                .find(|s| essential_hash::hash(&s.data) == solution_hash)
                 .cloned()
                 .map(|s| SolutionOutcome {
                     solution: s,

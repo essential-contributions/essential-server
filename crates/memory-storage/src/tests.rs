@@ -1,10 +1,10 @@
 use super::*;
+use essential_hash::hash;
 use std::vec;
 use test_utils::{
     intent_with_decision_variables, partial_solution_with_decision_variables,
     sign_with_random_keypair, solution_with_decision_variables,
 };
-use utils::hash;
 
 #[tokio::test]
 async fn test_insert_intent_set() {

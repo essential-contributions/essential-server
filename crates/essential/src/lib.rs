@@ -96,12 +96,12 @@ where
         partial_solutions: Vec<PartialSolution>,
         intents: Vec<Intent>,
     ) -> anyhow::Result<CheckSolutionOutput> {
-        let set = ContentAddress(utils::hash(&intents));
+        let set = ContentAddress(essential_hash::hash(&intents));
         let partial_solutions = partial_solutions
             .into_iter()
             .map(|partial_solution| {
                 (
-                    ContentAddress(utils::hash(&partial_solution)),
+                    ContentAddress(essential_hash::hash(&partial_solution)),
                     Arc::new(partial_solution),
                 )
             })
@@ -112,7 +112,7 @@ where
                 (
                     IntentAddress {
                         set: set.clone(),
-                        intent: ContentAddress(utils::hash(&intent)),
+                        intent: ContentAddress(essential_hash::hash(&intent)),
                     },
                     Arc::new(intent),
                 )

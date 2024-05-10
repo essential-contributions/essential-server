@@ -1,6 +1,7 @@
 pub mod empty;
 
 use empty::Empty;
+use essential_sign::sign;
 use essential_types::{
     intent::{Directive, Intent},
     slots::Slots,
@@ -9,7 +10,6 @@ use essential_types::{
 };
 use secp256k1::{rand::rngs::OsRng, PublicKey, Secp256k1, SecretKey};
 use serde::Serialize;
-use utils::sign;
 
 pub fn duration_secs(secs: u64) -> std::time::Duration {
     std::time::Duration::from_secs(secs)

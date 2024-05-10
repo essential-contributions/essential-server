@@ -9,13 +9,13 @@ use test_utils::{
 fn intent_set(intents: Vec<Intent>) -> IntentSet {
     let order = intents
         .iter()
-        .map(|intent| ContentAddress(utils::hash(intent)))
+        .map(|intent| ContentAddress(essential_hash::hash(intent)))
         .collect();
     let signature = sign_with_random_keypair(&intents).signature;
     IntentSet {
         data: intents
             .into_iter()
-            .map(|intent| (ContentAddress(utils::hash(&intent)), intent))
+            .map(|intent| (ContentAddress(essential_hash::hash(&intent)), intent))
             .collect(),
         storage_layout: essential_types::StorageLayout,
         order,
@@ -28,12 +28,12 @@ fn list_of_intent_sets(
 ) -> (Vec<ContentAddress>, HashMap<ContentAddress, IntentSet>) {
     let order = intents
         .iter()
-        .map(|intents| ContentAddress(utils::hash(&intents)))
+        .map(|intents| ContentAddress(essential_hash::hash(&intents)))
         .collect();
     let map = intents
         .into_iter()
         .map(|intents| {
-            let address = ContentAddress(utils::hash(&intents));
+            let address = ContentAddress(essential_hash::hash(&intents));
             (address, intent_set(intents))
         })
         .collect();

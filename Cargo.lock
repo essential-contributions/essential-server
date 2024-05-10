@@ -581,6 +581,7 @@ dependencies = [
  "axum",
  "base64",
  "clap",
+ "essential-hash",
  "essential-server",
  "essential-types",
  "futures",
@@ -602,6 +603,8 @@ dependencies = [
  "anyhow",
  "essential-check",
  "essential-constraint-vm",
+ "essential-hash",
+ "essential-sign",
  "essential-state-read-vm",
  "essential-types",
  "futures",
@@ -1132,6 +1135,7 @@ name = "memory-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "essential-hash",
  "essential-state-read-vm",
  "essential-types",
  "futures",
@@ -1490,6 +1494,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
+ "essential-hash",
  "essential-state-read-vm",
  "essential-types",
  "futures",
@@ -1866,6 +1871,8 @@ dependencies = [
 name = "test-utils"
 version = "0.1.0"
 dependencies = [
+ "essential-hash",
+ "essential-sign",
  "essential-types",
  "secp256k1",
  "serde",
@@ -2014,6 +2021,7 @@ name = "transaction-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "essential-hash",
  "essential-state-read-vm",
  "essential-types",
  "futures",
@@ -2085,15 +2093,6 @@ checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 [[package]]
 name = "utils"
 version = "0.1.0"
-dependencies = [
- "anyhow",
- "essential-types",
- "postcard",
- "secp256k1",
- "serde",
- "sha2",
- "test-utils",
-]
 
 [[package]]
 name = "vcpkg"

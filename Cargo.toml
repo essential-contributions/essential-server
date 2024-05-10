@@ -9,12 +9,10 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 base64 = "0.22.0"
 clap = { version = "4.5.4", features = ["derive"] }
-# essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-# essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-# essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-# essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
 essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
+essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
+essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
 essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
 futures = "0.3.30"

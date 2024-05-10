@@ -14,7 +14,7 @@ where
     S: Storage,
 {
     validate_solution_with_deps(&solution, storage).await?;
-    let solution_hash = utils::hash(&solution.data);
+    let solution_hash = essential_hash::hash(&solution.data);
 
     match storage.insert_solution_into_pool(solution).await {
         Ok(()) => Ok(solution_hash),

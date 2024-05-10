@@ -33,7 +33,7 @@ pub async fn deploy_intent_to_storage(
     storage: MemoryStorage,
     intent: Intent,
 ) -> (IntentAddress, MemoryStorage) {
-    let intent_hash = ContentAddress(utils::hash(&intent));
+    let intent_hash = ContentAddress(essential_hash::hash(&intent));
     let intent = sign_with_random_keypair(vec![intent]);
     let result = deploy(&storage, intent).await.unwrap();
     (
@@ -75,7 +75,7 @@ pub async fn deploy_partial_solution_to_storage<S: Storage>(
         .insert_partial_solution_into_pool(partial_solution.clone())
         .await
         .unwrap();
-    ContentAddress(utils::hash(&partial_solution.data))
+    ContentAddress(essential_hash::hash(&partial_solution.data))
 }
 
 // `decision_variables` acts like salt
