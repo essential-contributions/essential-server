@@ -1,4 +1,7 @@
-use essential_check::{self as check, solution::Utility};
+use essential_check::{
+    self as check,
+    solution::{CheckIntentConfig, Utility},
+};
 pub use essential_state_read_vm::{Gas, StateRead};
 use essential_types::{
     intent::Intent,
@@ -24,6 +27,9 @@ where
     S: Storage + Clone,
 {
     storage: S,
+    // Currently only check-related config, though we may want to add a
+    // top-level `Config` type for other kinds of configuration (e.g. gas costs).
+    config: Arc<CheckIntentConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -46,8 +52,8 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    pub fn new(storage: S) -> Self {
-        Self { storage }
+    pub fn new(storage: S, config: Arc<CheckIntentConfig>) -> Self {
+        Self { storage, config }
     }
 
     pub fn spawn(self) -> anyhow::Result<Handle>
@@ -80,8 +86,8 @@ where
         let _partial_solutions =
             read_partial_solutions_from_storage(&solution.data, &self.storage).await?;
         let transaction = self.storage.clone().transaction();
-        let config = Default::default();
         let solution = Arc::new(solution.data);
+        let config = self.config.clone();
         let (_post_state, utility, gas) =
             checked_state_transition(&transaction, solution, &intents, config).await?;
         Ok(CheckSolutionOutput { utility, gas })
@@ -119,7 +125,7 @@ where
         check::solution::check_signed(&solution)?;
 
         let transaction = self.storage.clone().transaction();
-        let config = Default::default();
+        let config = self.config.clone();
         let solution = Arc::new(solution.data);
         let (_post_state, utility, gas) =
             checked_state_transition(&transaction, solution, &intents, config).await?;

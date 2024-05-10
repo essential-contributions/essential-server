@@ -29,10 +29,11 @@ async fn setup() -> TestServer {
 }
 
 async fn setup_with_mem(mem: memory_storage::MemoryStorage) -> TestServer {
+    let config = Default::default();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
     let jh = tokio::task::spawn(async {
-        let essential = essential_server::Essential::new(mem);
+        let essential = essential_server::Essential::new(mem, config);
         run(essential, SERVER, tx, Some(shutdown_rx)).await
     });
     let client = Client::new();

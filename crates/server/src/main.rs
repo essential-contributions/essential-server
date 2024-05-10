@@ -30,19 +30,19 @@ async fn main() {
         rqlite_address,
     } = Cli::parse();
     let (local_addr, local_addr_rx) = tokio::sync::oneshot::channel();
+    let config = Default::default();
     let jh = tokio::task::spawn(async move {
         match db {
             Db::Memory => {
-                let essential =
-                    essential_server::Essential::new(memory_storage::MemoryStorage::new());
+                let storage = memory_storage::MemoryStorage::new();
+                let essential = essential_server::Essential::new(storage, config);
                 essential_rest_server::run(essential, address, local_addr, None).await
             }
             Db::Rqlite => {
-                let essential = essential_server::Essential::new(
-                    rqlite_storage::RqliteStorage::new(&rqlite_address)
-                        .await
-                        .expect("Failed to connect to rqlite"),
-                );
+                let storage = rqlite_storage::RqliteStorage::new(&rqlite_address)
+                    .await
+                    .expect("Failed to connect to rqlite");
+                let essential = essential_server::Essential::new(storage, config);
                 essential_rest_server::run(essential, address, local_addr, None).await
             }
         }
