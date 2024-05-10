@@ -6,8 +6,8 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     systems.url = "github:nix-systems/default";
-    yurt = {
-      url = "git+ssh://git@github.com/essential-contributions/yurt.nix";
+    pint = {
+      url = "git+ssh://git@github.com/essential-contributions/pint.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -16,7 +16,7 @@
     let
       overlays = [
         inputs.self.overlays.default
-        inputs.yurt.overlays.default
+        inputs.pint.overlays.default
       ];
       perSystemPkgs = f:
         inputs.nixpkgs.lib.genAttrs (import inputs.systems)
