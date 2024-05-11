@@ -15,9 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
         command: [
-            "fmt -- --check ./",
             "build --print-build-logs --no-update-lock-file .#essential-rest-server",
           ]
     runs-on: ${{ matrix.os }}
@@ -31,6 +30,14 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v10
       - uses: DeterminateSystems/magic-nix-cache-action@v4
       - run: nix ${{ matrix.command }}
+
+  nix-fmt-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: DeterminateSystems/nix-installer-action@v10
+    - uses: DeterminateSystems/magic-nix-cache-action@v4
+    - run: nix fmt -- --check ./
 
   cargo:
     runs-on: ubuntu-latest
