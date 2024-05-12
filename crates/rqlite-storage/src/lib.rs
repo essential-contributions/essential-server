@@ -6,6 +6,7 @@
 
 use anyhow::{bail, ensure};
 use base64::Engine;
+use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_types::{
     solution::PartialSolution, Block, ContentAddress, Hash, Key, Signed, StorageLayout, Word,
@@ -17,7 +18,6 @@ use storage::{
     word_range, QueryState, StateStorage, Storage,
 };
 use thiserror::Error;
-use utils::hash;
 
 use values::{single_value, QueryValues};
 

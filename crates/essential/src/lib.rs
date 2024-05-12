@@ -1,16 +1,19 @@
+use essential_check::{
+    self as check,
+    solution::{CheckIntentConfig, Utility},
+};
+pub use essential_state_read_vm::{Gas, StateRead};
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
     Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
 use run::{Handle, Shutdown};
-use solution::Output;
+use solution::read::{read_intents_from_storage, read_partial_solutions_from_storage};
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 use storage::failed_solution::CheckOutcome;
-
-pub use essential_state_read_vm::StateRead;
 pub use storage::Storage;
-use transaction_storage::Transaction;
+use transaction_storage::{Transaction, TransactionStorage};
 
 mod deploy;
 mod run;
@@ -24,6 +27,9 @@ where
     S: Storage + Clone,
 {
     storage: S,
+    // Currently only check-related config, though we may want to add a
+    // top-level `Config` type for other kinds of configuration (e.g. gas costs).
+    config: Arc<CheckIntentConfig>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
@@ -46,8 +52,8 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    pub fn new(storage: S) -> Self {
-        Self { storage }
+    pub fn new(storage: S, config: Arc<CheckIntentConfig>) -> Self {
+        Self { storage, config }
     }
 
     pub fn spawn(self) -> anyhow::Result<Handle>
@@ -75,18 +81,16 @@ where
         &self,
         solution: Signed<Solution>,
     ) -> anyhow::Result<CheckSolutionOutput> {
-        let intents = solution::validate_solution_with_deps(&solution, &self.storage).await?;
+        check::solution::check_signed(&solution)?;
+        let intents = read_intents_from_storage(&solution.data, &self.storage).await?;
+        let _partial_solutions =
+            read_partial_solutions_from_storage(&solution.data, &self.storage).await?;
         let transaction = self.storage.clone().transaction();
-        let Output {
-            transaction: _,
-            utility,
-            gas_used,
-        } = solution::check_solution_with_intents(transaction, Arc::new(solution.data), &intents)
-            .await?;
-        Ok(CheckSolutionOutput {
-            utility,
-            gas: gas_used,
-        })
+        let solution = Arc::new(solution.data);
+        let config = self.config.clone();
+        let (_post_state, utility, gas) =
+            checked_state_transition(&transaction, solution, &intents, config).await?;
+        Ok(CheckSolutionOutput { utility, gas })
     }
 
     pub async fn check_solution_with_data(
@@ -95,12 +99,12 @@ where
         partial_solutions: Vec<PartialSolution>,
         intents: Vec<Intent>,
     ) -> anyhow::Result<CheckSolutionOutput> {
-        let set = ContentAddress(utils::hash(&intents));
-        let partial_solutions = partial_solutions
+        let set = ContentAddress(essential_hash::hash(&intents));
+        let _partial_solutions: HashMap<_, _> = partial_solutions
             .into_iter()
             .map(|partial_solution| {
                 (
-                    ContentAddress(utils::hash(&partial_solution)),
+                    ContentAddress(essential_hash::hash(&partial_solution)),
                     Arc::new(partial_solution),
                 )
             })
@@ -111,26 +115,21 @@ where
                 (
                     IntentAddress {
                         set: set.clone(),
-                        intent: ContentAddress(utils::hash(&intent)),
+                        intent: ContentAddress(essential_hash::hash(&intent)),
                     },
                     Arc::new(intent),
                 )
             })
             .collect();
 
-        solution::validate_solution_with_data(&solution, &partial_solutions, &intents)?;
+        check::solution::check_signed(&solution)?;
 
         let transaction = self.storage.clone().transaction();
-        let Output {
-            transaction: _,
-            utility,
-            gas_used,
-        } = solution::check_solution_with_intents(transaction, Arc::new(solution.data), &intents)
-            .await?;
-        Ok(CheckSolutionOutput {
-            utility,
-            gas: gas_used,
-        })
+        let config = self.config.clone();
+        let solution = Arc::new(solution.data);
+        let (_post_state, utility, gas) =
+            checked_state_transition(&transaction, solution, &intents, config).await?;
+        Ok(CheckSolutionOutput { utility, gas })
     }
 
     pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
@@ -196,4 +195,36 @@ where
     ) -> anyhow::Result<Option<StorageLayout>> {
         self.storage.get_storage_layout(address).await
     }
+}
+
+/// Performs the three main steps of producing a state transition.
+///
+/// 1. Validates the given `intents` against the given `solution` prior to execution.
+/// 2. Clones the `pre_state` storage transaction and creates the proposed `post_state`.
+/// 3. Checks that the solution's data satisfies all constraints.
+///
+/// In the success case, returns the post state, utility and total gas used.
+pub(crate) async fn checked_state_transition<S>(
+    pre_state: &TransactionStorage<S>,
+    solution: Arc<Solution>,
+    intents: &HashMap<IntentAddress, Arc<Intent>>,
+    config: Arc<check::solution::CheckIntentConfig>,
+) -> anyhow::Result<(TransactionStorage<S>, Utility, Gas)>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+{
+    // Pre-execution validation.
+    solution::validate_intents(&solution, intents)?;
+    let get_intent = |addr: &IntentAddress| intents[addr].clone();
+
+    // Create the post state for constraint checking.
+    let post_state = solution::create_post_state(pre_state, &solution)?;
+
+    // We only need read-only access to pre and post state during validation.
+    let pre = pre_state.view();
+    let post = post_state.view();
+    let (util, gas) =
+        check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config).await?;
+
+    Ok((post_state, util, gas))
 }

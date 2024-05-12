@@ -1,36 +1,21 @@
 use crate::{
-    solution::validate::validate_solution_with_deps,
-    test_utils::{deploy_partial_solution_with_data_to_storage, sanity_solution},
+    solution::{
+        read::{read_intents_from_storage, read_partial_solutions_from_storage},
+        validate_intents,
+    },
+    test_utils::sanity_solution,
 };
-use essential_types::{solution::PartialSolutionData, ContentAddress, IntentAddress};
+use essential_types::{ContentAddress, IntentAddress};
 use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[tokio::test]
 async fn test_retrieve_intent_set() {
     let (solution, storage) = sanity_solution().await;
     let solution = sign_with_random_keypair(solution);
-    validate_solution_with_deps(&solution, &storage)
+    let intents = read_intents_from_storage(&solution.data, &storage)
         .await
         .unwrap();
-}
-
-#[tokio::test]
-async fn test_retrieve_partial_solution() {
-    let (mut solution, storage) = sanity_solution().await;
-    let partial_solution_data = PartialSolutionData {
-        intent_to_solve: solution.data[0].intent_to_solve.clone(),
-        decision_variables: Default::default(),
-    };
-    let (_, solution) = deploy_partial_solution_with_data_to_storage(
-        &storage,
-        &mut solution,
-        partial_solution_data,
-    )
-    .await;
-    let solution = sign_with_random_keypair(solution);
-    validate_solution_with_deps(&solution, &storage)
-        .await
-        .unwrap();
+    validate_intents(&solution.data, &intents).unwrap();
 }
 
 #[tokio::test]
@@ -40,9 +25,10 @@ async fn test_fail_to_retrieve_intent_set() {
     // Corrupt the intent set read from storage
     solution.data[0].intent_to_solve = IntentAddress::empty();
     let solution = sign_with_random_keypair(solution);
-    validate_solution_with_deps(&solution, &storage)
+    let intents = read_intents_from_storage(&solution.data, &storage)
         .await
         .unwrap();
+    validate_intents(&solution.data, &intents).unwrap();
 }
 
 #[tokio::test]
@@ -51,7 +37,7 @@ async fn test_fail_to_retrieve_partial_solution() {
     let (mut solution, storage) = sanity_solution().await;
     solution.partial_solutions = vec![sign_with_random_keypair(ContentAddress::empty())];
     let solution = sign_with_random_keypair(solution);
-    validate_solution_with_deps(&solution, &storage)
+    let _partial_solutions = read_partial_solutions_from_storage(&solution.data, &storage)
         .await
         .unwrap();
 }

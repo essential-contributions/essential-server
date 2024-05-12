@@ -32,6 +32,7 @@ where
 }
 
 /// Wrapper around a state storage that provides transactional semantics.
+#[derive(Clone)]
 pub struct TransactionStorage<S> {
     state: HashMap<ContentAddress, HashMap<Key, Mutation>>,
     storage: S,

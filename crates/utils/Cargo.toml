@@ -2,14 +2,3 @@
 edition = "2021"
 name = "utils"
 version = "0.1.0"
-
-[dependencies]
-anyhow = { workspace = true }
-essential-types = { workspace = true }
-postcard = { workspace = true }
-secp256k1 = { workspace = true, features = ["recovery"] }
-serde = { workspace = true }
-sha2 = { workspace = true }
-
-[dev-dependencies]
-test-utils = { workspace = true }

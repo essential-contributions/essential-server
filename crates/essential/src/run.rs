@@ -1,14 +1,11 @@
-use crate::{
-    solution::{check_solution_with_intents, read::read_intents_from_storage},
-    PRUNE_FAILED_STORAGE_OLDER_THAN,
-};
+use crate::{solution::read::read_intents_from_storage, PRUNE_FAILED_STORAGE_OLDER_THAN};
+use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_types::{solution::Solution, Hash};
 use std::sync::Arc;
 use storage::{failed_solution::SolutionFailReason, Storage};
 use tokio::sync::oneshot;
 use transaction_storage::{Transaction, TransactionStorage};
-use utils::hash;
 
 const RUN_LOOP_FREQUENCY: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -83,8 +80,6 @@ where
 async fn build_block<S>(storage: &S) -> anyhow::Result<(Solutions, TransactionStorage<S>)>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
 {
     // Get all solutions from the pool.
     // This returns the solutions in FIFO order.
@@ -105,21 +100,17 @@ where
         // Get the intents for this solution.
         let intents = read_intents_from_storage(&solution, storage).await?;
 
-        // TODO: This snapshot means all state mutations will cause clones.
-        // We should add a functionality to record which snapshots mutations are part of
-        // then we can just record which index this snapshot is.
-        // Then we can `rollback_to(snapshot)`.
-        // This would also require returning the transaction on error.
-        //
-        // Check the solution.
-        match check_solution_with_intents(transaction.snapshot(), solution.clone(), &intents).await
-        {
-            Ok(output) => {
-                // Set update the transaction.
-                transaction = output.transaction;
+        // Apply the proposed mutations, check the intents and return the result.
+        let config = Default::default();
 
+        match crate::checked_state_transition(&transaction, solution.clone(), &intents, config)
+            .await
+        {
+            Ok((post_state, util, _gas)) => {
+                // Update the transaction to the post state.
+                transaction = post_state;
                 // Collect the valid solution.
-                valid_solutions.push((solution, output.utility));
+                valid_solutions.push((solution, util));
             }
             Err(e) => {
                 // Collect the failed solution with the reason.

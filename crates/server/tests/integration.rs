@@ -29,10 +29,11 @@ async fn setup() -> TestServer {
 }
 
 async fn setup_with_mem(mem: memory_storage::MemoryStorage) -> TestServer {
+    let config = Default::default();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
     let jh = tokio::task::spawn(async {
-        let essential = essential_server::Essential::new(mem);
+        let essential = essential_server::Essential::new(mem, config);
         run(essential, SERVER, tx, Some(shutdown_rx)).await
     });
     let client = Client::new();
@@ -66,7 +67,7 @@ async fn test_deploy_intent_set() {
         .unwrap();
     assert_eq!(response.status(), 200);
     let address = response.json::<ContentAddress>().await.unwrap();
-    assert_eq!(address.0, utils::hash(&intent_set.data));
+    assert_eq!(address.0, essential_hash::hash(&intent_set.data));
 
     let a = url
         .join(&format!("/get-intent-set/{}", URL_SAFE.encode(address.0)))
@@ -83,7 +84,7 @@ async fn test_deploy_intent_set() {
 
     let intent_address = IntentAddress {
         set: address,
-        intent: ContentAddress(utils::hash(&intent_set.data[0])),
+        intent: ContentAddress(essential_hash::hash(&intent_set.data[0])),
     };
     let a = url
         .join(&format!(
@@ -130,9 +131,9 @@ async fn test_deploy_intent_set() {
 async fn test_submit_solution() {
     let mut intent = Intent::empty();
     intent.slots.decision_variables = 1;
-    let intent_address = ContentAddress(utils::hash(&intent));
+    let intent_address = ContentAddress(essential_hash::hash(&intent));
     let intent_set = sign_with_random_keypair(vec![intent]);
-    let set_address = ContentAddress(utils::hash(&intent_set.data));
+    let set_address = ContentAddress(essential_hash::hash(&intent_set.data));
 
     let mem = memory_storage::MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set)
@@ -159,7 +160,7 @@ async fn test_submit_solution() {
         .unwrap();
     assert_eq!(response.status(), 200);
     let hash = response.json::<essential_types::Hash>().await.unwrap();
-    assert_eq!(hash, utils::hash(&solution.data));
+    assert_eq!(hash, essential_hash::hash(&solution.data));
 
     let response = client
         .get(url.join("list-solutions-pool").unwrap())
@@ -170,7 +171,7 @@ async fn test_submit_solution() {
     let solutions = response.json::<Vec<Signed<Solution>>>().await.unwrap();
 
     assert_eq!(solutions.len(), 1);
-    assert_eq!(utils::hash(&solutions[0].data), hash);
+    assert_eq!(essential_hash::hash(&solutions[0].data), hash);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
@@ -179,7 +180,7 @@ async fn test_submit_solution() {
 #[tokio::test]
 async fn test_query_state() {
     let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
-    let address = ContentAddress(utils::hash(&intent_set.data));
+    let address = ContentAddress(essential_hash::hash(&intent_set.data));
     let key = [0; 4];
 
     let mem = memory_storage::MemoryStorage::new();
@@ -215,7 +216,7 @@ async fn test_query_state() {
 #[tokio::test]
 async fn test_list_winning_blocks() {
     let solution = sign_with_random_keypair(Solution::empty());
-    let hash = utils::hash(&solution.data);
+    let hash = essential_hash::hash(&solution.data);
 
     let mem = memory_storage::MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
@@ -234,7 +235,10 @@ async fn test_list_winning_blocks() {
     assert_eq!(response.status(), 200);
     let blocks = response.json::<Vec<Block>>().await.unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(utils::hash(&blocks[0].batch.solutions[0].data), hash);
+    assert_eq!(
+        essential_hash::hash(&blocks[0].batch.solutions[0].data),
+        hash
+    );
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
@@ -243,7 +247,7 @@ async fn test_list_winning_blocks() {
 #[tokio::test]
 async fn test_solution_outcome() {
     let solution = sign_with_random_keypair(Solution::empty());
-    let hash = utils::hash(&solution.data);
+    let hash = essential_hash::hash(&solution.data);
 
     let mem = memory_storage::MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
@@ -288,8 +292,8 @@ async fn test_check_solution() {
         jh,
     } = setup_with_mem(mem).await;
 
-    let set = ContentAddress(utils::hash(&intent_set.data));
-    let address = ContentAddress(utils::hash(&intent_set.data[0]));
+    let set = ContentAddress(essential_hash::hash(&intent_set.data));
+    let address = ContentAddress(essential_hash::hash(&intent_set.data[0]));
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
         intent_to_solve: IntentAddress {
@@ -340,8 +344,8 @@ async fn test_check_solution_with_data() {
     } = setup().await;
 
     let intent_set = vec![Intent::empty()];
-    let set = ContentAddress(utils::hash(&intent_set));
-    let address = ContentAddress(utils::hash(&intent_set[0]));
+    let set = ContentAddress(essential_hash::hash(&intent_set));
+    let address = ContentAddress(essential_hash::hash(&intent_set[0]));
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
         intent_to_solve: IntentAddress {

@@ -9,15 +9,18 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 base64 = "0.22.0"
 clap = { version = "4.5.4", features = ["derive"] }
-essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
+essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
+essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
+essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
+essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
+essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/essential-check" }
 futures = "0.3.30"
 imbl = "3.0.0"
 postcard = { version = "1.0.8", default-featues = false, features = ["alloc"] }
 rayon = "1.10"
 reqwest = "0.12.4"
-secp256k1 = { version = "0.28.2", features = ["rand-std", "hashes-std"] }
+secp256k1 = { version = "0.29", features = ["rand-std", "hashes-std"] }
 serde = { version = "1.0.195", features = ["derive"] }
 serde_json = "1.0.114"
 sha2 = "0.10.8"
