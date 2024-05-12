@@ -16,11 +16,49 @@
         "type": "github"
       }
     },
+    "pint": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "pint-src": "pint-src",
+        "systems": "systems"
+      },
+      "locked": {
+        "lastModified": 1715232066,
+        "narHash": "sha256-tdN++N0Ru7UoSEAv7t9AnNrsMujZntwImzN4X1YDxxk=",
+        "ref": "refs/heads/main",
+        "rev": "a14a6eebfcdcb053c090cf86ea830e3fba2c652b",
+        "revCount": 36,
+        "type": "git",
+        "url": "ssh://git@github.com/essential-contributions/pint.nix"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/essential-contributions/pint.nix"
+      }
+    },
+    "pint-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1714483645,
+        "narHash": "sha256-o7vREHins92Rrp+FV//Es8LEWRBD1nOM6hjOZBed8mE=",
+        "ref": "refs/heads/master",
+        "rev": "b6b018155224eb3a33d25edd22b1d8249ac60f62",
+        "revCount": 1162,
+        "type": "git",
+        "url": "ssh://git@github.com/essential-contributions/pint"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/essential-contributions/pint"
+      }
+    },
     "root": {
       "inputs": {
         "nixpkgs": "nixpkgs",
-        "systems": "systems",
-        "yurt": "yurt"
+        "pint": "pint",
+        "systems": "systems_2"
       }
     },
     "systems": {
@@ -51,44 +89,6 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
-      }
-    },
-    "yurt": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "systems": "systems_2",
-        "yurt-src": "yurt-src"
-      },
-      "locked": {
-        "lastModified": 1708658729,
-        "narHash": "sha256-wbTKLR0/kwus7Y4c/VnuWR3TdmAfSj5nDQqtNMCHQ4c=",
-        "ref": "refs/heads/main",
-        "rev": "a591f413d4364eb2621d3570031876117cb31173",
-        "revCount": 9,
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/yurt.nix"
-      },
-      "original": {
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/yurt.nix"
-      }
-    },
-    "yurt-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1708573875,
-        "narHash": "sha256-NzVoDuwmNDnIHjUNWG8DyFtBX90WGBBmYrTH+BcJB/M=",
-        "ref": "refs/heads/master",
-        "rev": "78deab18db4cbcb7cc0ddeeeb9b635638daa3738",
-        "revCount": 909,
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/yurt"
-      },
-      "original": {
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/yurt"
       }
     }
   },

@@ -3,9 +3,9 @@
 , clippy
 , essential-server
 , mkShell
+, pint
 , rust-analyzer
 , rustfmt
-, yurt
 }:
 mkShell {
   inputsFrom = [
@@ -14,8 +14,8 @@ mkShell {
   buildInputs = [
     cargo-toml-lint
     clippy
+    pint
     rust-analyzer
     rustfmt
-    yurt
   ];
 }
