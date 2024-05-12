@@ -1,8 +1,10 @@
 # A derivation for the `essential-rest-server` crate.
 { lib
 , stdenv
-, rustPlatform
 , darwin
+, openssl
+, pkg-config
+, rustPlatform
 }:
 let
   src = ../.;
@@ -15,7 +17,12 @@ rustPlatform.buildRustPackage {
   pname = "essential-rest-server";
   version = (builtins.fromTOML (builtins.readFile crateTOML)).package.version;
 
-  buildInputs = [
+  nativeBuildInputs = lib.optionals stdenv.isLinux [
+    pkg-config
+  ];
+
+  buildInputs = lib.optionals stdenv.isLinux [
+    openssl
   ] ++ lib.optionals stdenv.isDarwin [
     darwin.apple_sdk.frameworks.SystemConfiguration
   ];
