@@ -4,7 +4,6 @@
 , essential-server
 , essential-rest-server
 , mkShell
-, pint
 , rust-analyzer
 , rustfmt
 }:
@@ -16,7 +15,6 @@ mkShell {
   buildInputs = [
     cargo-toml-lint
     clippy
-    pint
     rust-analyzer
     rustfmt
   ];
