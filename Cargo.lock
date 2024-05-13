@@ -506,7 +506,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "essential-asm-spec",
  "essential-types",
@@ -518,7 +518,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -527,7 +527,7 @@ dependencies = [
 [[package]]
 name = "essential-check"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "essential-constraint-vm",
  "essential-sign",
@@ -541,7 +541,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "essential-asm-gen",
  "essential-types",
@@ -551,7 +551,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
@@ -565,7 +565,7 @@ dependencies = [
 [[package]]
 name = "essential-hash"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "essential-types",
  "postcard",
@@ -621,7 +621,7 @@ dependencies = [
 [[package]]
 name = "essential-sign"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "essential-hash",
  "essential-types",
@@ -632,7 +632,7 @@ dependencies = [
 [[package]]
 name = "essential-state-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "essential-asm-gen",
  "essential-constraint-asm",
@@ -642,7 +642,7 @@ dependencies = [
 [[package]]
 name = "essential-state-read-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "essential-constraint-vm",
  "essential-state-asm",
@@ -653,7 +653,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/essential-check#c749753c32eafc67abb255a5d7dcc652a68370d8"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#3430c1767e28a5a3fc7a2afa3f3ba61b9b8c2a28"
 dependencies = [
  "serde",
 ]
