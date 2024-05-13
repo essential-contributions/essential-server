@@ -1,11 +1,11 @@
 use crate::{solution::read::read_intents_from_storage, PRUNE_FAILED_STORAGE_OLDER_THAN};
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
+use essential_storage::{failed_solution::SolutionFailReason, Storage};
+use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{solution::Solution, Hash};
 use std::sync::Arc;
-use storage::{failed_solution::SolutionFailReason, Storage};
 use tokio::sync::oneshot;
-use transaction_storage::{Transaction, TransactionStorage};
 
 const RUN_LOOP_FREQUENCY: std::time::Duration = std::time::Duration::from_secs(10);
 

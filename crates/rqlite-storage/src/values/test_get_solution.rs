@@ -1,7 +1,7 @@
 use super::*;
 use crate::encode;
+use essential_storage::failed_solution::{CheckOutcome, SolutionFailReason};
 use serde_json::Number;
-use storage::failed_solution::{CheckOutcome, SolutionFailReason};
 use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[test]

@@ -4,11 +4,11 @@
 //! Provides a transactional layer on top of a state storage.
 
 use essential_state_read_vm::StateRead;
+use essential_storage::{word_range, QueryState, StateStorage};
 use essential_types::{ContentAddress, Key, Word};
 use futures::future::FutureExt;
 use imbl::HashMap;
 use std::{pin::Pin, sync::Arc};
-use storage::{word_range, QueryState, StateStorage};
 use thiserror::Error;
 
 #[cfg(test)]

@@ -1,4 +1,6 @@
 use clap::{Parser, ValueEnum};
+use essential_memory_storage::MemoryStorage;
+use essential_rqlite_storage::RqliteStorage;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -34,12 +36,12 @@ async fn main() {
     let jh = tokio::task::spawn(async move {
         match db {
             Db::Memory => {
-                let storage = memory_storage::MemoryStorage::new();
+                let storage = MemoryStorage::new();
                 let essential = essential_server::Essential::new(storage, config);
                 essential_rest_server::run(essential, address, local_addr, None).await
             }
             Db::Rqlite => {
-                let storage = rqlite_storage::RqliteStorage::new(&rqlite_address)
+                let storage = RqliteStorage::new(&rqlite_address)
                     .await
                     .expect("Failed to connect to rqlite");
                 let essential = essential_server::Essential::new(storage, config);

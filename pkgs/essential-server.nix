@@ -5,7 +5,7 @@
 }:
 let
   src = ../.;
-  crateDir = "${src}/crates/essential";
+  crateDir = "${src}/crates/server";
   crateTOML = "${crateDir}/Cargo.toml";
   lockFile = "${src}/Cargo.lock";
 in

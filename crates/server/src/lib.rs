@@ -1,384 +1,236 @@
-#![deny(missing_docs)]
-//! # Server
+//! A library providing the Essential server's core logic around handling
+//! storage read/write access, validation and state transitions.
 //!
-//! A simple REST server for the Essential platform.
+//! For an executable implementation of the Essential server, see the
+//! `essential-rest-server` crate.
 
-use std::{net::SocketAddr, time::Duration};
-
-use axum::{
-    extract::{Path, Query, State},
-    response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
+use essential_check::{
+    self as check,
+    solution::{CheckIntentConfig, Utility},
 };
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
-use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
+pub use essential_state_read_vm::{Gas, StateRead};
+use essential_storage::failed_solution::CheckOutcome;
+pub use essential_storage::Storage;
+use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{
-    convert::word_4_from_u8_32,
     intent::Intent,
     solution::{PartialSolution, Solution},
-    Block, ContentAddress, Hash, IntentAddress, Signed, Word,
+    Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
 };
-use serde::Deserialize;
-use tokio::{
-    net::{TcpListener, ToSocketAddrs},
-    sync::oneshot,
-};
+use run::{Handle, Shutdown};
+use solution::read::{read_intents_from_storage, read_partial_solutions_from_storage};
+use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
-#[derive(Deserialize)]
-/// Type to deserialize a time range query parameters.
-struct TimeRange {
-    /// Start of the time range in seconds.
-    start: u64,
-    /// End of the time range in seconds.
-    end: u64,
-}
+mod deploy;
+mod run;
+mod solution;
+#[cfg(test)]
+mod test_utils;
 
-#[derive(Deserialize)]
-/// Type to deserialize a page query parameter.
-struct Page {
-    /// The page number to start from.
-    page: u64,
-}
-
-#[derive(Deserialize)]
-struct CheckSolution {
-    solution: Signed<Solution>,
-    partial_solutions: Vec<PartialSolution>,
-    intents: Vec<Intent>,
-}
-
-/// Run the server.
-///
-/// - Takes the essential library to run it.
-/// - Address to bind to.
-/// - A channel that returns the actual chosen local address.
-/// - An optional channel that can be used to shutdown the server.
-pub async fn run<S, A>(
-    essential: Essential<S>,
-    addr: A,
-    local_addr: oneshot::Sender<SocketAddr>,
-    shutdown_rx: Option<oneshot::Receiver<()>>,
-) -> anyhow::Result<()>
+#[derive(Clone)]
+pub struct Essential<S>
 where
-    A: ToSocketAddrs,
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
+    S: Storage + Clone,
 {
-    // Spawn essential and get the handle.
-    let handle = essential.clone().spawn()?;
-
-    // Create all the endpoints.
-    let app = Router::new()
-        .route("/deploy-intent-set", post(deploy_intent_set))
-        .route("/get-intent-set/:address", get(get_intent_set))
-        .route("/get-intent/:set/:address", get(get_intent))
-        .route("/list-intent-sets", get(list_intent_sets))
-        .route("/submit-solution", post(submit_solution))
-        .route("/list-solutions-pool", get(list_solutions_pool))
-        .route("/query-state/:address/:key", get(query_state))
-        .route("/list-winning-blocks", get(list_winning_blocks))
-        .route("/solution-outcome/:hash", get(solution_outcome))
-        .route("/check-solution", post(check_solution))
-        .route("/check-solution-with-data", post(check_solution_with_data))
-        .with_state(essential.clone());
-
-    // Bind to the address.
-    let listener = TcpListener::bind(addr).await?;
-
-    // Send the local address to the caller.
-    // This is useful when the address or port is chosen by the OS.
-    let addr = listener.local_addr()?;
-    local_addr
-        .send(addr)
-        .map_err(|_| anyhow::anyhow!("Failed to send local address"))?;
-
-    // Serve the app.
-    axum::serve(listener, app)
-        // Attach the shutdown signal.
-        .with_graceful_shutdown(shutdown(shutdown_rx))
-        .await?;
-
-    // After the server is done, shutdown essential.
-    handle.shutdown().await?;
-
-    Ok(())
+    storage: S,
+    // Currently only check-related config, though we may want to add a
+    // top-level `Config` type for other kinds of configuration (e.g. gas costs).
+    config: Arc<CheckIntentConfig>,
 }
 
-/// The deploy intent set post endpoint.
-///
-/// Takes a signed vector of intents as a json payload.
-async fn deploy_intent_set<S>(
-    State(essential): State<Essential<S>>,
-    Json(payload): Json<Signed<Vec<Intent>>>,
-) -> Result<Json<ContentAddress>, Error>
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct CheckSolutionOutput {
+    pub utility: f64,
+    pub gas: u64,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub enum SolutionOutcome {
+    Success(u64),
+    Fail(String),
+}
+
+const PRUNE_FAILED_STORAGE_OLDER_THAN: Duration = Duration::from_secs(604800); // one week
+
+impl<S> Essential<S>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let address = essential.deploy_intent_set(payload).await?;
-    Ok(Json(address))
-}
+    pub fn new(storage: S, config: Arc<CheckIntentConfig>) -> Self {
+        Self { storage, config }
+    }
 
-/// The submit solution post endpoint.
-///
-/// Takes a signed solution as a json payload.
-async fn submit_solution<S>(
-    State(essential): State<Essential<S>>,
-    Json(payload): Json<Signed<Solution>>,
-) -> Result<Json<Hash>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let hash = essential.submit_solution(payload).await?;
-    Ok(Json(hash))
-}
+    pub fn spawn(self) -> anyhow::Result<Handle>
+    where
+        S: 'static + Send + Sync,
+    {
+        let (mut handle, shutdown) = Handle::new();
+        let jh = tokio::spawn(async move { self.run(shutdown).await });
+        handle.set_jh(jh);
+        Ok(handle)
+    }
 
-/// The get intent set get endpoint.
-///
-/// Takes a content address (encoded as base64) as a path parameter.
-async fn get_intent_set<S>(
-    State(essential): State<Essential<S>>,
-    Path(address): Path<String>,
-) -> Result<Json<Option<Signed<Vec<Intent>>>>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let address = ContentAddress(
-        URL_SAFE
-            .decode(address)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
-    let set = essential.get_intent_set(&address).await?;
-    Ok(Json(set))
-}
+    pub async fn run(&self, shutdown: Shutdown) -> anyhow::Result<()> {
+        run::run(&self.storage, shutdown).await
+    }
 
-/// The get intent get endpoint.
-///
-/// Takes a set content address and an intent content address as path parameters.
-/// Both are encoded as base64.
-async fn get_intent<S>(
-    State(essential): State<Essential<S>>,
-    Path((set, address)): Path<(String, String)>,
-) -> Result<Json<Option<Intent>>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let set = ContentAddress(
-        URL_SAFE
-            .decode(set)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
-    let intent = ContentAddress(
-        URL_SAFE
-            .decode(address)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
-    let intent = essential.get_intent(&IntentAddress { set, intent }).await?;
-    Ok(Json(intent))
-}
+    pub async fn deploy_intent_set(
+        &self,
+        intents: Signed<Vec<Intent>>,
+    ) -> anyhow::Result<ContentAddress> {
+        deploy::deploy(&self.storage, intents).await
+    }
 
-/// The list intent sets get endpoint.
-///
-/// Takes optional time range and page as query parameters.
-async fn list_intent_sets<S>(
-    State(essential): State<Essential<S>>,
-    time_range: Option<Query<TimeRange>>,
-    page: Option<Query<Page>>,
-) -> Result<Json<Vec<Vec<Intent>>>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let time_range =
-        time_range.map(|range| Duration::from_secs(range.start)..Duration::from_secs(range.end));
+    pub async fn check_solution(
+        &self,
+        solution: Signed<Solution>,
+    ) -> anyhow::Result<CheckSolutionOutput> {
+        check::solution::check_signed(&solution)?;
+        let intents = read_intents_from_storage(&solution.data, &self.storage).await?;
+        let _partial_solutions =
+            read_partial_solutions_from_storage(&solution.data, &self.storage).await?;
+        let transaction = self.storage.clone().transaction();
+        let solution = Arc::new(solution.data);
+        let config = self.config.clone();
+        let (_post_state, utility, gas) =
+            checked_state_transition(&transaction, solution, &intents, config).await?;
+        Ok(CheckSolutionOutput { utility, gas })
+    }
 
-    let sets = essential
-        .list_intent_sets(time_range, page.map(|p| p.page as usize))
-        .await?;
-    Ok(Json(sets))
-}
+    pub async fn check_solution_with_data(
+        &self,
+        solution: Signed<Solution>,
+        partial_solutions: Vec<PartialSolution>,
+        intents: Vec<Intent>,
+    ) -> anyhow::Result<CheckSolutionOutput> {
+        let set = ContentAddress(essential_hash::hash(&intents));
+        let _partial_solutions: HashMap<_, _> = partial_solutions
+            .into_iter()
+            .map(|partial_solution| {
+                (
+                    ContentAddress(essential_hash::hash(&partial_solution)),
+                    Arc::new(partial_solution),
+                )
+            })
+            .collect();
+        let intents: HashMap<_, _> = intents
+            .into_iter()
+            .map(|intent| {
+                (
+                    IntentAddress {
+                        set: set.clone(),
+                        intent: ContentAddress(essential_hash::hash(&intent)),
+                    },
+                    Arc::new(intent),
+                )
+            })
+            .collect();
 
-/// The list winning blocks get endpoint.
-///
-/// Takes optional time range and page as query parameters.
-async fn list_winning_blocks<S>(
-    State(essential): State<Essential<S>>,
-    time_range: Option<Query<TimeRange>>,
-    page: Option<Query<Page>>,
-) -> Result<Json<Vec<Block>>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let time_range =
-        time_range.map(|range| Duration::from_secs(range.start)..Duration::from_secs(range.end));
+        check::solution::check_signed(&solution)?;
 
-    let blocks = essential
-        .list_winning_blocks(time_range, page.map(|p| p.page as usize))
-        .await?;
-    Ok(Json(blocks))
-}
+        let transaction = self.storage.clone().transaction();
+        let config = self.config.clone();
+        let solution = Arc::new(solution.data);
+        let (_post_state, utility, gas) =
+            checked_state_transition(&transaction, solution, &intents, config).await?;
+        Ok(CheckSolutionOutput { utility, gas })
+    }
 
-/// The list solutions pool get endpoint.
-async fn list_solutions_pool<S>(
-    State(essential): State<Essential<S>>,
-) -> Result<Json<Vec<Signed<Solution>>>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let solutions = essential.list_solutions_pool().await?;
-    Ok(Json(solutions))
-}
+    pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
+        solution::submit_solution(&self.storage, solution).await
+    }
 
-/// The query state get endpoint.
-///
-/// Takes a content address and a key as path parameters.
-/// Both are encoded as base64.
-///
-/// Note the key is a 32 byte array of u8 encoded as base64.
-async fn query_state<S>(
-    State(essential): State<Essential<S>>,
-    Path((address, key)): Path<(String, String)>,
-) -> Result<Json<Option<Word>>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let address = ContentAddress(
-        URL_SAFE
-            .decode(address)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
-    let key: [u8; 32] = URL_SAFE
-        .decode(key)?
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("State key wrong size"))?;
+    pub async fn solution_outcome(
+        &self,
+        solution_hash: &Hash,
+    ) -> anyhow::Result<Option<SolutionOutcome>> {
+        Ok(self
+            .storage
+            .get_solution(*solution_hash)
+            .await?
+            .map(|outcome| match outcome.outcome {
+                CheckOutcome::Success(block_number) => SolutionOutcome::Success(block_number),
+                CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
+            }))
+    }
 
-    // Convert the key to four words.
-    let key = word_4_from_u8_32(key);
+    pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
+        self.storage.get_intent(address).await
+    }
 
-    let state = essential.query_state(&address, &key).await?;
-    Ok(Json(state))
-}
+    pub async fn get_intent_set(
+        &self,
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
+        self.storage.get_intent_set(address).await
+    }
 
-/// The solution outcome get endpoint.
-///
-/// Takes a solution hash as a path parameter.
-///
-/// The solution hash is a 32 byte array encoded as base64.
-async fn solution_outcome<S>(
-    State(essential): State<Essential<S>>,
-    Path(hash): Path<String>,
-) -> Result<Json<Option<SolutionOutcome>>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let hash: Hash = URL_SAFE
-        .decode(hash)?
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Hash is wrong size"))?;
-    let outcome = essential.solution_outcome(&hash).await?;
-    Ok(Json(outcome))
-}
+    pub async fn list_intent_sets(
+        &self,
+        time_range: Option<Range<Duration>>,
+        page: Option<usize>,
+    ) -> anyhow::Result<Vec<Vec<Intent>>> {
+        self.storage.list_intent_sets(time_range, page).await
+    }
 
-/// The check solution post endpoint.
-///
-/// Takes a signed solution as a json payload.
-async fn check_solution<S>(
-    State(essential): State<Essential<S>>,
-    Json(payload): Json<Signed<Solution>>,
-) -> Result<Json<CheckSolutionOutput>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let outcome = essential.check_solution(payload).await?;
-    Ok(Json(outcome))
-}
+    pub async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
+        self.storage.list_solutions_pool().await
+    }
 
-/// The check solution with data post endpoint.
-///
-/// Takes a signed solution, a list of partial solutions, and a list of intents as a json payload.
-async fn check_solution_with_data<S>(
-    State(essential): State<Essential<S>>,
-    Json(payload): Json<CheckSolution>,
-) -> Result<Json<CheckSolutionOutput>, Error>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let outcome = essential
-        .check_solution_with_data(payload.solution, payload.partial_solutions, payload.intents)
-        .await?;
-    Ok(Json(outcome))
-}
+    pub async fn list_winning_blocks(
+        &self,
+        time_range: Option<Range<Duration>>,
+        page: Option<usize>,
+    ) -> anyhow::Result<Vec<Block>> {
+        self.storage.list_winning_blocks(time_range, page).await
+    }
 
-/// Shutdown the server manually or on ctrl-c.
-async fn shutdown(rx: Option<oneshot::Receiver<()>>) {
-    // The manual signal is used to shutdown the server.
-    let manual = async {
-        match rx {
-            Some(rx) => {
-                rx.await.ok();
-            }
-            None => futures::future::pending().await,
-        }
-    };
+    pub async fn query_state(
+        &self,
+        address: &ContentAddress,
+        key: &Key,
+    ) -> anyhow::Result<Option<Word>> {
+        self.storage.query_state(address, key).await
+    }
 
-    // The ctrl-c signal is used to shutdown the server.
-    let ctrl_c = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl-c");
-    };
-
-    // Wait for either signal.
-    tokio::select! {
-        _ = manual => {},
-        _ = ctrl_c => {},
+    pub async fn get_storage_layout(
+        &self,
+        address: &ContentAddress,
+    ) -> anyhow::Result<Option<StorageLayout>> {
+        self.storage.get_storage_layout(address).await
     }
 }
 
-struct Error(anyhow::Error);
-
-impl IntoResponse for Error {
-    fn into_response(self) -> axum::response::Response {
-        // Return an internal server error with the error message.
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            format!("{}", self.0),
-        )
-            .into_response()
-    }
-}
-
-impl<E> From<E> for Error
+/// Performs the three main steps of producing a state transition.
+///
+/// 1. Validates the given `intents` against the given `solution` prior to execution.
+/// 2. Clones the `pre_state` storage transaction and creates the proposed `post_state`.
+/// 3. Checks that the solution's data satisfies all constraints.
+///
+/// In the success case, returns the post state, utility and total gas used.
+pub(crate) async fn checked_state_transition<S>(
+    pre_state: &TransactionStorage<S>,
+    solution: Arc<Solution>,
+    intents: &HashMap<IntentAddress, Arc<Intent>>,
+    config: Arc<check::solution::CheckIntentConfig>,
+) -> anyhow::Result<(TransactionStorage<S>, Utility, Gas)>
 where
-    E: Into<anyhow::Error>,
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
 {
-    fn from(err: E) -> Self {
-        Self(err.into())
-    }
+    // Pre-execution validation.
+    solution::validate_intents(&solution, intents)?;
+    let get_intent = |addr: &IntentAddress| intents[addr].clone();
+
+    // Create the post state for constraint checking.
+    let post_state = solution::create_post_state(pre_state, &solution)?;
+
+    // We only need read-only access to pre and post state during validation.
+    let pre = pre_state.view();
+    let post = post_state.view();
+    let (util, gas) =
+        check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config).await?;
+
+    Ok((post_state, util, gas))
 }

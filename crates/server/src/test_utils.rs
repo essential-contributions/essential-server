@@ -1,4 +1,5 @@
 use crate::deploy::deploy;
+use essential_memory_storage::MemoryStorage;
 use essential_types::{
     intent::Intent,
     slots::{Slots, StateSlot},
@@ -7,7 +8,6 @@ use essential_types::{
     },
     ContentAddress, IntentAddress,
 };
-use memory_storage::MemoryStorage;
 use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
 
 // TODO: replace `MemoryStorage`s with `S: Storage` objects

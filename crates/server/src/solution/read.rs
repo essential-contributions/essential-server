@@ -1,11 +1,11 @@
 use essential_sign::verify;
+use essential_storage::Storage;
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
     ContentAddress, IntentAddress,
 };
 use std::{collections::HashMap, sync::Arc};
-use storage::Storage;
 
 pub async fn read_intents_from_storage<S>(
     solution: &Solution,

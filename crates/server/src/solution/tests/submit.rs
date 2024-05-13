@@ -1,5 +1,5 @@
 use crate::{solution::submit_solution, test_utils::sanity_solution};
-use storage::Storage;
+use essential_storage::Storage;
 use test_utils::sign_with_random_keypair;
 
 #[tokio::test]

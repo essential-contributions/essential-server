@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::bail;
+use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcome};
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
@@ -8,7 +9,6 @@ use essential_types::{
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcome};
 
 use crate::{decode, RESULTS_KEY};
 
