@@ -1,20 +1,20 @@
 [package]
 edition = "2021"
-name = "transaction-storage"
+name = "essential-transaction-storage"
 version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
 essential-hash = { workspace = true }
 essential-state-read-vm = { workspace = true }
+essential-storage = { workspace = true }
 essential-types = { workspace = true }
 futures = { workspace = true }
 imbl = { workspace = true }
-storage = { workspace = true }
 thiserror = { workspace = true }
 utils = { workspace = true }
 
 [dev-dependencies]
-memory-storage = { workspace = true }
+essential-memory-storage = { workspace = true }
 test-utils = { workspace = true }
 tokio = { workspace = true }

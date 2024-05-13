@@ -1,8 +1,8 @@
 use essential_check as check;
+use essential_storage::{StateStorage, Storage};
+use essential_transaction_storage::TransactionStorage;
 use essential_types::{intent::Intent, solution::Solution, Hash, IntentAddress, Signed};
 use std::{collections::HashMap, sync::Arc};
-use storage::{StateStorage, Storage};
-use transaction_storage::TransactionStorage;
 
 pub(crate) mod read;
 #[cfg(test)]

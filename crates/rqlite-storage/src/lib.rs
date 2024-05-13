@@ -8,15 +8,15 @@ use anyhow::{bail, ensure};
 use base64::Engine;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
+use essential_storage::{
+    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
+    word_range, QueryState, StateStorage, Storage,
+};
 use essential_types::{
     solution::PartialSolution, Block, ContentAddress, Hash, Key, Signed, StorageLayout, Word,
 };
 use futures::FutureExt;
 use std::{pin::Pin, time::Duration};
-use storage::{
-    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
-    word_range, QueryState, StateStorage, Storage,
-};
 use thiserror::Error;
 
 use values::{single_value, QueryValues};

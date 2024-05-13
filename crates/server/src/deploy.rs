@@ -1,6 +1,6 @@
 use essential_check as check;
+use essential_storage::Storage;
 use essential_types::{intent::Intent, ContentAddress, Signed, StorageLayout};
-use storage::Storage;
 
 #[cfg(test)]
 mod tests;

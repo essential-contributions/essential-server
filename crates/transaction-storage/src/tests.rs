@@ -1,7 +1,7 @@
 use essential_hash::hash;
+use essential_memory_storage::MemoryStorage;
+use essential_storage::{QueryState, Storage};
 use essential_types::{intent::Intent, StorageLayout};
-use memory_storage::MemoryStorage;
-use storage::{QueryState, Storage};
 use test_utils::{empty::Empty, sign_with_random_keypair};
 
 use super::*;

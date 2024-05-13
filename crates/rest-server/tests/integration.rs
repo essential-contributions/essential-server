@@ -1,8 +1,10 @@
 use std::{time::Duration, vec};
 
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use essential_memory_storage::MemoryStorage;
 use essential_rest_server as server;
 use essential_server::{CheckSolutionOutput, SolutionOutcome};
+use essential_storage::{StateStorage, Storage};
 use essential_types::{
     convert::u8_32_from_word_4,
     intent::Intent,
@@ -11,7 +13,6 @@ use essential_types::{
 };
 use reqwest::Client;
 use server::run;
-use storage::{StateStorage, Storage};
 use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_decision_variables};
 
 static SERVER: &str = "localhost:0";
@@ -25,10 +26,10 @@ struct TestServer {
 }
 
 async fn setup() -> TestServer {
-    setup_with_mem(memory_storage::MemoryStorage::new()).await
+    setup_with_mem(MemoryStorage::new()).await
 }
 
-async fn setup_with_mem(mem: memory_storage::MemoryStorage) -> TestServer {
+async fn setup_with_mem(mem: MemoryStorage) -> TestServer {
     let config = Default::default();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
@@ -135,7 +136,7 @@ async fn test_submit_solution() {
     let intent_set = sign_with_random_keypair(vec![intent]);
     let set_address = ContentAddress(essential_hash::hash(&intent_set.data));
 
-    let mem = memory_storage::MemoryStorage::new();
+    let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set)
         .await
         .unwrap();
@@ -183,7 +184,7 @@ async fn test_query_state() {
     let address = ContentAddress(essential_hash::hash(&intent_set.data));
     let key = [0; 4];
 
-    let mem = memory_storage::MemoryStorage::new();
+    let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set)
         .await
         .unwrap();
@@ -218,7 +219,7 @@ async fn test_list_winning_blocks() {
     let solution = sign_with_random_keypair(Solution::empty());
     let hash = essential_hash::hash(&solution.data);
 
-    let mem = memory_storage::MemoryStorage::new();
+    let mem = MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
     mem.move_solutions_to_solved(&[hash]).await.unwrap();
 
@@ -249,7 +250,7 @@ async fn test_solution_outcome() {
     let solution = sign_with_random_keypair(Solution::empty());
     let hash = essential_hash::hash(&solution.data);
 
-    let mem = memory_storage::MemoryStorage::new();
+    let mem = MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
     mem.move_solutions_to_solved(&[hash]).await.unwrap();
 
@@ -280,7 +281,7 @@ async fn test_solution_outcome() {
 #[tokio::test]
 async fn test_check_solution() {
     let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
-    let mem = memory_storage::MemoryStorage::new();
+    let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set.clone())
         .await
         .unwrap();

@@ -1,25 +1,24 @@
 [package]
 edition = "2021"
-name = "essential-rest-server"
+name = "essential-server"
 version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true }
-axum = { workspace = true }
-base64 = { workspace = true }
-clap = { workspace = true }
-essential-server = { workspace = true }
+essential-check = { workspace = true }
+essential-constraint-vm = { workspace = true }
+essential-hash = { workspace = true }
+essential-sign = { workspace = true }
+essential-state-read-vm = { workspace = true }
+essential-storage = { workspace = true }
+essential-transaction-storage = { workspace = true }
 essential-types = { workspace = true }
 futures = { workspace = true }
-memory-storage = { workspace = true }
-rqlite-storage = { workspace = true }
+rayon = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+utils = { workspace = true }
 
 [dev-dependencies]
-essential-hash = { workspace = true }
-reqwest = { workspace = true, features = ["json"] }
-serde_json = { workspace = true }
-storage = { workspace = true }
+essential-memory-storage = { workspace = true }
 test-utils = { workspace = true }
-utils = { workspace = true }

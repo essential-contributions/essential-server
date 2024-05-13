@@ -1,5 +1,9 @@
 use anyhow::bail;
 use essential_state_read_vm::StateRead;
+use essential_storage::{
+    failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcome},
+    word_range, QueryState, StateStorage, Storage,
+};
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
@@ -12,10 +16,6 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
     vec,
-};
-use storage::{
-    failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcome},
-    word_range, QueryState, StateStorage, Storage,
 };
 use thiserror::Error;
 use utils::Lock;

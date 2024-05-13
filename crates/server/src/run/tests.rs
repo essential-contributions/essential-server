@@ -5,7 +5,7 @@ use crate::{
     test_utils::{counter_intent, counter_solution, deploy_intent, test_solution},
 };
 use essential_state_read_vm::StateRead;
-use storage::{QueryState, Storage};
+use essential_storage::{QueryState, Storage};
 use test_utils::sign_with_random_keypair;
 
 async fn run<S>(storage: &S) -> anyhow::Result<()>

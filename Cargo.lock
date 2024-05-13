@@ -574,6 +574,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "essential-memory-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "essential-hash",
+ "essential-state-read-vm",
+ "essential-storage",
+ "essential-types",
+ "futures",
+ "test-utils",
+ "thiserror",
+ "tokio",
+ "utils",
+]
+
+[[package]]
 name = "essential-rest-server"
 version = "0.1.0"
 dependencies = [
@@ -582,16 +598,38 @@ dependencies = [
  "base64",
  "clap",
  "essential-hash",
+ "essential-memory-storage",
+ "essential-rqlite-storage",
  "essential-server",
+ "essential-storage",
  "essential-types",
  "futures",
- "memory-storage",
  "reqwest",
- "rqlite-storage",
  "serde",
  "serde_json",
- "storage",
  "test-utils",
+ "tokio",
+ "utils",
+]
+
+[[package]]
+name = "essential-rqlite-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64",
+ "essential-hash",
+ "essential-state-read-vm",
+ "essential-storage",
+ "essential-types",
+ "futures",
+ "postcard",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "test-utils",
+ "thiserror",
  "tokio",
  "utils",
 ]
@@ -604,17 +642,17 @@ dependencies = [
  "essential-check",
  "essential-constraint-vm",
  "essential-hash",
+ "essential-memory-storage",
  "essential-sign",
  "essential-state-read-vm",
+ "essential-storage",
+ "essential-transaction-storage",
  "essential-types",
  "futures",
- "memory-storage",
  "rayon",
  "serde",
- "storage",
  "test-utils",
  "tokio",
- "transaction-storage",
  "utils",
 ]
 
@@ -648,6 +686,33 @@ dependencies = [
  "essential-state-asm",
  "essential-types",
  "thiserror",
+]
+
+[[package]]
+name = "essential-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "essential-types",
+ "serde",
+]
+
+[[package]]
+name = "essential-transaction-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "essential-hash",
+ "essential-memory-storage",
+ "essential-state-read-vm",
+ "essential-storage",
+ "essential-types",
+ "futures",
+ "imbl",
+ "test-utils",
+ "thiserror",
+ "tokio",
+ "utils",
 ]
 
 [[package]]
@@ -1131,22 +1196,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
 
 [[package]]
-name = "memory-storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "essential-hash",
- "essential-state-read-vm",
- "essential-types",
- "futures",
- "storage",
- "test-utils",
- "thiserror",
- "tokio",
- "utils",
-]
-
-[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1489,28 +1538,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rqlite-storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64",
- "essential-hash",
- "essential-state-read-vm",
- "essential-types",
- "futures",
- "postcard",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "storage",
- "test-utils",
- "thiserror",
- "tokio",
- "utils",
-]
-
-[[package]]
 name = "rusqlite"
 version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1791,15 +1818,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "essential-types",
- "serde",
-]
-
-[[package]]
 name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2014,24 +2032,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
-]
-
-[[package]]
-name = "transaction-storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "essential-hash",
- "essential-state-read-vm",
- "essential-types",
- "futures",
- "imbl",
- "memory-storage",
- "storage",
- "test-utils",
- "thiserror",
- "tokio",
- "utils",
 ]
 
 [[package]]

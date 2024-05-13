@@ -1,6 +1,6 @@
 use super::*;
 use crate::encode;
-use storage::failed_solution::SolutionFailReason;
+use essential_storage::failed_solution::SolutionFailReason;
 use test_utils::{empty::Empty, sign_with_random_keypair};
 
 #[test]

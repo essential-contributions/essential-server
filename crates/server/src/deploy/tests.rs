@@ -1,6 +1,6 @@
 use crate::test_utils::deploy_intent;
+use essential_storage::Storage;
 use essential_types::intent::Intent;
-use storage::Storage;
 use test_utils::empty::Empty;
 
 #[tokio::test]

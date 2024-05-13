@@ -1,12 +1,12 @@
 use essential_hash::hash;
+use essential_rqlite_storage::RqliteStorage;
+use essential_storage::{QueryState, StateStorage, Storage};
 use essential_types::{
     intent::Intent,
     solution::{PartialSolution, Solution},
     ContentAddress, IntentAddress, StorageLayout,
 };
-use rqlite_storage::RqliteStorage;
 use std::vec;
-use storage::{QueryState, StateStorage, Storage};
 use test_utils::{empty::Empty, intent_with_decision_variables, sign_with_random_keypair};
 
 #[tokio::test]

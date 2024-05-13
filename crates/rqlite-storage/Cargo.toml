@@ -1,6 +1,6 @@
 [package]
 edition = "2021"
-name = "rqlite-storage"
+name = "essential-rqlite-storage"
 version = "0.1.0"
 
 [dependencies]
@@ -8,13 +8,13 @@ anyhow = { workspace = true }
 base64 = { workspace = true }
 essential-hash = { workspace = true }
 essential-state-read-vm = { workspace = true }
+essential-storage = { workspace = true }
 essential-types = { workspace = true }
 futures = { workspace = true }
 postcard = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["preserve_order"] }
-storage = { workspace = true }
 thiserror = { workspace = true }
 utils = { workspace = true }
 
