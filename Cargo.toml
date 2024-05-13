@@ -32,5 +32,5 @@ essential-rqlite-storage = { path = "crates/rqlite-storage" }
 essential-server = { path = "crates/server" }
 essential-storage = { path = "crates/storage" }
 essential-transaction-storage = { path = "crates/transaction-storage" }
-test-utils = { path = "crates/test_utils" }
+test-utils = { path = "crates/test-utils" }
 utils = { path = "crates/utils" }
