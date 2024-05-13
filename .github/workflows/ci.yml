@@ -20,6 +20,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         command: [
+            "flake check --print-build-logs --no-update-lock-file",
             "build --print-build-logs --no-update-lock-file .#essential-rest-server",
           ]
     runs-on: ${{ matrix.os }}
