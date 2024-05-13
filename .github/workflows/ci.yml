@@ -12,6 +12,9 @@ concurrency:
 
 jobs:
   nix:
+    permissions:
+      id-token: "write" # added for magic-nix-cache-action
+      contents: "read"  # added for magic-nix-cache-action
     strategy:
       fail-fast: false
       matrix:
