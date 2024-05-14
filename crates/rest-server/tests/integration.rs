@@ -8,7 +8,7 @@ use essential_storage::{StateStorage, Storage};
 use essential_types::{
     convert::u8_32_from_word_4,
     intent::Intent,
-    solution::{PartialSolution, Solution, SolutionData},
+    solution::{Solution, SolutionData},
     Block, ContentAddress, IntentAddress, Signed, StorageLayout, Word,
 };
 use reqwest::Client;
@@ -334,7 +334,6 @@ async fn test_check_solution_with_data() {
     #[derive(serde::Serialize)]
     struct CheckSolution {
         solution: Signed<Solution>,
-        partial_solutions: Vec<PartialSolution>,
         intents: Vec<Intent>,
     }
     let TestServer {
@@ -357,7 +356,6 @@ async fn test_check_solution_with_data() {
     });
     let input = CheckSolution {
         solution: sign_with_random_keypair(solution),
-        partial_solutions: vec![],
         intents: intent_set,
     };
     let response = client

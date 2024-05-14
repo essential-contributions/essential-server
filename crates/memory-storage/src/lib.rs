@@ -5,9 +5,8 @@ use essential_storage::{
     word_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{
-    intent::Intent,
-    solution::{PartialSolution, Solution},
-    Batch, Block, ContentAddress, Hash, IntentAddress, Key, Signature, Signed, StorageLayout, Word,
+    intent::Intent, solution::Solution, Batch, Block, ContentAddress, Hash, IntentAddress, Key,
+    Signature, Signed, StorageLayout, Word,
 };
 use futures::future::FutureExt;
 use std::{
@@ -46,8 +45,6 @@ struct Inner {
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, FailedSolution>,
     failed_solution_time_index: HashMap<Duration, Vec<Hash>>,
-    partial_solution_pool: HashMap<Hash, Signed<PartialSolution>>,
-    partial_solution_solved: HashMap<ContentAddress, Signed<PartialSolution>>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
     solution_block_time_index: HashMap<Hash, Duration>,
@@ -171,16 +168,6 @@ impl Storage for MemoryStorage {
         Ok(())
     }
 
-    async fn insert_partial_solution_into_pool(
-        &self,
-        solution: Signed<essential_types::solution::PartialSolution>,
-    ) -> anyhow::Result<()> {
-        let hash = essential_hash::hash(&solution.data);
-        self.inner
-            .apply(|i| i.partial_solution_pool.insert(hash, solution));
-        Ok(())
-    }
-
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
         if solutions.is_empty() {
             return Ok(());
@@ -242,23 +229,6 @@ impl Storage for MemoryStorage {
         })
     }
 
-    async fn move_partial_solutions_to_solved(
-        &self,
-        partial_solutions: &[Hash],
-    ) -> anyhow::Result<()> {
-        self.inner.apply(|i| {
-            let solutions = partial_solutions.iter().filter_map(|h| {
-                i.partial_solution_pool
-                    .remove(h)
-                    .map(|s| (ContentAddress(*h), s))
-            });
-            for (hash, solution) in solutions {
-                i.partial_solution_solved.insert(hash, solution);
-            }
-        });
-        Ok(())
-    }
-
     async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
         let v = self.inner.apply(|i| {
             let set = i.intents.get(&address.set)?;
@@ -283,39 +253,6 @@ impl Storage for MemoryStorage {
                 data,
                 signature: set.signature.clone(),
             })
-        });
-        Ok(v)
-    }
-
-    async fn get_partial_solution(
-        &self,
-        address: &ContentAddress,
-    ) -> anyhow::Result<Option<Signed<essential_types::solution::PartialSolution>>> {
-        let v = self.inner.apply(|i| {
-            i.partial_solution_pool
-                .get(&address.0)
-                .cloned()
-                .or_else(|| i.partial_solution_solved.get(address).cloned())
-        });
-        Ok(v)
-    }
-
-    async fn is_partial_solution_solved(
-        &self,
-        address: &ContentAddress,
-    ) -> anyhow::Result<Option<bool>> {
-        let v = self.inner.apply(|i| {
-            let in_solved = i.partial_solution_solved.contains_key(address);
-            if in_solved {
-                Some(true)
-            } else {
-                let in_pool = i.partial_solution_pool.contains_key(&address.0);
-                if in_pool {
-                    Some(false)
-                } else {
-                    None
-                }
-            }
         });
         Ok(v)
     }
@@ -363,14 +300,6 @@ impl Storage for MemoryStorage {
         Ok(self
             .inner
             .apply(|i| i.failed_solution_pool.values().cloned().collect()))
-    }
-
-    async fn list_partial_solutions_pool(
-        &self,
-    ) -> anyhow::Result<Vec<Signed<essential_types::solution::PartialSolution>>> {
-        Ok(self
-            .inner
-            .apply(|i| i.partial_solution_pool.values().cloned().collect()))
     }
 
     async fn list_winning_blocks(

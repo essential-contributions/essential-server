@@ -14,10 +14,8 @@ use axum::{
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_types::{
-    convert::word_4_from_u8_32,
-    intent::Intent,
-    solution::{PartialSolution, Solution},
-    Block, ContentAddress, Hash, IntentAddress, Signed, Word,
+    convert::word_4_from_u8_32, intent::Intent, solution::Solution, Block, ContentAddress, Hash,
+    IntentAddress, Signed, Word,
 };
 use serde::Deserialize;
 use tokio::{
@@ -44,7 +42,6 @@ struct Page {
 #[derive(Deserialize)]
 struct CheckSolution {
     solution: Signed<Solution>,
-    partial_solutions: Vec<PartialSolution>,
     intents: Vec<Intent>,
 }
 
@@ -319,7 +316,7 @@ where
 
 /// The check solution with data post endpoint.
 ///
-/// Takes a signed solution, a list of partial solutions, and a list of intents as a json payload.
+/// Takes a signed solution and a list of intents as a json payload.
 async fn check_solution_with_data<S>(
     State(essential): State<Essential<S>>,
     Json(payload): Json<CheckSolution>,
@@ -330,7 +327,7 @@ where
     <S as StateRead>::Error: Send,
 {
     let outcome = essential
-        .check_solution_with_data(payload.solution, payload.partial_solutions, payload.intents)
+        .check_solution_with_data(payload.solution, payload.intents)
         .await?;
     Ok(Json(outcome))
 }
