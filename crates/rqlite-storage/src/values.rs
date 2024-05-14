@@ -2,11 +2,7 @@ use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::bail;
 use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcome};
-use essential_types::{
-    intent::Intent,
-    solution::{PartialSolution, Solution},
-    Batch, Block, Signature, Signed, Word,
-};
+use essential_types::{intent::Intent, solution::Solution, Batch, Block, Signature, Signed, Word};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
@@ -14,8 +10,6 @@ use crate::{decode, RESULTS_KEY};
 
 #[cfg(test)]
 mod test_get_intent_set;
-#[cfg(test)]
-mod test_get_partial_solution;
 #[cfg(test)]
 mod test_get_solution;
 #[cfg(test)]
@@ -100,32 +94,6 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<Signed<Vec<
 
     Ok(Some(Signed {
         data: intents,
-        signature,
-    }))
-}
-
-pub fn get_partial_solution(
-    QueryValues { queries }: QueryValues,
-) -> Result<Option<Signed<PartialSolution>>, anyhow::Error> {
-    let rows = match &queries[..] {
-        [Some(Rows { rows })] => rows,
-        [None] => return Ok(None),
-        _ => bail!("expected a single query {:?}", queries),
-    };
-
-    let [Columns { columns }] = &rows[..] else {
-        bail!("expected a single row");
-    };
-
-    let [Value::String(solution), Value::String(signature)] = &columns[..] else {
-        bail!("expected two columns");
-    };
-
-    let solution = decode(solution)?;
-    let signature = decode(signature)?;
-
-    Ok(Some(Signed {
-        data: solution,
         signature,
     }))
 }
@@ -220,12 +188,6 @@ pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<
 }
 
 pub fn list_solutions_pool(queries: QueryValues) -> anyhow::Result<Vec<Signed<Solution>>> {
-    list_solutions(queries)
-}
-
-pub fn list_partial_solutions_pool(
-    queries: QueryValues,
-) -> Result<Vec<Signed<PartialSolution>>, anyhow::Error> {
     list_solutions(queries)
 }
 

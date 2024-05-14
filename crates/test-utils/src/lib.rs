@@ -5,7 +5,7 @@ use essential_sign::sign;
 use essential_types::{
     intent::{Directive, Intent},
     slots::Slots,
-    solution::{DecisionVariable, PartialSolution, PartialSolutionData, Solution, SolutionData},
+    solution::{DecisionVariable, Solution, SolutionData},
     IntentAddress, Signature, Signed, Word,
 };
 use secp256k1::{rand::rngs::OsRng, PublicKey, Secp256k1, SecretKey};
@@ -44,7 +44,6 @@ pub fn solution_with_intent(intent_to_solve: IntentAddress) -> Solution {
             decision_variables: Default::default(),
         }],
         state_mutations: Default::default(),
-        partial_solutions: Default::default(),
     }
 }
 
@@ -60,19 +59,6 @@ pub fn intent_with_decision_variables(decision_variables: usize) -> Intent {
     }
 }
 
-pub fn partial_solution_with_decision_variables(decision_variables: usize) -> PartialSolution {
-    PartialSolution {
-        data: vec![PartialSolutionData {
-            intent_to_solve: IntentAddress::empty(),
-            decision_variables: vec![
-                Some(DecisionVariable::Inline(decision_variables as Word));
-                decision_variables
-            ],
-        }],
-        state_mutations: Default::default(),
-    }
-}
-
 pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
     Solution {
         data: vec![SolutionData {
@@ -83,6 +69,5 @@ pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
             ],
         }],
         state_mutations: Default::default(),
-        partial_solutions: Default::default(),
     }
 }

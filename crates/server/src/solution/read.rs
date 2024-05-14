@@ -1,10 +1,5 @@
-use essential_sign::verify;
 use essential_storage::Storage;
-use essential_types::{
-    intent::Intent,
-    solution::{PartialSolution, Solution},
-    ContentAddress, IntentAddress,
-};
+use essential_types::{intent::Intent, solution::Solution, IntentAddress};
 use std::{collections::HashMap, sync::Arc};
 
 pub async fn read_intents_from_storage<S>(
@@ -25,23 +20,4 @@ where
         }
     }
     Ok(intents)
-}
-
-pub async fn read_partial_solutions_from_storage<S>(
-    solution: &Solution,
-    storage: &S,
-) -> anyhow::Result<HashMap<ContentAddress, Arc<PartialSolution>>>
-where
-    S: Storage,
-{
-    let mut partial_solutions: HashMap<_, _> = HashMap::new();
-    for ps_address in &solution.partial_solutions {
-        if let Ok(Some(ps)) = storage.get_partial_solution(&ps_address.data).await {
-            verify(&ps)?;
-            partial_solutions.insert(ps_address.data.clone(), Arc::new(ps.data));
-        } else {
-            anyhow::bail!("Failed to retrieve partial solution from storage");
-        }
-    }
-    Ok(partial_solutions)
 }

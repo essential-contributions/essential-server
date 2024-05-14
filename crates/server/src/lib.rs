@@ -13,12 +13,11 @@ use essential_storage::failed_solution::CheckOutcome;
 pub use essential_storage::Storage;
 use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{
-    intent::Intent,
-    solution::{PartialSolution, Solution},
-    Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
+    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
+    StorageLayout, Word,
 };
 use run::{Handle, Shutdown};
-use solution::read::{read_intents_from_storage, read_partial_solutions_from_storage};
+use solution::read::read_intents_from_storage;
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
 mod deploy;
@@ -89,8 +88,6 @@ where
     ) -> anyhow::Result<CheckSolutionOutput> {
         check::solution::check_signed(&solution)?;
         let intents = read_intents_from_storage(&solution.data, &self.storage).await?;
-        let _partial_solutions =
-            read_partial_solutions_from_storage(&solution.data, &self.storage).await?;
         let transaction = self.storage.clone().transaction();
         let solution = Arc::new(solution.data);
         let config = self.config.clone();
@@ -102,19 +99,9 @@ where
     pub async fn check_solution_with_data(
         &self,
         solution: Signed<Solution>,
-        partial_solutions: Vec<PartialSolution>,
         intents: Vec<Intent>,
     ) -> anyhow::Result<CheckSolutionOutput> {
         let set = ContentAddress(essential_hash::hash(&intents));
-        let _partial_solutions: HashMap<_, _> = partial_solutions
-            .into_iter()
-            .map(|partial_solution| {
-                (
-                    ContentAddress(essential_hash::hash(&partial_solution)),
-                    Arc::new(partial_solution),
-                )
-            })
-            .collect();
         let intents: HashMap<_, _> = intents
             .into_iter()
             .map(|intent| {

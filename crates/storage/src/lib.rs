@@ -6,9 +6,8 @@
 use std::{future::Future, ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent,
-    solution::{PartialSolution, Solution},
-    Block, ContentAddress, Hash, IntentAddress, Key, Signed, StorageLayout, Word,
+    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
+    StorageLayout, Word,
 };
 use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome};
 
@@ -32,12 +31,6 @@ pub trait Storage: StateStorage {
         solution: Signed<Solution>,
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
-    /// Add a partial solution to the pool of unsolved partial solutions.
-    fn insert_partial_solution_into_pool(
-        &self,
-        solution: Signed<PartialSolution>,
-    ) -> impl Future<Output = anyhow::Result<()>> + Send;
-
     /// Move these solutions from the pool to the solved state.
     fn move_solutions_to_solved(
         &self,
@@ -49,12 +42,6 @@ pub trait Storage: StateStorage {
         &self,
         solutions: &[(Hash, SolutionFailReason)],
     ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
-
-    /// Move these partial solutions from the pool to the solved state.
-    fn move_partial_solutions_to_solved(
-        &self,
-        partial_solutions: &[Hash],
-    ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
     // Reads
     /// Get an individual intent.
@@ -69,18 +56,6 @@ pub trait Storage: StateStorage {
         &self,
         address: &ContentAddress,
     ) -> impl Future<Output = anyhow::Result<Option<Signed<Vec<Intent>>>>> + Send;
-
-    /// Get a partial solution from either the pool or the solved state.
-    fn get_partial_solution(
-        &self,
-        address: &ContentAddress,
-    ) -> impl Future<Output = anyhow::Result<Option<Signed<PartialSolution>>>> + Send;
-
-    /// Check if a partial solution is solved or not.
-    fn is_partial_solution_solved(
-        &self,
-        address: &ContentAddress,
-    ) -> impl Future<Output = anyhow::Result<Option<bool>>> + Send;
 
     /// List all intents. This will paginate the results. The page is 0-indexed.
     /// A time range can optionally be provided to filter the results.
@@ -100,11 +75,6 @@ pub trait Storage: StateStorage {
     fn list_failed_solutions_pool(
         &self,
     ) -> impl std::future::Future<Output = anyhow::Result<Vec<FailedSolution>>> + Send;
-
-    /// List all partial solutions in the pool.
-    fn list_partial_solutions_pool(
-        &self,
-    ) -> impl Future<Output = anyhow::Result<Vec<Signed<PartialSolution>>>> + Send;
 
     /// List all blocks of solutions that have been solved.
     fn list_winning_blocks(

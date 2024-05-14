@@ -2,8 +2,7 @@ use super::*;
 use essential_hash::hash;
 use std::vec;
 use test_utils::{
-    intent_with_decision_variables, partial_solution_with_decision_variables,
-    sign_with_random_keypair, solution_with_decision_variables,
+    intent_with_decision_variables, sign_with_random_keypair, solution_with_decision_variables,
 };
 
 #[tokio::test]
@@ -165,102 +164,6 @@ async fn test_solutions() {
 
     let result = storage.list_failed_solutions_pool().await.unwrap();
     assert!(result.is_empty());
-}
-
-#[tokio::test]
-async fn test_partial_solutions() {
-    let storage = MemoryStorage::new();
-    let partial_solution1 = sign_with_random_keypair(partial_solution_with_decision_variables(0));
-    let partial_solution2 = sign_with_random_keypair(partial_solution_with_decision_variables(1));
-    let partial_solution3 = sign_with_random_keypair(partial_solution_with_decision_variables(2));
-
-    // Idempotent insert
-    storage
-        .insert_partial_solution_into_pool(partial_solution1.clone())
-        .await
-        .unwrap();
-    storage
-        .insert_partial_solution_into_pool(partial_solution1.clone())
-        .await
-        .unwrap();
-
-    let result = storage.list_partial_solutions_pool().await.unwrap();
-    assert_eq!(result, vec![partial_solution1.clone()]);
-
-    storage
-        .insert_partial_solution_into_pool(partial_solution2.clone())
-        .await
-        .unwrap();
-    let result = storage.list_partial_solutions_pool().await.unwrap();
-    assert_eq!(result.len(), 2);
-    assert!(result.contains(&partial_solution1));
-    assert!(result.contains(&partial_solution2));
-
-    let result = storage
-        .get_partial_solution(&ContentAddress(hash(&partial_solution1.data)))
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(result, partial_solution1);
-
-    storage
-        .move_partial_solutions_to_solved(&[hash(&partial_solution1.data)])
-        .await
-        .unwrap();
-
-    let result = storage.list_partial_solutions_pool().await.unwrap();
-    assert_eq!(result.len(), 1);
-    assert!(result.contains(&partial_solution2));
-
-    let result = storage
-        .is_partial_solution_solved(&ContentAddress(hash(&partial_solution1.data)))
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(result);
-    let result = storage
-        .is_partial_solution_solved(&ContentAddress(hash(&partial_solution2.data)))
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(!result);
-
-    storage
-        .insert_partial_solution_into_pool(partial_solution3.clone())
-        .await
-        .unwrap();
-
-    storage
-        .move_partial_solutions_to_solved(&[
-            hash(&partial_solution2.data),
-            hash(&partial_solution3.data),
-        ])
-        .await
-        .unwrap();
-
-    let result = storage
-        .is_partial_solution_solved(&ContentAddress(hash(&partial_solution3.data)))
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(result);
-
-    let result = storage.list_partial_solutions_pool().await.unwrap();
-    assert!(result.is_empty());
-
-    let result = storage
-        .get_partial_solution(&ContentAddress(hash(&partial_solution2.data)))
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(result, partial_solution2);
-
-    let result = storage
-        .get_partial_solution(&ContentAddress(hash(&partial_solution2.data)))
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(result, partial_solution2);
 }
 
 #[tokio::test]

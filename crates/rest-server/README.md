@@ -69,7 +69,7 @@ Returns: `Hash` as JSON
 
 **Example:**
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[],"partial_solutions":[]},"signature":[[]]}' http://localhost:59498/submit-solution
+curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[]},"signature":[[]]}' http://localhost:59498/submit-solution
 ```
 ### GET `/list-solutions-pool`
 Returns: `Vec<Signed<Solution>>` as JSON
@@ -130,16 +130,15 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[],"partial_solutions":[]},"signature":[[]]}' http://localhost:59498/check-solution
+curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[]},"signature":[[]]}' http://localhost:59498/check-solution
 ```
 ### Post `/check-solution-with-data`
-Check a solution with all partial solutions and intents without changing state.\
+Check a solution with all intents without changing state.\
 This is a dry run of the solution.\
 Body: `CheckSolution` as JSON \
 ```rust
 struct CheckSolution {
     solution: Signed<Solution>,
-    partial_solutions: Vec<PartialSolution>,
     intents: Vec<Intent>,
 }
 ```
@@ -153,5 +152,5 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"solution": {"data":{"data":[],"state_mutations":[],"partial_solutions":[]},"signature":[[]]}, "partial_solutions: [], intents: [{"slots":{"decision_variables":0,"state":[]},"state_read":[],"constraints":[],"directive":"Satisfy"}]}' http://localhost:59498/check-solution-with-data
+curl -X POST -H "Content-Type: application/json" -d '{"solution": {"data":{"data":[],"state_mutations":[]},"signature":[[]]}, intents: [{"slots":{"decision_variables":0,"state":[]},"state_read":[],"constraints":[],"directive":"Satisfy"}]}' http://localhost:59498/check-solution-with-data
 ```

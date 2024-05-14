@@ -76,7 +76,7 @@ fn test_valid_solution() {
 
 #[test]
 fn test_invalid_solution() {
-    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
     let queries = QueryValues {
         queries: vec![Some(Rows {
@@ -157,7 +157,8 @@ fn test_invalid_solution() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx".to_string();
-    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
+    let Signed { data, signature } =
+        sign_with_random_keypair(essential_types::solution::SolutionData::empty());
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
 
     let queries = QueryValues {
@@ -219,7 +220,7 @@ fn test_invalid_data() {
 
 #[test]
 fn test_wrong_num_columns() {
-    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
@@ -237,7 +238,7 @@ fn test_wrong_num_columns() {
 
 #[test]
 fn test_wrong_num_rows() {
-    let Signed { data, signature } = sign_with_random_keypair(PartialSolution::empty());
+    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![
