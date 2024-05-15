@@ -18,8 +18,8 @@ hex = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
-utils = { workspace = true }
 tracing = { workspace = true }
+utils = { workspace = true }
 
 [dev-dependencies]
 essential-memory-storage = { workspace = true }
