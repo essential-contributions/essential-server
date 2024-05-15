@@ -63,8 +63,9 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    // Initialize tracing subscriber with the level determined by `RUST_LOG` environment variable.
-    if std::env::var("RUST_LOG").is_ok() {
+    // Initialize tracing subscriber if `ESSENTIAL_SERVER_LOG` environment variable is set.
+    // The level of tracing is by default determined by `RUST_LOG` environment variable.
+    if std::env::var("ESSENTIAL_SERVER_LOG").is_ok() {
         let _ = tracing_subscriber::fmt::try_init();
     }
 
