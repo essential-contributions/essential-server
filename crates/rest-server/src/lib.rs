@@ -63,6 +63,11 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
+    // Initialize tracing subscriber with the level determined by `RUST_LOG` environment variable.
+    if std::env::var("RUST_LOG").is_ok() {
+        let _ = tracing_subscriber::fmt::try_init();
+    }
+
     // Spawn essential and get the handle.
     let handle = essential.clone().spawn()?;
 

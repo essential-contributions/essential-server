@@ -9,6 +9,7 @@ pub(crate) mod read;
 mod tests;
 
 /// Validates a signed solution and submits it to storage.
+#[tracing::instrument(skip_all)]
 pub async fn submit_solution<S>(storage: &S, solution: Signed<Solution>) -> anyhow::Result<Hash>
 where
     S: Storage,
@@ -21,9 +22,20 @@ where
 
     // Insert the solution into the pool.
     let solution_hash = essential_hash::hash(&solution.data);
+    let solution_hex = hex::encode(solution_hash);
     match storage.insert_solution_into_pool(solution).await {
-        Ok(()) => Ok(solution_hash),
-        Err(e) => anyhow::bail!("Failed to submit solution: {}", e),
+        Ok(()) => {
+            tracing::debug!("submitted solution: 0x{}", solution_hex);
+            Ok(solution_hash)
+        }
+        Err(err) => {
+            tracing::info!(
+                "error submitting solution with hash 0x{}: {}",
+                solution_hex,
+                err
+            );
+            anyhow::bail!("Failed to submit solution: {}", err)
+        }
     }
 }
 
@@ -51,6 +63,7 @@ where
 
 /// Given the pre_state and a solution, produce the post_state with all proposed
 /// solution mutations applied.
+#[tracing::instrument(skip_all)]
 pub fn create_post_state<S>(
     pre_state: &TransactionStorage<S>,
     solution: &Solution,
@@ -59,20 +72,36 @@ where
     S: Clone + StateStorage,
 {
     let mut post_state = pre_state.clone();
-    apply_mutations(&mut post_state, solution)?;
-    Ok(post_state)
+    match apply_mutations(&mut post_state, solution) {
+        Ok(()) => Ok(post_state),
+        Err(err) => {
+            tracing::info!("error simulating state mutations: {}", err);
+            Err(err)
+        }
+    }
 }
 
 /// Validate what we can of the solution's associated intents without performing execution.
+#[tracing::instrument(skip_all)]
 pub fn validate_intents(
     solution: &Solution,
     intents: &HashMap<IntentAddress, Arc<Intent>>,
 ) -> anyhow::Result<()> {
     // The map must contain all intents referred to by solution data.
-    contains_all_intents(solution, intents)?;
-    // The decision variable lenghts must match.
-    check::solution::check_decision_variable_lengths(solution, |addr| intents[addr].clone())
-        .map_err(|(ix, err)| anyhow::anyhow!("solution data at {ix} invalid: {err}"))
+    match contains_all_intents(solution, intents) {
+        Ok(()) => {
+            // The decision variable lengths must match.
+            check::solution::check_decision_variable_lengths(solution, |addr| intents[addr].clone())
+                .map_err(|(ix, err)| {
+                    tracing::info!("solution data at {} invalid: {}", ix, err);
+                    anyhow::anyhow!("solution data at {ix} invalid: {err}")
+                })
+        }
+        Err(err) => {
+            tracing::info!("{}", err);
+            Err(err)
+        }
+    }
 }
 
 /// Ensure that all intents referred to by the solution have been read from the storage.

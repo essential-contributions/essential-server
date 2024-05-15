@@ -9,6 +9,8 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 base64 = "0.22.0"
 clap = { version = "4.5.4", features = ["derive"] }
+# TODO: add "tracing" feature to `essential-check`, `essential-constraint-vm` and `essential-state-read-vm`  
+# once https://github.com/essential-contributions/essential-base/pull/101 lands.
 essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
@@ -16,6 +18,7 @@ essential-sign = { git = "ssh://git@github.com/essential-contributions/essential
 essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 futures = "0.3.30"
+hex = "0.4.3"
 imbl = "3.0.0"
 postcard = { version = "1.0.8", default-featues = false, features = ["alloc"] }
 rayon = "1.10"
@@ -26,6 +29,8 @@ serde_json = "1.0.114"
 sha2 = "0.10.8"
 thiserror = "1.0.58"
 tokio = { version = "1.36.0", features = ["full"] }
+tracing = {version = "0.1", features = ["attributes"]}
+tracing-subscriber = "0.3"
 
 essential-memory-storage = { path = "crates/memory-storage" }
 essential-rqlite-storage = { path = "crates/rqlite-storage" }
