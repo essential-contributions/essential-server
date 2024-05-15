@@ -13,25 +13,16 @@ where
     let mut intents: HashMap<_, _> = HashMap::new();
     for data in &solution.data {
         let address = data.intent_to_solve.clone();
-        match storage.get_intent(&address).await {
-            Ok(Some(intent)) => {
-                intents.insert(address, Arc::new(intent));
-            }
-            Ok(None) => {
-                tracing::debug!(
-                    "intent 0x{} not in set 0x{}",
-                    hex::encode(address.intent.0),
-                    hex::encode(address.set.0),
-                );
-            }
-            Err(err) => {
-                tracing::info!(
-                    "error retrieving intent set 0x{} from storage: {}",
-                    hex::encode(address.set.0),
-                    err
-                );
-                anyhow::bail!("Failed to retrieve intent set from storage");
-            }
+        if let Ok(Some(intent)) = storage.get_intent(&address).await {
+            intents.insert(address, Arc::new(intent));
+        } else {
+            tracing::info!(
+                "error retrieving intent 0x{} from set 0x{} from storage",
+                hex::encode(address.intent.0),
+                hex::encode(address.set.0),
+            );
+
+            anyhow::bail!("Failed to retrieve intent set from storage");
         }
     }
     Ok(intents)
