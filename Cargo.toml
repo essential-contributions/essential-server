@@ -18,7 +18,6 @@ essential-sign = { git = "ssh://git@github.com/essential-contributions/essential
 essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 futures = "0.3.30"
-hex = "0.4.3"
 imbl = "3.0.0"
 postcard = { version = "1.0.8", default-featues = false, features = ["alloc"] }
 rayon = "1.10"

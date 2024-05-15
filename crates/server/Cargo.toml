@@ -14,7 +14,6 @@ essential-storage = { workspace = true }
 essential-transaction-storage = { workspace = true }
 essential-types = { workspace = true }
 futures = { workspace = true }
-hex = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
