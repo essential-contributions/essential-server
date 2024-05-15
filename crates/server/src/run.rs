@@ -120,7 +120,7 @@ where
     let mut failed_solutions: Vec<_> = vec![];
 
     for solution in solutions {
-        let solution_hex = hex::encode(essential_hash::hash(&solution.data));
+        let solution_hash = essential_hash::content_addr(&solution.data);
         // Put the solution into an Arc so it's cheap to clone.
         let solution = Arc::new(solution.data);
 
@@ -140,16 +140,16 @@ where
                 valid_solutions.push((solution, util));
 
                 tracing::debug!(
-                    "valid solution with hash 0x{} and utility {}",
-                    solution_hex,
+                    "valid solution with hash {} and utility {}",
+                    solution_hash,
                     util
                 );
             }
             Err(err) => {
                 // Collect the failed solution with the reason.
                 tracing::debug!(
-                    "failed solution with hash 0x{}: {}",
-                    solution_hex,
+                    "failed solution with hash {}: {}",
+                    solution_hash,
                     err.to_string()
                 );
                 failed_solutions.push((

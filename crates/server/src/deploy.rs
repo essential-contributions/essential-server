@@ -11,18 +11,17 @@ where
     S: Storage,
 {
     check::intent::check_signed_set(&intent)?;
-    let intent_hash = essential_hash::hash(&intent.data);
-    let intent_hex = hex::encode(intent_hash);
+    let intent_hash = essential_hash::content_addr(&intent.data);
 
     match storage.insert_intent_set(StorageLayout, intent).await {
         Ok(()) => {
-            tracing::debug!("deployed intent set: 0x{}", intent_hex);
-            Ok(ContentAddress(intent_hash))
+            tracing::debug!("deployed intent set: {}", intent_hash);
+            Ok(intent_hash)
         }
         Err(err) => {
             tracing::info!(
-                "error deploying intent set with hash 0x{}: {}",
-                intent_hex,
+                "error deploying intent set with hash {}: {}",
+                intent_hash,
                 err
             );
             anyhow::bail!("Failed to deploy intent set: {}", err)

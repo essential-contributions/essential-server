@@ -17,9 +17,9 @@ where
             intents.insert(address, Arc::new(intent));
         } else {
             tracing::info!(
-                "error retrieving intent 0x{} from set 0x{} from storage",
-                hex::encode(address.intent.0),
-                hex::encode(address.set.0),
+                "error retrieving intent {} from set {} from storage",
+                address.intent,
+                address.set,
             );
 
             anyhow::bail!("Failed to retrieve intent set from storage");

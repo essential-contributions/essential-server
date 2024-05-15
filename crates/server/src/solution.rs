@@ -21,17 +21,16 @@ where
     validate_intents(&solution.data, &intents)?;
 
     // Insert the solution into the pool.
-    let solution_hash = essential_hash::hash(&solution.data);
-    let solution_hex = hex::encode(solution_hash);
+    let solution_hash = essential_hash::content_addr(&solution.data);
     match storage.insert_solution_into_pool(solution).await {
         Ok(()) => {
-            tracing::debug!("submitted solution: 0x{}", solution_hex);
-            Ok(solution_hash)
+            tracing::debug!("submitted solution: {}", solution_hash);
+            Ok(solution_hash.0)
         }
         Err(err) => {
             tracing::info!(
-                "error submitting solution with hash 0x{}: {}",
-                solution_hex,
+                "error submitting solution with hash {}: {}",
+                solution_hash,
                 err
             );
             anyhow::bail!("Failed to submit solution: {}", err)
