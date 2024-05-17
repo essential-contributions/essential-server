@@ -506,7 +506,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-asm-spec",
  "essential-types",
@@ -518,7 +518,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -527,21 +527,24 @@ dependencies = [
 [[package]]
 name = "essential-check"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-constraint-vm",
+ "essential-hash",
  "essential-sign",
  "essential-state-read-vm",
  "essential-types",
+ "hex",
  "rayon",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-asm-gen",
  "essential-types",
@@ -551,7 +554,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
@@ -560,12 +563,13 @@ dependencies = [
  "secp256k1",
  "sha2",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
 name = "essential-hash"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-types",
  "postcard",
@@ -650,7 +654,6 @@ dependencies = [
  "essential-transaction-storage",
  "essential-types",
  "futures",
- "hex",
  "rayon",
  "serde",
  "test-utils",
@@ -663,7 +666,7 @@ dependencies = [
 [[package]]
 name = "essential-sign"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-hash",
  "essential-types",
@@ -674,7 +677,7 @@ dependencies = [
 [[package]]
 name = "essential-state-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-asm-gen",
  "essential-constraint-asm",
@@ -684,12 +687,13 @@ dependencies = [
 [[package]]
 name = "essential-state-read-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-constraint-vm",
  "essential-state-asm",
  "essential-types",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
@@ -722,7 +726,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#1810da137cff4f059ff338ea62865c0466871030"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "serde",
 ]
