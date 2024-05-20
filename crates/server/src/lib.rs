@@ -71,11 +71,12 @@ where
         Ok(handle)
     }
 
-    #[tracing::instrument(skip_all, err)]
+    #[tracing::instrument(skip_all)]
     pub async fn run(&self, shutdown: Shutdown) -> anyhow::Result<()> {
         run::run(&self.storage, shutdown).await
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn deploy_intent_set(
         &self,
         intents: Signed<Vec<Intent>>,
@@ -83,7 +84,7 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    #[tracing::instrument(skip_all, err)]
+    #[tracing::instrument(skip_all)]
     pub async fn check_solution(
         &self,
         solution: Signed<Solution>,
@@ -98,7 +99,7 @@ where
         Ok(CheckSolutionOutput { utility, gas })
     }
 
-    #[tracing::instrument(skip_all, err)]
+    #[tracing::instrument(skip_all)]
     pub async fn check_solution_with_data(
         &self,
         solution: Signed<Solution>,
@@ -128,11 +129,11 @@ where
         Ok(CheckSolutionOutput { utility, gas })
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
         solution::submit_solution(&self.storage, solution).await
     }
 
-    #[tracing::instrument(skip(self), err)]
     pub async fn solution_outcome(
         &self,
         solution_hash: &Hash,
@@ -141,52 +142,23 @@ where
             .storage
             .get_solution(*solution_hash)
             .await?
-            .map(|outcome| {
-                let outcome = match outcome.outcome {
-                    CheckOutcome::Success(block_number) => SolutionOutcome::Success(block_number),
-                    CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
-                };
-                tracing::debug!("{:?}", outcome);
-                outcome
+            .map(|outcome| match outcome.outcome {
+                CheckOutcome::Success(block_number) => SolutionOutcome::Success(block_number),
+                CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
             }))
     }
 
-    #[tracing::instrument(skip(self))]
     pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
-        match self.storage.get_intent(address).await {
-            Ok(intent_option) => {
-                if intent_option.is_none() {
-                    tracing::debug!("intent is None");
-                }
-                Ok(intent_option)
-            }
-            Err(err) => {
-                tracing::info!("{}", err);
-                anyhow::bail!("Error getting intent: {}", err)
-            }
-        }
+        self.storage.get_intent(address).await
     }
 
-    #[tracing::instrument(skip(self))]
     pub async fn get_intent_set(
         &self,
         address: &ContentAddress,
     ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
-        match self.storage.get_intent_set(address).await {
-            Ok(set_option) => {
-                if set_option.is_none() {
-                    tracing::debug!("set is None");
-                }
-                Ok(set_option)
-            }
-            Err(err) => {
-                tracing::info!("{}", err);
-                anyhow::bail!("Error getting intent set: {}", err)
-            }
-        }
+        self.storage.get_intent_set(address).await
     }
 
-    #[tracing::instrument(skip_all, err)]
     pub async fn list_intent_sets(
         &self,
         time_range: Option<Range<Duration>>,
@@ -195,12 +167,10 @@ where
         self.storage.list_intent_sets(time_range, page).await
     }
 
-    #[tracing::instrument(skip_all, err)]
     pub async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
         self.storage.list_solutions_pool().await
     }
 
-    #[tracing::instrument(skip_all, err)]
     pub async fn list_winning_blocks(
         &self,
         time_range: Option<Range<Duration>>,
@@ -209,7 +179,6 @@ where
         self.storage.list_winning_blocks(time_range, page).await
     }
 
-    #[tracing::instrument(skip(self), err)]
     pub async fn query_state(
         &self,
         address: &ContentAddress,
@@ -218,7 +187,6 @@ where
         self.storage.query_state(address, key).await
     }
 
-    #[tracing::instrument(skip(self), err)]
     pub async fn get_storage_layout(
         &self,
         address: &ContentAddress,
