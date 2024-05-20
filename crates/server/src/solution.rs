@@ -66,10 +66,7 @@ where
     S: Clone + StateStorage,
 {
     let mut post_state = pre_state.clone();
-    match apply_mutations(&mut post_state, solution) {
-        Ok(()) => Ok(post_state),
-        Err(err) => Err(err),
-    }
+    apply_mutations(&mut post_state, solution).map(|_| post_state)
 }
 
 /// Validate what we can of the solution's associated intents without performing execution.
@@ -79,14 +76,11 @@ pub fn validate_intents(
     intents: &HashMap<IntentAddress, Arc<Intent>>,
 ) -> anyhow::Result<()> {
     // The map must contain all intents referred to by solution data.
-    match contains_all_intents(solution, intents) {
-        Ok(()) => {
-            // The decision variable lengths must match.
-            check::solution::check_decision_variable_lengths(solution, |addr| intents[addr].clone())
-                .map_err(|(ix, err)| anyhow::anyhow!("solution data at {ix} invalid: {err}"))
-        }
-        Err(err) => Err(err),
-    }
+    contains_all_intents(solution, intents)?;
+
+    // The decision variable lengths must match.
+    check::solution::check_decision_variable_lengths(solution, |addr| intents[addr].clone())
+        .map_err(|(ix, err)| anyhow::anyhow!("solution data at {ix} invalid: {err}"))
 }
 
 /// Ensure that all intents referred to by the solution have been read from the storage.
