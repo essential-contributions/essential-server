@@ -72,7 +72,7 @@ where
                                             .await
                                             .err()
                                         {
-                                            tracing::warn!(
+                                            tracing::error!(
                                                 "error pruning failed solutions: {}",
                                                 err
                                             )
@@ -87,11 +87,11 @@ where
                                 }
                             }
                             Err(err) => {
-                                tracing::warn!("error marking solutions as solved: {}", err)
+                                tracing::error!("error marking solutions as solved: {}", err)
                             }
                         }
                     }
-                    Err(err) => tracing::warn!("error marking solutions as failed: {}", err),
+                    Err(err) => tracing::error!("error marking solutions as failed: {}", err),
                 }
             }
             Err(err) => tracing::error!("error building block: {}", err),
