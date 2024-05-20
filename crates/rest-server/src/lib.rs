@@ -63,12 +63,6 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    // Initialize tracing subscriber if `ESSENTIAL_SERVER_LOG` environment variable is set.
-    // The level of tracing is by default determined by `RUST_LOG` environment variable.
-    if std::env::var("ESSENTIAL_SERVER_LOG").is_ok() {
-        let _ = tracing_subscriber::fmt::try_init();
-    }
-
     // Spawn essential and get the handle.
     let handle = essential.clone().spawn()?;
 

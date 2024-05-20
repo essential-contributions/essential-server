@@ -16,6 +16,9 @@ struct Cli {
     #[arg(long, short, default_value_t = String::from("https://localhost:4001"))]
     /// Address of the rqlite server, if using rqlite.
     rqlite_address: String,
+
+    #[arg(default_value_t = false)]
+    tracing: bool,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -30,9 +33,13 @@ async fn main() {
         address,
         db,
         rqlite_address,
+        tracing,
     } = Cli::parse();
     let (local_addr, local_addr_rx) = tokio::sync::oneshot::channel();
     let config = Default::default();
+    if tracing {
+        let _ = tracing_subscriber::fmt::try_init();
+    }
     let jh = tokio::task::spawn(async move {
         match db {
             Db::Memory => {
