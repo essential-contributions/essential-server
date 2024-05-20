@@ -71,12 +71,10 @@ where
         Ok(handle)
     }
 
-    #[tracing::instrument(skip_all)]
     pub async fn run(&self, shutdown: Shutdown) -> anyhow::Result<()> {
         run::run(&self.storage, shutdown).await
     }
 
-    #[tracing::instrument(skip_all)]
     pub async fn deploy_intent_set(
         &self,
         intents: Signed<Vec<Intent>>,
@@ -84,7 +82,6 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    #[tracing::instrument(skip_all)]
     pub async fn check_solution(
         &self,
         solution: Signed<Solution>,
@@ -99,7 +96,6 @@ where
         Ok(CheckSolutionOutput { utility, gas })
     }
 
-    #[tracing::instrument(skip_all)]
     pub async fn check_solution_with_data(
         &self,
         solution: Signed<Solution>,
@@ -129,8 +125,10 @@ where
         Ok(CheckSolutionOutput { utility, gas })
     }
 
-    #[tracing::instrument(skip_all)]
-    pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
+    pub async fn submit_solution(
+        &self,
+        solution: Signed<Solution>,
+    ) -> anyhow::Result<ContentAddress> {
         solution::submit_solution(&self.storage, solution).await
     }
 

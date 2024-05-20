@@ -125,7 +125,7 @@ where
 async fn submit_solution<S>(
     State(essential): State<Essential<S>>,
     Json(payload): Json<Signed<Solution>>,
-) -> Result<Json<Hash>, Error>
+) -> Result<Json<ContentAddress>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
