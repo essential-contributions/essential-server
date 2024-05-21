@@ -24,3 +24,7 @@ reqwest = { workspace = true, features = ["json"] }
 serde_json = { workspace = true }
 test-utils = { workspace = true }
 utils = { workspace = true }
+
+[features]
+default = ["tracing"]
+tracing = ["dep:tracing-subscriber", "essential-server/tracing"]

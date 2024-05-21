@@ -9,11 +9,11 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 base64 = "0.22.0"
 clap = { version = "4.5.4", features = ["derive"] }
-essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git", features = ["tracing"] }
-essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", features = ["tracing"] }
+essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", features = ["tracing"] }
+essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 futures = "0.3.30"
 imbl = "3.0.0"

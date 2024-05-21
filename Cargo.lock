@@ -507,7 +507,6 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-asm-spec",
  "essential-types",
@@ -519,7 +518,6 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -528,24 +526,19 @@ dependencies = [
 [[package]]
 name = "essential-check"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-constraint-vm",
- "essential-hash",
  "essential-sign",
  "essential-state-read-vm",
  "essential-types",
- "hex",
  "rayon",
  "thiserror",
  "tokio",
- "tracing",
 ]
 
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-asm-gen",
  "essential-types",
@@ -555,7 +548,6 @@ dependencies = [
 [[package]]
 name = "essential-constraint-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
@@ -564,13 +556,11 @@ dependencies = [
  "secp256k1",
  "sha2",
  "thiserror",
- "tracing",
 ]
 
 [[package]]
 name = "essential-hash"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-types",
  "postcard",
@@ -660,13 +650,13 @@ dependencies = [
  "test-utils",
  "tokio",
  "tracing",
+ "tracing-subscriber",
  "utils",
 ]
 
 [[package]]
 name = "essential-sign"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-hash",
  "essential-types",
@@ -677,7 +667,6 @@ dependencies = [
 [[package]]
 name = "essential-state-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-asm-gen",
  "essential-constraint-asm",
@@ -687,13 +676,11 @@ dependencies = [
 [[package]]
 name = "essential-state-read-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "essential-constraint-vm",
  "essential-state-asm",
  "essential-types",
  "thiserror",
- "tracing",
 ]
 
 [[package]]
@@ -726,7 +713,6 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
 dependencies = [
  "serde",
 ]
@@ -972,12 +958,6 @@ name = "hermit-abi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
-
-[[package]]
-name = "hex"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hex-conservative"

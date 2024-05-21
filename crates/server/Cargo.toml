@@ -23,3 +23,6 @@ utils = { workspace = true }
 [dev-dependencies]
 essential-memory-storage = { workspace = true }
 test-utils = { workspace = true }
+
+[features]
+tracing = ["essential-check/tracing", "essential-constraint-vm/tracing", "essential-state-vm/tracing" ]
