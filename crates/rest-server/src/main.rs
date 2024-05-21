@@ -39,12 +39,13 @@ async fn main() {
     let config = Default::default();
     if tracing {
         #[cfg(feature = "tracing")]
-        if let Ok(filter) = tracing_subscriber::EnvFilter::builder()
-            .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
-            .from_env_lossy()
-        {
-            let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
-        }
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::builder()
+                    .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                    .from_env_lossy(),
+            )
+            .try_init();
     }
 
     let jh = tokio::task::spawn(async move {
