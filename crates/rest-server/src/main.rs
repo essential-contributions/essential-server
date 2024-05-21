@@ -1,6 +1,7 @@
 use clap::{Parser, ValueEnum};
 use essential_memory_storage::MemoryStorage;
 use essential_rqlite_storage::RqliteStorage;
+use tracing_subscriber::{filter::LevelFilter, EnvFilter};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -38,8 +39,14 @@ async fn main() {
     let (local_addr, local_addr_rx) = tokio::sync::oneshot::channel();
     let config = Default::default();
     if tracing {
-        let _ = tracing_subscriber::fmt::try_init();
+        if let Ok(filter) = EnvFilter::builder()
+            .with_default_directive(LevelFilter::INFO.into())
+            .parse("")
+        {
+            let _ = tracing_subscriber::fmt().with_env_filter(filter).try_init();
+        }
     }
+
     let jh = tokio::task::spawn(async move {
         match db {
             Db::Memory => {
