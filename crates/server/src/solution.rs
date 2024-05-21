@@ -3,14 +3,13 @@ use essential_storage::{StateStorage, Storage};
 use essential_transaction_storage::TransactionStorage;
 use essential_types::{intent::Intent, solution::Solution, ContentAddress, IntentAddress, Signed};
 use std::{collections::HashMap, sync::Arc};
-use tracing::Level;
 
 pub(crate) mod read;
 #[cfg(test)]
 mod tests;
 
 /// Validates a signed solution and submits it to storage.
-#[tracing::instrument(skip_all, err(level=Level::DEBUG), ret(Display))]
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err(level=tracing::Level::DEBUG), ret(Display)))]
 pub async fn submit_solution<S>(
     storage: &S,
     solution: Signed<Solution>,
@@ -57,7 +56,7 @@ where
 
 /// Given the pre_state and a solution, produce the post_state with all proposed
 /// solution mutations applied.
-#[tracing::instrument(skip_all, err)]
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
 pub fn create_post_state<S>(
     pre_state: &TransactionStorage<S>,
     solution: &Solution,
@@ -71,7 +70,7 @@ where
 }
 
 /// Validate what we can of the solution's associated intents without performing execution.
-#[tracing::instrument(skip_all, err)]
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
 pub fn validate_intents(
     solution: &Solution,
     intents: &HashMap<IntentAddress, Arc<Intent>>,

@@ -2,7 +2,7 @@ use essential_storage::Storage;
 use essential_types::{intent::Intent, solution::Solution, IntentAddress};
 use std::{collections::HashMap, sync::Arc};
 
-#[tracing::instrument(skip_all, err)]
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
 pub async fn read_intents_from_storage<S>(
     solution: &Solution,
     storage: &S,
@@ -19,6 +19,7 @@ where
             anyhow::bail!("Failed to retrieve intent set from storage");
         }
     }
+    #[cfg(feature = "tracing")]
     tracing::trace!(count = intents.len());
     Ok(intents)
 }

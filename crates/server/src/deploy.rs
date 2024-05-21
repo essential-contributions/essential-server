@@ -1,13 +1,12 @@
 use essential_check as check;
 use essential_storage::Storage;
 use essential_types::{intent::Intent, ContentAddress, Signed, StorageLayout};
-use tracing::Level;
 
 #[cfg(test)]
 mod tests;
 
 /// Validates an intent and deploys it to storage.
-#[tracing::instrument(skip_all, err(level=Level::DEBUG), ret(Display))]
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err(level=tracing::Level::DEBUG), ret(Display)))]
 pub async fn deploy<S>(storage: &S, intent: Signed<Vec<Intent>>) -> anyhow::Result<ContentAddress>
 where
     S: Storage,

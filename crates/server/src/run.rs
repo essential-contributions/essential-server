@@ -26,7 +26,7 @@ struct Solutions {
 }
 
 /// The main loop that builds blocks.
-#[tracing::instrument(skip_all, err)]
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
 pub async fn run<S>(storage: &S, mut shutdown: Shutdown) -> anyhow::Result<()>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
@@ -109,6 +109,7 @@ where
     let mut failed_solutions: Vec<_> = vec![];
 
     for solution in solutions {
+        #[cfg(feature = "tracing")]
         let solution_hash = essential_hash::content_addr(&solution.data);
         // Put the solution into an Arc so it's cheap to clone.
         let solution = Arc::new(solution.data);
@@ -127,17 +128,17 @@ where
                 transaction = post_state;
                 // Collect the valid solution.
                 valid_solutions.push((solution, util));
-
+                #[cfg(feature = "tracing")]
                 tracing::debug!(valid_solution = %solution_hash, utility = util);
             }
             Err(err) => {
                 // Collect the failed solution with the reason.
-                tracing::debug!(failed_solution = %solution_hash, %err);
-
                 failed_solutions.push((
                     solution,
                     SolutionFailReason::ConstraintsFailed(err.to_string()),
                 ));
+                #[cfg(feature = "tracing")]
+                tracing::debug!(failed_solution = %solution_hash, %err);
             }
         }
     }
