@@ -15,6 +15,7 @@ essential-types = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+tracing-subscriber = { workspace = true, optional = true, features = ["env-filter"] }
 
 [dev-dependencies]
 essential-hash = { workspace = true }
@@ -23,3 +24,7 @@ reqwest = { workspace = true, features = ["json"] }
 serde_json = { workspace = true }
 test-utils = { workspace = true }
 utils = { workspace = true }
+
+[features]
+default = ["tracing"]
+tracing = ["dep:tracing-subscriber", "essential-server/tracing"]

@@ -6,15 +6,16 @@ use essential_types::{intent::Intent, ContentAddress, Signed, StorageLayout};
 mod tests;
 
 /// Validates an intent and deploys it to storage.
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err(level=tracing::Level::DEBUG), ret(Display)))]
 pub async fn deploy<S>(storage: &S, intent: Signed<Vec<Intent>>) -> anyhow::Result<ContentAddress>
 where
     S: Storage,
 {
     check::intent::check_signed_set(&intent)?;
-    let intent_hash = essential_hash::hash(&intent.data);
+    let intent_hash = essential_hash::content_addr(&intent.data);
 
     match storage.insert_intent_set(StorageLayout, intent).await {
-        Ok(()) => Ok(ContentAddress(intent_hash)),
-        Err(e) => anyhow::bail!("Failed to deploy intent set: {}", e),
+        Ok(()) => Ok(intent_hash),
+        Err(err) => anyhow::bail!("Failed to deploy intent set: {}", err),
     }
 }

@@ -10,8 +10,6 @@ use essential_types::{
 };
 use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
 
-// TODO: replace `MemoryStorage`s with `S: Storage` objects
-
 // Empty valid solution.
 // Sign an empty valid intent and deploy it to newly created memory storage,
 // create a solution with the signed intent address.

@@ -125,7 +125,10 @@ where
         Ok(CheckSolutionOutput { utility, gas })
     }
 
-    pub async fn submit_solution(&self, solution: Signed<Solution>) -> anyhow::Result<Hash> {
+    pub async fn submit_solution(
+        &self,
+        solution: Signed<Solution>,
+    ) -> anyhow::Result<ContentAddress> {
         solution::submit_solution(&self.storage, solution).await
     }
 

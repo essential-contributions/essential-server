@@ -2,6 +2,7 @@ use essential_storage::Storage;
 use essential_types::{intent::Intent, solution::Solution, IntentAddress};
 use std::{collections::HashMap, sync::Arc};
 
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
 pub async fn read_intents_from_storage<S>(
     solution: &Solution,
     storage: &S,
@@ -9,7 +10,6 @@ pub async fn read_intents_from_storage<S>(
 where
     S: Storage,
 {
-    // TODO: consider FuturesUnordered
     let mut intents: HashMap<_, _> = HashMap::new();
     for data in &solution.data {
         let address = data.intent_to_solve.clone();
@@ -19,5 +19,7 @@ where
             anyhow::bail!("Failed to retrieve intent set from storage");
         }
     }
+    #[cfg(feature = "tracing")]
+    tracing::trace!(count = intents.len());
     Ok(intents)
 }

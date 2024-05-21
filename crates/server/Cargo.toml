@@ -17,8 +17,12 @@ futures = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true, optional = true }
 utils = { workspace = true }
 
 [dev-dependencies]
 essential-memory-storage = { workspace = true }
 test-utils = { workspace = true }
+
+[features]
+tracing = ["dep:tracing", "essential-check/tracing", "essential-constraint-vm/tracing", "essential-state-read-vm/tracing" ]

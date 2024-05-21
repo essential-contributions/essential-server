@@ -1,4 +1,5 @@
 use crate::{solution::read::read_intents_from_storage, PRUNE_FAILED_STORAGE_OLDER_THAN};
+use anyhow::Context;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_storage::{failed_solution::SolutionFailReason, Storage};
@@ -25,6 +26,7 @@ struct Solutions {
 }
 
 /// The main loop that builds blocks.
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
 pub async fn run<S>(storage: &S, mut shutdown: Shutdown) -> anyhow::Result<()>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
@@ -43,7 +45,8 @@ where
         }
 
         // Build a block.
-        let (solutions, mut transaction) = build_block(storage).await?;
+        let (solutions, mut transaction) =
+            build_block(storage).await.context("error building block")?;
 
         // FIXME: These 3 database commits should be atomic. If one fails they should all fail.
         // We don't have transactions for storage yet so that will be required to implement this.
@@ -54,7 +57,11 @@ where
             .iter()
             .map(|(solution, reason)| (hash(solution.as_ref()), reason.clone()))
             .collect();
-        storage.move_solutions_to_failed(&failed_solutions).await?;
+
+        storage
+            .move_solutions_to_failed(&failed_solutions)
+            .await
+            .context("error marking solutions as failed")?;
 
         // Move valid solutions.
         let solved_solutions: Vec<Hash> = solutions
@@ -62,14 +69,22 @@ where
             .iter()
             .map(|s| hash(s.0.as_ref()))
             .collect();
-        storage.move_solutions_to_solved(&solved_solutions).await?;
+
+        storage
+            .move_solutions_to_solved(&solved_solutions)
+            .await
+            .context("error marking solutions as solved")?;
 
         // Commit the state updates transaction.
-        transaction.commit().await?;
+        transaction
+            .commit()
+            .await
+            .context("error committing state changes")?;
 
-        let _result = storage
+        storage
             .prune_failed_solutions(PRUNE_FAILED_STORAGE_OLDER_THAN)
-            .await;
+            .await
+            .context("error pruning failed solutions")?;
     }
 }
 
@@ -94,6 +109,8 @@ where
     let mut failed_solutions: Vec<_> = vec![];
 
     for solution in solutions {
+        #[cfg(feature = "tracing")]
+        let solution_hash = essential_hash::content_addr(&solution.data);
         // Put the solution into an Arc so it's cheap to clone.
         let solution = Arc::new(solution.data);
 
@@ -111,13 +128,17 @@ where
                 transaction = post_state;
                 // Collect the valid solution.
                 valid_solutions.push((solution, util));
+                #[cfg(feature = "tracing")]
+                tracing::debug!(valid_solution = %solution_hash, utility = util);
             }
-            Err(e) => {
+            Err(err) => {
                 // Collect the failed solution with the reason.
                 failed_solutions.push((
                     solution,
-                    SolutionFailReason::ConstraintsFailed(e.to_string()),
+                    SolutionFailReason::ConstraintsFailed(err.to_string()),
                 ));
+                #[cfg(feature = "tracing")]
+                tracing::debug!(failed_solution = %solution_hash, %err);
             }
         }
     }

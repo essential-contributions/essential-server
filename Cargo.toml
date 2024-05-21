@@ -26,6 +26,8 @@ serde_json = "1.0.114"
 sha2 = "0.10.8"
 thiserror = "1.0.58"
 tokio = { version = "1.36.0", features = ["full"] }
+tracing = {version = "0.1", features = ["attributes"]}
+tracing-subscriber = "0.3"
 
 essential-memory-storage = { path = "crates/memory-storage" }
 essential-rqlite-storage = { path = "crates/rqlite-storage" }
