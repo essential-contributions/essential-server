@@ -66,7 +66,8 @@ where
     S: Clone + StateStorage,
 {
     let mut post_state = pre_state.clone();
-    apply_mutations(&mut post_state, solution).map(|_| post_state)
+    apply_mutations(&mut post_state, solution)?;
+    Ok(post_state)
 }
 
 /// Validate what we can of the solution's associated intents without performing execution.
