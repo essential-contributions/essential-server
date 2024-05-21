@@ -9,7 +9,7 @@ use test_utils::{
 async fn test_insert_intent_set() {
     let storage = MemoryStorage::new();
     let storage_layout = StorageLayout {};
-    let intents = [
+    let intent_sets = [
         sign_with_random_keypair(vec![
             intent_with_decision_variables(0),
             intent_with_decision_variables(1),
@@ -22,44 +22,44 @@ async fn test_insert_intent_set() {
         ]),
     ];
     storage
-        .insert_intent_set(storage_layout.clone(), intents[0].clone())
+        .insert_intent_set(storage_layout.clone(), intent_sets[0].clone())
         .await
         .unwrap();
 
     storage
-        .insert_intent_set(storage_layout.clone(), intents[0].clone())
+        .insert_intent_set(storage_layout.clone(), intent_sets[0].clone())
         .await
         .unwrap();
 
     let result = storage.list_intent_sets(None, None).await.unwrap();
-    assert_eq!(result, vec![intents[0].data.clone()]);
+    assert_eq!(result, vec![intent_sets[0].data.clone()]);
 
     storage
-        .insert_intent_set(storage_layout, intents[1].clone())
+        .insert_intent_set(storage_layout, intent_sets[1].clone())
         .await
         .unwrap();
 
     let result = storage.list_intent_sets(None, None).await.unwrap();
     assert_eq!(
         result,
-        vec![intents[0].data.clone(), intents[1].data.clone()]
+        vec![intent_sets[0].data.clone(), intent_sets[1].data.clone()]
     );
 
-    for intent in &intents {
-        for j in 0..3 {
+    for intent_set in &intent_sets {
+        for intent in &intent_set.data {
             let address = IntentAddress {
-                set: ContentAddress(hash(&intent.data)),
-                intent: ContentAddress(hash(&intent.data[j])),
+                set: essential_hash::intent_set_addr::from_intents(&intent_set.data),
+                intent: essential_hash::content_addr(intent),
             };
-
             let result = storage.get_intent(&address).await.unwrap().unwrap();
-
-            assert_eq!(result, intent.data[j]);
+            assert_eq!(&result, intent);
         }
     }
 
     let result = storage
-        .get_storage_layout(&ContentAddress(hash(&intents[0].data)))
+        .get_storage_layout(&essential_hash::intent_set_addr::from_intents(
+            &intent_sets[0].data,
+        ))
         .await
         .unwrap()
         .unwrap();
@@ -171,7 +171,7 @@ async fn test_update_and_query_state() {
     let storage = MemoryStorage::new();
 
     let intent_set = sign_with_random_keypair(vec![intent_with_decision_variables(0)]);
-    let address = ContentAddress(hash(&intent_set.data));
+    let address = essential_hash::intent_set_addr::from_intents(&intent_set.data);
     let key = [0; 4];
     let word = Some(42);
 

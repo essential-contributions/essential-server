@@ -522,7 +522,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "essential-asm-spec",
  "essential-types",
@@ -534,7 +534,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -543,7 +543,7 @@ dependencies = [
 [[package]]
 name = "essential-check"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "essential-constraint-vm",
  "essential-hash",
@@ -560,7 +560,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "essential-asm-gen",
  "essential-types",
@@ -570,7 +570,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
@@ -585,7 +585,7 @@ dependencies = [
 [[package]]
 name = "essential-hash"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "essential-types",
  "postcard",
@@ -681,7 +681,7 @@ dependencies = [
 [[package]]
 name = "essential-sign"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "essential-hash",
  "essential-types",
@@ -692,7 +692,7 @@ dependencies = [
 [[package]]
 name = "essential-state-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "essential-asm-gen",
  "essential-constraint-asm",
@@ -702,7 +702,7 @@ dependencies = [
 [[package]]
 name = "essential-state-read-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "essential-constraint-vm",
  "essential-state-asm",
@@ -741,7 +741,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#21c0ca6ffb611ba48eca077d6e23f56ddce3b24f"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=mitchmindtree/intent-set-ca#4ed33404c7605ba56ee257e672b92698b38a9c88"
 dependencies = [
  "serde",
 ]

@@ -128,12 +128,14 @@ impl Storage for MemoryStorage {
         intent: Signed<Vec<Intent>>,
     ) -> anyhow::Result<()> {
         let Signed { data, signature } = intent;
-        let hash = ContentAddress(essential_hash::hash(&data));
+        // TODO: Refactor upon solving essential-contributions/essential-base#116.
         let order: Vec<_> = data
             .iter()
-            .map(|i| ContentAddress(essential_hash::hash(i)))
+            .map(|intent| essential_hash::content_addr(&intent))
             .collect();
-        let map = order.iter().cloned().zip(data.into_iter()).collect();
+        let map = order.iter().cloned().zip(data).collect();
+        let set_addr = essential_hash::intent_set_addr::from_intent_addrs(order.iter().cloned());
+
         let set = IntentSet {
             storage_layout,
             order,
@@ -145,11 +147,11 @@ impl Storage for MemoryStorage {
             if i.intent_time_index.contains_key(&time) {
                 bail!("Two intent sets created at the same time");
             }
-            let contains = i.intents.insert(hash.clone(), set);
+            let contains = i.intents.insert(set_addr.clone(), set);
             if contains.is_none() {
-                i.intent_time_index.insert(time, hash.clone());
+                i.intent_time_index.insert(time, set_addr.clone());
             }
-            i.state.entry(hash).or_default();
+            i.state.entry(set_addr).or_default();
             Ok(())
         })
     }

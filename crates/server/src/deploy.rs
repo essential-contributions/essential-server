@@ -7,15 +7,18 @@ mod tests;
 
 /// Validates an intent and deploys it to storage.
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err(level=tracing::Level::DEBUG), ret(Display)))]
-pub async fn deploy<S>(storage: &S, intent: Signed<Vec<Intent>>) -> anyhow::Result<ContentAddress>
+pub async fn deploy<S>(
+    storage: &S,
+    intent_set: Signed<Vec<Intent>>,
+) -> anyhow::Result<ContentAddress>
 where
     S: Storage,
 {
-    check::intent::check_signed_set(&intent)?;
-    let intent_hash = essential_hash::content_addr(&intent.data);
+    check::intent::check_signed_set(&intent_set)?;
+    let intent_set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.data);
 
-    match storage.insert_intent_set(StorageLayout, intent).await {
-        Ok(()) => Ok(intent_hash),
+    match storage.insert_intent_set(StorageLayout, intent_set).await {
+        Ok(()) => Ok(intent_set_addr),
         Err(err) => anyhow::bail!("Failed to deploy intent set: {}", err),
     }
 }

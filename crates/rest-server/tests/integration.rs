@@ -68,7 +68,8 @@ async fn test_deploy_intent_set() {
         .unwrap();
     assert_eq!(response.status(), 200);
     let address = response.json::<ContentAddress>().await.unwrap();
-    assert_eq!(address.0, essential_hash::hash(&intent_set.data));
+    let expected = essential_hash::intent_set_addr::from_intents(&intent_set.data);
+    assert_eq!(address, expected);
 
     let a = url
         .join(&format!("/get-intent-set/{}", URL_SAFE.encode(address.0)))
@@ -85,7 +86,7 @@ async fn test_deploy_intent_set() {
 
     let intent_address = IntentAddress {
         set: address,
-        intent: ContentAddress(essential_hash::hash(&intent_set.data[0])),
+        intent: essential_hash::content_addr(&intent_set.data[0]),
     };
     let a = url
         .join(&format!(
@@ -134,7 +135,7 @@ async fn test_submit_solution() {
     intent.slots.decision_variables = 1;
     let intent_address = ContentAddress(essential_hash::hash(&intent));
     let intent_set = sign_with_random_keypair(vec![intent]);
-    let set_address = ContentAddress(essential_hash::hash(&intent_set.data));
+    let set_address = essential_hash::intent_set_addr::from_intents(&intent_set.data);
 
     let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set)
@@ -181,7 +182,7 @@ async fn test_submit_solution() {
 #[tokio::test]
 async fn test_query_state() {
     let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
-    let address = ContentAddress(essential_hash::hash(&intent_set.data));
+    let address = essential_hash::intent_set_addr::from_intents(&intent_set.data);
     let key = [0; 4];
 
     let mem = MemoryStorage::new();
@@ -293,8 +294,8 @@ async fn test_check_solution() {
         jh,
     } = setup_with_mem(mem).await;
 
-    let set = ContentAddress(essential_hash::hash(&intent_set.data));
-    let address = ContentAddress(essential_hash::hash(&intent_set.data[0]));
+    let set = essential_hash::intent_set_addr::from_intents(&intent_set.data);
+    let address = essential_hash::content_addr(&intent_set.data[0]);
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
         intent_to_solve: IntentAddress {
