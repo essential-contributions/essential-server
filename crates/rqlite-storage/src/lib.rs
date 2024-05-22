@@ -303,7 +303,8 @@ impl Storage for RqliteStorage {
         let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
 
         // Encode the data into base64 blobs.
-        let address = encode(&ContentAddress(hash(&intents.data)));
+        let set_addr = essential_hash::intent_set_addr::from_intents(&intents.data);
+        let address = encode(&set_addr);
         let signature = encode(&intents.signature);
         let storage_layout = encode(&storage_layout);
 
