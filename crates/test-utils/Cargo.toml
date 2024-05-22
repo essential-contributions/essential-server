@@ -10,4 +10,3 @@ essential-sign = { workspace = true }
 essential-types = { workspace = true }
 secp256k1 = { workspace = true }
 serde = { workspace = true }
-utils = { workspace = true }

@@ -12,6 +12,7 @@ clap = { version = "4.5.4", features = ["derive"] }
 essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+essential-lock = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
@@ -35,4 +36,3 @@ essential-server = { path = "crates/server" }
 essential-storage = { path = "crates/storage" }
 essential-transaction-storage = { path = "crates/transaction-storage" }
 test-utils = { path = "crates/test-utils" }
-utils = { path = "crates/utils" }

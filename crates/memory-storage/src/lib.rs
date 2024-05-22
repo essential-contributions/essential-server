@@ -1,4 +1,5 @@
 use anyhow::bail;
+use essential_lock::StdLock;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcome},
@@ -17,7 +18,6 @@ use std::{
     vec,
 };
 use thiserror::Error;
-use utils::Lock;
 
 #[cfg(test)]
 mod tests;
@@ -28,7 +28,7 @@ const PAGE_SIZE: usize = 100;
 
 #[derive(Clone)]
 pub struct MemoryStorage {
-    inner: Arc<Lock<Inner>>,
+    inner: Arc<StdLock<Inner>>,
 }
 
 impl Default for MemoryStorage {
@@ -62,7 +62,7 @@ struct IntentSet {
 impl MemoryStorage {
     pub fn new() -> Self {
         Self {
-            inner: Arc::new(Lock::new(Inner::default())),
+            inner: Arc::new(StdLock::new(Inner::default())),
         }
     }
 }
