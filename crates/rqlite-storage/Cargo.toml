@@ -16,7 +16,6 @@ reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["preserve_order"] }
 thiserror = { workspace = true }
-utils = { workspace = true }
 
 [dev-dependencies]
 rusqlite = { version = "0.31.0", features = ["bundled"] }

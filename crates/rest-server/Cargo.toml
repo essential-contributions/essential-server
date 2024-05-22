@@ -23,7 +23,6 @@ essential-storage = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde_json = { workspace = true }
 test-utils = { workspace = true }
-utils = { workspace = true }
 
 [features]
 default = ["tracing"]

@@ -18,7 +18,6 @@ rayon = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true, optional = true }
-utils = { workspace = true }
 
 [dev-dependencies]
 essential-memory-storage = { workspace = true }

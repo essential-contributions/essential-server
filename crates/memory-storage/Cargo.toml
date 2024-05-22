@@ -6,12 +6,12 @@ version = "0.1.0"
 [dependencies]
 anyhow = { workspace = true }
 essential-hash = { workspace = true }
+essential-lock = { workspace = true }
 essential-state-read-vm = { workspace = true }
 essential-storage = { workspace = true }
 essential-types = { workspace = true }
 futures = { workspace = true }
 thiserror = { workspace = true }
-utils = { workspace = true }
 
 [dev-dependencies]
 test-utils = { workspace = true }

@@ -12,7 +12,6 @@ essential-types = { workspace = true }
 futures = { workspace = true }
 imbl = { workspace = true }
 thiserror = { workspace = true }
-utils = { workspace = true }
 
 [dev-dependencies]
 essential-memory-storage = { workspace = true }
