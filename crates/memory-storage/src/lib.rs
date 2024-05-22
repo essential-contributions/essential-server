@@ -41,7 +41,7 @@ impl Default for MemoryStorage {
 struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
     intent_time_index: BTreeMap<Duration, ContentAddress>,
-    solution_pool: HashMap<Hash, Signed<Solution>>,
+    solution_pool: HashMap<Hash, Solution>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, FailedSolution>,
     failed_solution_time_index: HashMap<Duration, Vec<Hash>>,
@@ -156,9 +156,9 @@ impl Storage for MemoryStorage {
         })
     }
 
-    async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
+    async fn insert_solution_into_pool(&self, solution: Solution) -> anyhow::Result<()> {
         let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-        let hash = essential_hash::hash(&solution.data);
+        let hash = essential_hash::hash(&solution);
         self.inner.apply(|i| {
             if i.solution_pool.insert(hash, solution).is_none() {
                 i.solution_time_index
@@ -287,7 +287,7 @@ impl Storage for MemoryStorage {
         }
     }
 
-    async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
+    async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Solution>> {
         Ok(self.inner.apply(|i| {
             i.solution_time_index
                 .values()
@@ -349,7 +349,7 @@ impl Storage for MemoryStorage {
                 .batch
                 .solutions
                 .iter()
-                .find(|s| essential_hash::hash(&s.data) == solution_hash)
+                .find(|s| essential_hash::hash(&s) == solution_hash)
                 .cloned()
                 .map(|s| SolutionOutcome {
                     solution: s,

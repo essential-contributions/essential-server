@@ -110,9 +110,9 @@ where
 
     for solution in solutions {
         #[cfg(feature = "tracing")]
-        let solution_hash = essential_hash::content_addr(&solution.data);
+        let solution_hash = essential_hash::content_addr(&solution);
         // Put the solution into an Arc so it's cheap to clone.
-        let solution = Arc::new(solution.data);
+        let solution = Arc::new(solution);
 
         // Get the intents for this solution.
         let intents = read_intents_from_storage(&solution, storage).await?;

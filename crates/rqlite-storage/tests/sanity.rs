@@ -150,7 +150,7 @@ async fn test_insert_intent_set() {
 #[ignore]
 async fn test_insert_solution_into_pool() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
-    let solution = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     storage
         .insert_solution_into_pool(solution.clone())
         .await

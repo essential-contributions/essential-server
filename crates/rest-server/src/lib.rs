@@ -41,7 +41,7 @@ struct Page {
 
 #[derive(Deserialize)]
 struct CheckSolution {
-    solution: Signed<Solution>,
+    solution: Solution,
     intents: Vec<Intent>,
 }
 
@@ -124,7 +124,7 @@ where
 /// Takes a signed solution as a json payload.
 async fn submit_solution<S>(
     State(essential): State<Essential<S>>,
-    Json(payload): Json<Signed<Solution>>,
+    Json(payload): Json<Solution>,
 ) -> Result<Json<ContentAddress>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
@@ -233,7 +233,7 @@ where
 /// The list solutions pool get endpoint.
 async fn list_solutions_pool<S>(
     State(essential): State<Essential<S>>,
-) -> Result<Json<Vec<Signed<Solution>>>, Error>
+) -> Result<Json<Vec<Solution>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -303,7 +303,7 @@ where
 /// Takes a signed solution as a json payload.
 async fn check_solution<S>(
     State(essential): State<Essential<S>>,
-    Json(payload): Json<Signed<Solution>>,
+    Json(payload): Json<Solution>,
 ) -> Result<Json<CheckSolutionOutput>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,

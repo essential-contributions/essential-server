@@ -69,10 +69,10 @@ async fn test_insert_intent_set() {
 #[tokio::test]
 async fn test_solutions() {
     let storage = MemoryStorage::new();
-    let solution = sign_with_random_keypair(solution_with_decision_variables(0));
-    let solution2 = sign_with_random_keypair(solution_with_decision_variables(1));
-    let solution3 = sign_with_random_keypair(solution_with_decision_variables(2));
-    let solution4 = sign_with_random_keypair(solution_with_decision_variables(3));
+    let solution = solution_with_decision_variables(0);
+    let solution2 = solution_with_decision_variables(1);
+    let solution3 = solution_with_decision_variables(2);
+    let solution4 = solution_with_decision_variables(3);
 
     // Idempotent insert
     storage
@@ -97,7 +97,7 @@ async fn test_solutions() {
     assert!(result.contains(&solution2));
 
     storage
-        .move_solutions_to_solved(&[hash(&solution.data)])
+        .move_solutions_to_solved(&[hash(&solution)])
         .await
         .unwrap();
 
@@ -120,7 +120,7 @@ async fn test_solutions() {
         .unwrap();
 
     storage
-        .move_solutions_to_solved(&[hash(&solution2.data), hash(&solution3.data)])
+        .move_solutions_to_solved(&[hash(&solution2), hash(&solution3)])
         .await
         .unwrap();
 
@@ -128,7 +128,7 @@ async fn test_solutions() {
     assert_eq!(result.len(), 1);
     assert!(result.contains(&solution4));
 
-    let solution4_hash = hash(&solution4.data);
+    let solution4_hash = hash(&solution4);
     let solution4_fail_reason = SolutionFailReason::NotComposable;
     storage
         .move_solutions_to_failed(&[(solution4_hash, solution4_fail_reason.clone())])

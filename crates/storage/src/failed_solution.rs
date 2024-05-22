@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use essential_types::{solution::Solution, Signed};
+use essential_types::solution::Solution;
 use serde::{Deserialize, Serialize};
 
 /// Reasons why a solution failed.
@@ -16,7 +16,7 @@ pub enum SolutionFailReason {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FailedSolution {
     /// The failed solution.
-    pub solution: Signed<Solution>,
+    pub solution: Solution,
     /// Reason why the solution failed.
     pub reason: SolutionFailReason,
 }
@@ -33,7 +33,7 @@ pub enum CheckOutcome {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SolutionOutcome {
     /// The solution.
-    pub solution: Signed<Solution>,
+    pub solution: Solution,
     /// The outcome of the solution.
     pub outcome: CheckOutcome,
 }

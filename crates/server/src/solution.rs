@@ -1,7 +1,7 @@
 use essential_check as check;
 use essential_storage::{StateStorage, Storage};
 use essential_transaction_storage::TransactionStorage;
-use essential_types::{intent::Intent, solution::Solution, ContentAddress, IntentAddress, Signed};
+use essential_types::{intent::Intent, solution::Solution, ContentAddress, IntentAddress};
 use std::{collections::HashMap, sync::Arc};
 
 pub(crate) mod read;
@@ -10,22 +10,19 @@ mod tests;
 
 /// Validates a signed solution and submits it to storage.
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err(level=tracing::Level::DEBUG), ret(Display)))]
-pub async fn submit_solution<S>(
-    storage: &S,
-    solution: Signed<Solution>,
-) -> anyhow::Result<ContentAddress>
+pub async fn submit_solution<S>(storage: &S, solution: Solution) -> anyhow::Result<ContentAddress>
 where
     S: Storage,
 {
-    check::solution::check_signed(&solution)?;
+    check::solution::check(&solution)?;
 
     // Validation of intents being read from storage.
     let intents: HashMap<IntentAddress, Arc<Intent>> =
-        read::read_intents_from_storage(&solution.data, storage).await?;
-    validate_intents(&solution.data, &intents)?;
+        read::read_intents_from_storage(&solution, storage).await?;
+    validate_intents(&solution, &intents)?;
 
     // Insert the solution into the pool.
-    let solution_hash = essential_hash::content_addr(&solution.data);
+    let solution_hash = essential_hash::content_addr(&solution);
     match storage.insert_solution_into_pool(solution).await {
         Ok(()) => Ok(solution_hash),
         Err(err) => anyhow::bail!("Failed to submit solution: {}", err),

@@ -24,4 +24,4 @@ essential-memory-storage = { workspace = true }
 test-utils = { workspace = true }
 
 [features]
-tracing = ["dep:tracing", "essential-check/tracing", "essential-constraint-vm/tracing", "essential-state-read-vm/tracing" ]
+tracing = [ "dep:tracing", "essential-check/tracing", "essential-constraint-vm/tracing", "essential-state-read-vm/tracing" ]

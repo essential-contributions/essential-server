@@ -349,18 +349,12 @@ impl Storage for RqliteStorage {
 
     async fn insert_solution_into_pool(
         &self,
-        solution: Signed<essential_types::solution::Solution>,
+        solution: essential_types::solution::Solution,
     ) -> anyhow::Result<()> {
-        let hash = encode(&hash(&solution.data));
-        let signature = encode(&solution.signature);
-        let solution = encode(&solution.data);
+        let hash = encode(&hash(&solution));
+        let solution = encode(&solution);
 
-        let inserts = &[include_sql!(
-            "insert/solutions_pool.sql",
-            hash,
-            solution,
-            signature
-        )];
+        let inserts = &[include_sql!("insert/solutions_pool.sql", hash, solution)];
         self.execute(&inserts[..]).await
     }
 
@@ -481,7 +475,7 @@ impl Storage for RqliteStorage {
 
     async fn list_solutions_pool(
         &self,
-    ) -> anyhow::Result<Vec<Signed<essential_types::solution::Solution>>> {
+    ) -> anyhow::Result<Vec<essential_types::solution::Solution>> {
         // TODO: Maybe we want to page this?
         let sql = &[include_sql!("query/list_solutions_pool.sql")];
         let queries = self.query_values(sql).await?;

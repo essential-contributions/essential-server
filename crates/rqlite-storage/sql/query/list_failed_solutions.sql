@@ -1,5 +1,4 @@
 SELECT
-    signature,
     solution,
     reason
 FROM

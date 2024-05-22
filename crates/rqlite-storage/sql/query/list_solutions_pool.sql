@@ -1,2 +1,2 @@
-SELECT signature, solution
+SELECT solution
 FROM solutions_pool

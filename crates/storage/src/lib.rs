@@ -28,7 +28,7 @@ pub trait Storage: StateStorage {
     /// Add a solution to the pool of unsolved solutions.
     fn insert_solution_into_pool(
         &self,
-        solution: Signed<Solution>,
+        solution: Solution,
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
     /// Move these solutions from the pool to the solved state.
@@ -67,9 +67,7 @@ pub trait Storage: StateStorage {
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Intent>>>> + Send;
 
     /// List all solutions in the pool.
-    fn list_solutions_pool(
-        &self,
-    ) -> impl Future<Output = anyhow::Result<Vec<Signed<Solution>>>> + Send;
+    fn list_solutions_pool(&self) -> impl Future<Output = anyhow::Result<Vec<Solution>>> + Send;
 
     /// List all failed solutions in the pool.
     fn list_failed_solutions_pool(
