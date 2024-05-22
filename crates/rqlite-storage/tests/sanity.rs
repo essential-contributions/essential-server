@@ -43,6 +43,23 @@ async fn test_update_state() {
     assert!(v.is_empty());
     let v = storage.query_state(&address, &key).await.unwrap();
     assert_eq!(v, vec![1]);
+
+    let v = storage.query_state(&address, &vec![1; 14]).await.unwrap();
+    assert!(v.is_empty());
+    let v = storage
+        .update_state(&address, &vec![1; 14], vec![3; 8])
+        .await
+        .unwrap();
+    assert!(v.is_empty());
+    let v = storage.query_state(&address, &vec![1; 14]).await.unwrap();
+    assert_eq!(v, vec![3; 8]);
+    let v = storage
+        .update_state(&address, &vec![1; 14], vec![3; 2])
+        .await
+        .unwrap();
+    assert_eq!(v, vec![3; 8]);
+    let v = storage.query_state(&address, &vec![1; 14]).await.unwrap();
+    assert_eq!(v, vec![3; 2]);
 }
 
 #[tokio::test]
