@@ -1,6 +1,6 @@
 use std::{time::Duration, vec};
 
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use base64::Engine as _;
 use essential_memory_storage::MemoryStorage;
 use essential_rest_server as server;
 use essential_server::{CheckSolutionOutput, SolutionOutcome};
@@ -71,9 +71,7 @@ async fn test_deploy_intent_set() {
     let expected = essential_hash::intent_set_addr::from_intents(&intent_set.data);
     assert_eq!(address, expected);
 
-    let a = url
-        .join(&format!("/get-intent-set/{}", URL_SAFE.encode(address.0)))
-        .unwrap();
+    let a = url.join(&format!("/get-intent-set/{address}")).unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
     let set = response
@@ -91,8 +89,7 @@ async fn test_deploy_intent_set() {
     let a = url
         .join(&format!(
             "/get-intent/{}/{}",
-            URL_SAFE.encode(intent_address.set.0),
-            URL_SAFE.encode(intent_address.intent.0),
+            intent_address.set, intent_address.intent,
         ))
         .unwrap();
     let response = client.get(a).send().await.unwrap();
@@ -133,9 +130,9 @@ async fn test_deploy_intent_set() {
 async fn test_submit_solution() {
     let mut intent = Intent::empty();
     intent.slots.decision_variables = 1;
-    let intent_address = ContentAddress(essential_hash::hash(&intent));
+    let intent_addr = essential_hash::content_addr(&intent);
     let intent_set = sign_with_random_keypair(vec![intent]);
-    let set_address = essential_hash::intent_set_addr::from_intents(&intent_set.data);
+    let set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.data);
 
     let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set)
@@ -150,8 +147,8 @@ async fn test_submit_solution() {
     } = setup_with_mem(mem).await;
     let mut solution = solution_with_decision_variables(1);
     solution.data[0].intent_to_solve = IntentAddress {
-        set: set_address,
-        intent: intent_address,
+        set: set_addr,
+        intent: intent_addr,
     };
     let solution = sign_with_random_keypair(solution);
     let response = client
@@ -161,8 +158,11 @@ async fn test_submit_solution() {
         .await
         .unwrap();
     assert_eq!(response.status(), 200);
-    let hash = response.json::<essential_types::Hash>().await.unwrap();
-    assert_eq!(hash, essential_hash::hash(&solution.data));
+    let ca = response
+        .json::<essential_types::ContentAddress>()
+        .await
+        .unwrap();
+    assert_eq!(ca, essential_hash::content_addr(&solution.data));
 
     let response = client
         .get(url.join("list-solutions-pool").unwrap())
@@ -173,7 +173,7 @@ async fn test_submit_solution() {
     let solutions = response.json::<Vec<Signed<Solution>>>().await.unwrap();
 
     assert_eq!(solutions.len(), 1);
-    assert_eq!(essential_hash::hash(&solutions[0].data), hash);
+    assert_eq!(essential_hash::content_addr(&solutions[0].data), ca);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
@@ -200,9 +200,8 @@ async fn test_query_state() {
 
     let a = url
         .join(&format!(
-            "/query-state/{}/{}",
-            URL_SAFE.encode(address.0),
-            URL_SAFE.encode(u8_32_from_word_4(key)),
+            "/query-state/{address}/{}",
+            essential_types::serde::hash::BASE64.encode(u8_32_from_word_4(key)),
         ))
         .unwrap();
     let response = client.get(a).send().await.unwrap();
@@ -249,11 +248,11 @@ async fn test_list_winning_blocks() {
 #[tokio::test]
 async fn test_solution_outcome() {
     let solution = sign_with_random_keypair(Solution::empty());
-    let hash = essential_hash::hash(&solution.data);
+    let ca = essential_hash::content_addr(&solution.data);
 
     let mem = MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
-    mem.move_solutions_to_solved(&[hash]).await.unwrap();
+    mem.move_solutions_to_solved(&[ca.0]).await.unwrap();
 
     let TestServer {
         client,
@@ -262,9 +261,7 @@ async fn test_solution_outcome() {
         jh,
     } = setup_with_mem(mem).await;
 
-    let a = url
-        .join(&format!("/solution-outcome/{}", URL_SAFE.encode(hash),))
-        .unwrap();
+    let a = url.join(&format!("/solution-outcome/{ca}")).unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
     let value = response
