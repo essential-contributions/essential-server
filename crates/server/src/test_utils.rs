@@ -118,8 +118,23 @@ pub fn counter_intent(salt: Word) -> Intent {
     ])
     .collect()];
     intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
+        // Salt
         essential_constraint_vm::asm::Stack::Push(salt).into(),
         essential_constraint_vm::asm::Stack::Pop.into(),
+        // Jump distance
+        essential_constraint_vm::asm::Stack::Push(2).into(),
+        // Check if the state is not empty
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Access::StateLen.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Pred::Eq.into(),
+        essential_constraint_vm::asm::Pred::Not.into(),
+        // If not empty skip pushing 0
+        essential_constraint_vm::asm::TotalControlFlow::JumpForwardIf.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        // Add 1 to the state or zero.
+        // If state is empty then it won't push anything on the stack.
         essential_constraint_vm::asm::Stack::Push(0).into(),
         essential_constraint_vm::asm::Stack::Push(0).into(),
         essential_constraint_vm::asm::Access::State.into(),
@@ -129,6 +144,14 @@ pub fn counter_intent(salt: Word) -> Intent {
         essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Access::State.into(),
         essential_constraint_vm::asm::Pred::Eq.into(),
+        // Check the final value matches the dec var
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Access::DecisionVar.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
+        essential_constraint_vm::asm::Access::State.into(),
+        essential_constraint_vm::asm::Pred::Eq.into(),
+        essential_constraint_vm::asm::Pred::And.into(),
     ])
     .collect()];
     intent

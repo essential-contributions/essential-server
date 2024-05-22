@@ -209,9 +209,9 @@ async fn test_query_state() {
         .unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let value = response.json::<Option<Word>>().await.unwrap().unwrap();
+    let value = response.json::<Vec<Word>>().await.unwrap();
 
-    assert_eq!(value, 42);
+    assert_eq!(value, vec![42]);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
