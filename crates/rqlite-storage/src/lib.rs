@@ -102,8 +102,6 @@ impl RqliteStorage {
             include_sql!("create/solutions_pool.sql"),
             include_sql!("create/solved.sql"),
             include_sql!("create/intent_state.sql"),
-            include_sql!("create/eoa.sql"),
-            include_sql!("create/eoa_state.sql"),
             include_sql!("create/batch.sql"),
             include_sql!("create/failed_solutions.sql"),
         ];
@@ -212,6 +210,7 @@ impl StateStorage for RqliteStorage {
     ) -> anyhow::Result<Vec<essential_types::Word>> {
         let address = encode(address);
         let key = encode(key);
+        let value = encode(&value);
         if value.is_empty() {
             // Delete the value and return the existing value if it exists.
             let inserts = &[
@@ -238,6 +237,7 @@ impl StateStorage for RqliteStorage {
             .flat_map(|(address, key, value)| {
                 let address = encode(&address);
                 let key = encode(&key);
+                let value = encode(&value);
                 if value.is_empty() {
                     // Delete the value and return the existing value if it exists.
                     [
