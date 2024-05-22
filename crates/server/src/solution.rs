@@ -48,7 +48,7 @@ where
             .intent_to_solve
             .set;
         for mutation in state_mutation.mutations.iter() {
-            storage.apply_state(set, &mutation.key, mutation.value);
+            storage.apply_state(set, mutation.key.clone(), mutation.value.clone());
         }
     }
     Ok(())
@@ -77,10 +77,7 @@ pub fn validate_intents(
 ) -> anyhow::Result<()> {
     // The map must contain all intents referred to by solution data.
     contains_all_intents(solution, intents)?;
-
-    // The decision variable lengths must match.
-    check::solution::check_decision_variable_lengths(solution, |addr| intents[addr].clone())
-        .map_err(|(ix, err)| anyhow::anyhow!("solution data at {ix} invalid: {err}"))
+    Ok(())
 }
 
 /// Ensure that all intents referred to by the solution have been read from the storage.

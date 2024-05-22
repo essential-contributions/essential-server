@@ -10,7 +10,7 @@ use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
     failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
-    word_range, QueryState, StateStorage, Storage,
+    key_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{Block, ContentAddress, Hash, Key, Signed, StorageLayout, Word};
 use futures::FutureExt;
@@ -147,13 +147,10 @@ impl RqliteStorage {
         values::map_query_to_query_values(value)
     }
 
-    /// Execute a sql statement on the rqlite server and return a single word.
+    /// Execute a sql statement on the rqlite server and return a list of words.
     /// This is useful for mixing word queries in the same transaction
     /// as an execute statement.
-    async fn execute_query_word(
-        &self,
-        sql: &[&[serde_json::Value]],
-    ) -> anyhow::Result<Option<Word>> {
+    async fn execute_query_words(&self, sql: &[&[serde_json::Value]]) -> anyhow::Result<Vec<Word>> {
         let r = self
             .http
             .post(self.server.join("/db/request?transaction&level=strong")?)
@@ -168,7 +165,7 @@ impl RqliteStorage {
 
         let value: serde_json::Map<String, serde_json::Value> = r.json().await?;
         handle_errors(&value, sql)?;
-        values::map_execute_to_word(value)
+        values::map_execute_to_values(value)
     }
 
     /// Query a sql statement on the rqlite server.
@@ -211,54 +208,48 @@ impl StateStorage for RqliteStorage {
         &self,
         address: &essential_types::ContentAddress,
         key: &essential_types::Key,
-        value: Option<essential_types::Word>,
-    ) -> anyhow::Result<Option<essential_types::Word>> {
+        value: Vec<essential_types::Word>,
+    ) -> anyhow::Result<Vec<essential_types::Word>> {
         let address = encode(address);
         let key = encode(key);
-        match value {
-            Some(value) => {
-                // Update the value and return the existing value if it exists.
-                let inserts = &[
-                    include_sql!("query/get_state.sql", address.clone(), key.clone()),
-                    include_sql!("update/update_state.sql", key, value, address),
-                ];
-                self.execute_query_word(&inserts[..]).await
-            }
-            None => {
-                // Delete the value and return the existing value if it exists.
-                let inserts = &[
-                    include_sql!("query/get_state.sql", address.clone(), key.clone()),
-                    include_sql!("update/delete_state.sql", address, key),
-                ];
-                self.execute_query_word(&inserts[..]).await
-            }
+        if value.is_empty() {
+            // Delete the value and return the existing value if it exists.
+            let inserts = &[
+                include_sql!("query/get_state.sql", address.clone(), key.clone()),
+                include_sql!("update/delete_state.sql", address, key),
+            ];
+            self.execute_query_words(&inserts[..]).await
+        } else {
+            // Update the value and return the existing value if it exists.
+            let inserts = &[
+                include_sql!("query/get_state.sql", address.clone(), key.clone()),
+                include_sql!("update/update_state.sql", key, value, address),
+            ];
+            self.execute_query_words(&inserts[..]).await
         }
     }
 
-    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
+    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Vec<Word>>>
     where
-        U: IntoIterator<Item = (ContentAddress, essential_types::Key, Option<Word>)> + Send,
+        U: IntoIterator<Item = (ContentAddress, essential_types::Key, Vec<Word>)> + Send,
     {
         let sql: Vec<_> = updates
             .into_iter()
             .flat_map(|(address, key, value)| {
                 let address = encode(&address);
                 let key = encode(&key);
-                match value {
-                    Some(value) => {
-                        // Update the value and return the existing value if it exists.
-                        [
-                            include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
-                            include_sql!(owned "update/update_state.sql", key, value, address),
-                        ]
-                    }
-                    None => {
-                        // Delete the value and return the existing value if it exists.
-                        [
-                            include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
-                            include_sql!(owned "update/delete_state.sql", address, key),
-                        ]
-                    }
+                if value.is_empty() {
+                    // Delete the value and return the existing value if it exists.
+                    [
+                        include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
+                        include_sql!(owned "update/delete_state.sql", address, key),
+                    ]
+                } else {
+                    // Update the value and return the existing value if it exists.
+                    [
+                        include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
+                        include_sql!(owned "update/update_state.sql", key, value, address),
+                    ]
                 }
             })
             .collect();
@@ -267,7 +258,7 @@ impl StateStorage for RqliteStorage {
         // Maybe create an owned version of execute.
         let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| &v[..]).collect();
         let queries = self.execute_query(&sql).await?;
-        Ok(values::map_execute_to_words(queries))
+        values::map_execute_to_multiple_values(queries)
     }
 }
 
@@ -276,17 +267,14 @@ impl QueryState for RqliteStorage {
         &self,
         address: &essential_types::ContentAddress,
         key: &essential_types::Key,
-    ) -> anyhow::Result<Option<essential_types::Word>> {
+    ) -> anyhow::Result<Vec<essential_types::Word>> {
         let address = encode(address);
         let key = encode(key);
         let sql = &[include_sql!("query/get_state.sql", address, key)];
         let queries = self.query_values(sql).await?;
         match single_value(&queries) {
-            Some(serde_json::Value::Number(v)) => match v.as_i64() {
-                Some(r) => Ok(Some(r)),
-                None => bail!("State stored incorrectly"),
-            },
-            None => Ok(None),
+            Some(serde_json::Value::String(v)) => decode(v),
+            None => Ok(Vec::new()),
             _ => bail!("State stored incorrectly"),
         }
     }
@@ -565,10 +553,10 @@ impl StateRead for RqliteStorage {
     type Error = RqliteError;
 
     type Future =
-        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<Word>>, Self::Error>> + Send>>;
 
-    fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+    fn key_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { word_range(&storage, set_addr, key, num_words).await }.boxed()
+        async move { key_range(&storage, set_addr, key, num_words).await }.boxed()
     }
 }

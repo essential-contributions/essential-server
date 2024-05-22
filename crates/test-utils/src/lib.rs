@@ -4,7 +4,6 @@ use empty::Empty;
 use essential_sign::sign;
 use essential_types::{
     intent::{Directive, Intent},
-    slots::Slots,
     solution::{DecisionVariable, Solution, SolutionData},
     IntentAddress, Signature, Signed, Word,
 };
@@ -47,14 +46,14 @@ pub fn solution_with_intent(intent_to_solve: IntentAddress) -> Solution {
     }
 }
 
-pub fn intent_with_decision_variables(decision_variables: usize) -> Intent {
+pub fn intent_with_salt(salt: Word) -> Intent {
     Intent {
-        slots: Slots {
-            decision_variables: decision_variables as u32,
-            state: Default::default(),
-        },
         state_read: Default::default(),
-        constraints: Default::default(),
+        constraints: vec![essential_constraint_vm::asm::to_bytes(vec![
+            essential_constraint_vm::asm::Stack::Push(salt).into(),
+            essential_constraint_vm::asm::Stack::Pop.into(),
+        ])
+        .collect()],
         directive: Directive::Satisfy,
     }
 }

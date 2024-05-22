@@ -181,7 +181,7 @@ where
         &self,
         address: &ContentAddress,
         key: &Key,
-    ) -> anyhow::Result<Option<Word>> {
+    ) -> anyhow::Result<Vec<Word>> {
         self.storage.query_state(address, key).await
     }
 

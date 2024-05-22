@@ -4,7 +4,7 @@
 //! Provides a transactional layer on top of a state storage.
 
 use essential_state_read_vm::StateRead;
-use essential_storage::{word_range, QueryState, StateStorage};
+use essential_storage::{key_range, QueryState, StateStorage};
 use essential_types::{ContentAddress, Key, Word};
 use futures::future::FutureExt;
 use imbl::HashMap;
@@ -42,9 +42,9 @@ pub struct TransactionStorage<S> {
 #[derive(Clone)]
 pub struct TransactionView<S>(Arc<TransactionStorage<S>>);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Mutation {
-    Insert(Word),
+    Insert(Vec<Word>),
     Delete,
 }
 
@@ -63,11 +63,11 @@ where
     type Error = TransactionViewError;
 
     type Future =
-        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<Word>>, Self::Error>> + Send>>;
 
-    fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+    fn key_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { word_range(&storage, set_addr, key, num_words).await }.boxed()
+        async move { key_range(&storage, set_addr, key, num_words).await }.boxed()
     }
 }
 
@@ -113,8 +113,8 @@ impl<S> TransactionStorage<S> {
                     address.clone(),
                     key,
                     match mutation {
-                        Mutation::Insert(v) => Some(v),
-                        Mutation::Delete => None,
+                        Mutation::Insert(v) => v,
+                        Mutation::Delete => Vec::new(),
                     },
                 )
             })
@@ -133,60 +133,58 @@ impl<S> TransactionStorage<S> {
     pub async fn update_state(
         &mut self,
         address: &ContentAddress,
-        key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>>
+        key: Key,
+        value: Vec<Word>,
+    ) -> anyhow::Result<Vec<Word>>
     where
         S: QueryState,
     {
         let m = self.state.entry(address.clone()).or_default();
-        let entry = m.entry(*key);
+        let entry = m.entry(key.clone());
         let mutation = match entry {
-            imbl::hashmap::Entry::Occupied(mut v) => match value {
-                Some(value) => Some(v.insert(Mutation::Insert(value))),
-                None => Some(v.insert(Mutation::Delete)),
-            },
+            imbl::hashmap::Entry::Occupied(mut v) => {
+                if value.is_empty() {
+                    Some(v.insert(Mutation::Delete))
+                } else {
+                    Some(v.insert(Mutation::Insert(value)))
+                }
+            }
             imbl::hashmap::Entry::Vacant(v) => {
-                match value {
-                    Some(value) => {
-                        v.insert(Mutation::Insert(value));
-                    }
-                    None => {
-                        v.insert(Mutation::Delete);
-                    }
+                if value.is_empty() {
+                    v.insert(Mutation::Delete);
+                } else {
+                    v.insert(Mutation::Insert(value));
                 }
                 None
             }
         };
 
         match mutation {
-            Some(Mutation::Insert(v)) => Ok(Some(v)),
-            Some(Mutation::Delete) => Ok(None),
-            None => self.storage.query_state(address, key).await,
+            Some(Mutation::Insert(v)) => Ok(v),
+            Some(Mutation::Delete) => Ok(Vec::new()),
+            None => self.storage.query_state(address, &key).await,
         }
     }
 
     /// Apply state changes without returning the previous value.
-    pub fn apply_state(&mut self, address: &ContentAddress, key: &Key, value: Option<Word>) {
+    pub fn apply_state(&mut self, address: &ContentAddress, key: Key, value: Vec<Word>) {
         let m = self.state.entry(address.clone()).or_default();
-        let entry = m.entry(*key);
+        let entry = m.entry(key);
         match entry {
-            imbl::hashmap::Entry::Occupied(mut v) => match value {
-                Some(value) => {
+            imbl::hashmap::Entry::Occupied(mut v) => {
+                if value.is_empty() {
+                    v.insert(Mutation::Delete);
+                } else {
                     v.insert(Mutation::Insert(value));
                 }
-                None => {
+            }
+            imbl::hashmap::Entry::Vacant(v) => {
+                if value.is_empty() {
                     v.insert(Mutation::Delete);
-                }
-            },
-            imbl::hashmap::Entry::Vacant(v) => match value {
-                Some(value) => {
+                } else {
                     v.insert(Mutation::Insert(value));
                 }
-                None => {
-                    v.insert(Mutation::Delete);
-                }
-            },
+            }
         }
     }
 
@@ -195,14 +193,14 @@ impl<S> TransactionStorage<S> {
         &self,
         address: &ContentAddress,
         key: &Key,
-    ) -> anyhow::Result<Option<Word>>
+    ) -> anyhow::Result<Vec<Word>>
     where
         S: QueryState,
     {
-        let mutation = self.state.get(address).and_then(|m| m.get(key)).copied();
+        let mutation = self.state.get(address).and_then(|m| m.get(key)).cloned();
         match mutation {
-            Some(Mutation::Insert(v)) => Ok(Some(v)),
-            Some(Mutation::Delete) => Ok(None),
+            Some(Mutation::Insert(v)) => Ok(v),
+            Some(Mutation::Delete) => Ok(Vec::new()),
             None => self.storage.query_state(address, key).await,
         }
     }
@@ -212,11 +210,7 @@ impl<S> QueryState for TransactionView<S>
 where
     S: QueryState + Clone + Send + Sync + 'static,
 {
-    async fn query_state(
-        &self,
-        address: &ContentAddress,
-        key: &Key,
-    ) -> anyhow::Result<Option<Word>> {
+    async fn query_state(&self, address: &ContentAddress, key: &Key) -> anyhow::Result<Vec<Word>> {
         self.0.query_state(address, key).await
     }
 }

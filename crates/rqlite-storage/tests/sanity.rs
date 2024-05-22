@@ -5,7 +5,7 @@ use essential_types::{
     intent::Intent, solution::Solution, ContentAddress, IntentAddress, StorageLayout,
 };
 use std::vec;
-use test_utils::{empty::Empty, intent_with_decision_variables, sign_with_random_keypair};
+use test_utils::{empty::Empty, intent_with_salt, sign_with_random_keypair};
 
 #[tokio::test]
 #[ignore]
@@ -30,19 +30,19 @@ async fn test_update_state() {
         .await
         .unwrap();
     let address = ContentAddress(hash(&vec![Intent::empty()]));
-    let key = [0; 4];
-    let v = storage.update_state(&address, &key, Some(1)).await.unwrap();
-    assert_eq!(v, None);
-    let v = storage.update_state(&address, &key, Some(2)).await.unwrap();
-    assert_eq!(v, Some(1));
-    let v = storage.update_state(&address, &key, None).await.unwrap();
-    assert_eq!(v, Some(2));
-    let v = storage.update_state(&address, &key, None).await.unwrap();
-    assert_eq!(v, None);
-    let v = storage.update_state(&address, &key, Some(1)).await.unwrap();
-    assert_eq!(v, None);
+    let key = vec![0; 4];
+    let v = storage.update_state(&address, &key, vec![1]).await.unwrap();
+    assert!(v.is_empty());
+    let v = storage.update_state(&address, &key, vec![2]).await.unwrap();
+    assert_eq!(v, vec![1]);
+    let v = storage.update_state(&address, &key, vec![]).await.unwrap();
+    assert_eq!(v, vec![2]);
+    let v = storage.update_state(&address, &key, vec![]).await.unwrap();
+    assert!(v.is_empty());
+    let v = storage.update_state(&address, &key, vec![1]).await.unwrap();
+    assert!(v.is_empty());
     let v = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(v, Some(1));
+    assert_eq!(v, vec![1]);
 }
 
 #[tokio::test]
@@ -55,51 +55,51 @@ async fn test_update_state_batch() {
         .insert_intent_set(storage_layout.clone(), intent)
         .await
         .unwrap();
-    let intent = sign_with_random_keypair(vec![intent_with_decision_variables(3)]);
+    let intent = sign_with_random_keypair(vec![intent_with_salt(3)]);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
         .unwrap();
     let address_0 = ContentAddress(hash(&vec![Intent::empty()]));
-    let address_1 = ContentAddress(hash(&vec![intent_with_decision_variables(3)]));
-    let key = [0; 4];
+    let address_1 = ContentAddress(hash(&vec![intent_with_salt(3)]));
+    let key = vec![0; 4];
     let v = storage
-        .update_state(&address_0, &key, Some(1))
+        .update_state(&address_0, &key, vec![1])
         .await
         .unwrap();
-    assert_eq!(v, None);
+    assert!(v.is_empty());
     let v = storage
-        .update_state(&address_1, &[1; 4], Some(2))
+        .update_state(&address_1, &vec![1; 4], vec![2])
         .await
         .unwrap();
-    assert_eq!(v, None);
+    assert!(v.is_empty());
     let updates = (0..10).map(|i| {
         let address = if i % 2 == 0 {
             address_0.clone()
         } else {
             address_1.clone()
         };
-        (address, [i; 4], Some(i))
+        (address, vec![i; 4], vec![i])
     });
     let v = storage.update_state_batch(updates).await.unwrap();
     assert_eq!(
         v,
         vec![
-            Some(1),
-            Some(2),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None
+            vec![1],
+            vec![2],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![]
         ]
     );
 
-    let v = storage.query_state(&address_0, &[8; 4]).await.unwrap();
-    assert_eq!(v, Some(8));
+    let v = storage.query_state(&address_0, &vec![8; 4]).await.unwrap();
+    assert_eq!(v, vec![8]);
 }
 
 #[tokio::test]
@@ -112,10 +112,7 @@ async fn test_insert_intent_set() {
         .insert_intent_set(storage_layout.clone(), intent_0.clone())
         .await
         .unwrap();
-    let intent_1 = sign_with_random_keypair(vec![
-        intent_with_decision_variables(1),
-        intent_with_decision_variables(2),
-    ]);
+    let intent_1 = sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     storage
         .insert_intent_set(storage_layout, intent_1)
         .await
@@ -125,10 +122,7 @@ async fn test_insert_intent_set() {
         intent_sets,
         vec![
             vec![Intent::empty()],
-            vec![
-                intent_with_decision_variables(1),
-                intent_with_decision_variables(2)
-            ]
+            vec![intent_with_salt(1), intent_with_salt(2)]
         ]
     );
     let intent_set = storage

@@ -1,6 +1,5 @@
 use essential_types::{
     intent::{Directive, Intent},
-    slots::StateSlot,
     solution::{DecisionVariable, Solution, SolutionData, StateMutation},
     ContentAddress, IntentAddress, Word,
 };
@@ -14,20 +13,9 @@ pub trait Empty {
 impl Empty for Intent {
     fn empty() -> Self {
         Self {
-            slots: Default::default(),
             state_read: Default::default(),
             constraints: Default::default(),
             directive: Directive::Satisfy,
-        }
-    }
-}
-
-impl Empty for StateSlot {
-    fn empty() -> Self {
-        Self {
-            amount: Default::default(),
-            index: Default::default(),
-            program_index: Default::default(),
         }
     }
 }

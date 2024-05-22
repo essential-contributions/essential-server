@@ -1,3 +1,5 @@
+use crate::encode;
+
 use super::*;
 use serde_json::json;
 
@@ -10,11 +12,11 @@ fn test_valid_result() {
                         "foo",
                     ],
                     "types": [
-                        "integer",
+                        "blob",
                     ],
                     "values": [
                         [
-                            1,
+                            encode(&vec![1, 2]),
                         ]
                     ]
                 },
@@ -28,8 +30,8 @@ fn test_valid_result() {
     .unwrap()
     .clone();
 
-    let r = map_execute_to_word(json).unwrap().unwrap();
-    assert_eq!(r, 1);
+    let r = map_execute_to_values(json).unwrap();
+    assert_eq!(r, vec![1, 2]);
 }
 
 #[test]
@@ -54,8 +56,8 @@ fn test_empty_result() {
     .unwrap()
     .clone();
 
-    let r = map_execute_to_word(json).unwrap();
-    assert_eq!(r, None);
+    let r = map_execute_to_values(json).unwrap();
+    assert!(r.is_empty());
 }
 
 #[test]
@@ -80,7 +82,7 @@ fn test_missing_results() {
     .unwrap()
     .clone();
 
-    map_execute_to_word(json).unwrap_err();
+    map_execute_to_values(json).unwrap_err();
 }
 
 #[test]
@@ -101,7 +103,7 @@ fn test_missing_execute() {
     .unwrap()
     .clone();
 
-    map_execute_to_word(json).unwrap_err();
+    map_execute_to_values(json).unwrap_err();
 }
 
 #[test]
@@ -131,7 +133,7 @@ fn test_invalid_result() {
     .unwrap()
     .clone();
 
-    map_execute_to_word(json).unwrap_err();
+    map_execute_to_values(json).unwrap_err();
 
     let json = json!({
             "results": [
@@ -158,7 +160,7 @@ fn test_invalid_result() {
     .unwrap()
     .clone();
 
-    map_execute_to_word(json).unwrap_err();
+    map_execute_to_values(json).unwrap_err();
 
     let json = json!({
             "results": [
@@ -186,7 +188,7 @@ fn test_invalid_result() {
     .unwrap()
     .clone();
 
-    map_execute_to_word(json).unwrap_err();
+    map_execute_to_values(json).unwrap_err();
 
     let json = json!({
             "results": [
@@ -211,5 +213,5 @@ fn test_invalid_result() {
     .unwrap()
     .clone();
 
-    map_execute_to_word(json).unwrap_err();
+    map_execute_to_values(json).unwrap_err();
 }

@@ -3,7 +3,7 @@ use essential_lock::StdLock;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcome},
-    word_range, QueryState, StateStorage, Storage,
+    key_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{
     intent::Intent, solution::Solution, Batch, Block, ContentAddress, Hash, IntentAddress, Key,
@@ -48,7 +48,7 @@ struct Inner {
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
     solution_block_time_index: HashMap<Hash, Duration>,
-    state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
+    state: HashMap<ContentAddress, BTreeMap<Key, Vec<Word>>>,
 }
 
 #[derive(Debug)]
@@ -72,33 +72,37 @@ impl StateStorage for MemoryStorage {
         &self,
         address: &ContentAddress,
         key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>> {
+        value: Vec<Word>,
+    ) -> anyhow::Result<Vec<Word>> {
         self.inner.apply(|i| {
             let Some(map) = i.state.get_mut(address) else {
                 bail!("No state for address, {:?}", address);
             };
-            let v = match value {
-                None => map.remove(key),
-                Some(value) => map.insert(*key, value),
+            let v = if value.is_empty() {
+                map.remove(key)
+            } else {
+                map.insert(key.clone(), value)
             };
+            let v = v.unwrap_or_default();
             Ok(v)
         })
     }
 
-    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
+    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Vec<Word>>>
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send,
+        U: IntoIterator<Item = (ContentAddress, Key, Vec<Word>)> + Send,
     {
         let v = self.inner.apply(|i| {
             updates
                 .into_iter()
                 .map(|(address, key, value)| {
                     let map = i.state.entry(address).or_default();
-                    match value {
-                        None => map.remove(&key),
-                        Some(value) => map.insert(key, value),
-                    }
+                    let v = if value.is_empty() {
+                        map.remove(&key)
+                    } else {
+                        map.insert(key, value)
+                    };
+                    v.unwrap_or_default()
                 })
                 .collect()
         });
@@ -107,17 +111,13 @@ impl StateStorage for MemoryStorage {
 }
 
 impl QueryState for MemoryStorage {
-    async fn query_state(
-        &self,
-        address: &ContentAddress,
-        key: &Key,
-    ) -> anyhow::Result<Option<Word>> {
+    async fn query_state(&self, address: &ContentAddress, key: &Key) -> anyhow::Result<Vec<Word>> {
         let v = self.inner.apply(|i| {
             let map = i.state.get(address)?;
             let v = map.get(key)?;
-            Some(*v)
+            Some(v.clone())
         });
-        Ok(v)
+        Ok(v.unwrap_or_default())
     }
 }
 
@@ -388,10 +388,10 @@ impl StateRead for MemoryStorage {
     type Error = MemoryStorageError;
 
     type Future =
-        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<Word>>, Self::Error>> + Send>>;
 
-    fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+    fn key_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { word_range(&storage, set_addr, key, num_words).await }.boxed()
+        async move { key_range(&storage, set_addr, key, num_words).await }.boxed()
     }
 }

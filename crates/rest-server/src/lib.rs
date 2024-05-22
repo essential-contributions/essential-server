@@ -15,7 +15,7 @@ use axum::{
 use base64::Engine as _;
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_types::{
-    convert::word_4_from_u8_32, intent::Intent, solution::Solution, Block, ContentAddress,
+    convert::word_from_bytes, intent::Intent, solution::Solution, Block, ContentAddress, Hash,
     IntentAddress, Signed, Word,
 };
 use serde::Deserialize;
@@ -237,12 +237,12 @@ where
 
 /// The query state get endpoint.
 ///
-/// Takes a content address and a 32-byte key as path parameters.
+/// Takes a content address and a byte array key as path parameters.
 /// Both are encoded as URL-safe base64 without padding.
 async fn query_state<S>(
     State(essential): State<Essential<S>>,
     Path((address, key)): Path<(String, String)>,
-) -> Result<Json<Option<Word>>, Error>
+) -> Result<Json<Vec<Word>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -251,14 +251,15 @@ where
     let address: ContentAddress = address
         .parse()
         .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
-    let key: [u8; 32] = essential_types::serde::hash::BASE64
+    let key: Vec<u8> = essential_types::serde::hash::BASE64
         .decode(key)
-        .map_err(|e| anyhow!("failed to decode key: {e}"))?
-        .try_into()
-        .map_err(|_| anyhow!("invalid state key size"))?;
+        .map_err(|e| anyhow!("failed to decode key: {e}"))?;
 
-    // Convert the key to four words.
-    let key = word_4_from_u8_32(key);
+    // Convert the key to words.
+    let key = key
+        .chunks_exact(8)
+        .map(|chunk| word_from_bytes(chunk.try_into().expect("Safe due to chunk size")))
+        .collect::<Vec<_>>();
 
     let state = essential.query_state(&address, &key).await?;
     Ok(Json(state))

@@ -6,7 +6,7 @@ use essential_rest_server as server;
 use essential_server::{CheckSolutionOutput, SolutionOutcome};
 use essential_storage::{StateStorage, Storage};
 use essential_types::{
-    convert::u8_32_from_word_4,
+    convert::bytes_from_word,
     intent::Intent,
     solution::{Solution, SolutionData},
     Block, ContentAddress, IntentAddress, Signed, StorageLayout, Word,
@@ -129,7 +129,6 @@ async fn test_deploy_intent_set() {
 #[tokio::test]
 async fn test_submit_solution() {
     let mut intent = Intent::empty();
-    intent.slots.decision_variables = 1;
     let intent_addr = essential_hash::content_addr(&intent);
     let intent_set = sign_with_random_keypair(vec![intent]);
     let set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.data);
@@ -183,13 +182,13 @@ async fn test_submit_solution() {
 async fn test_query_state() {
     let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
     let address = essential_hash::intent_set_addr::from_intents(&intent_set.data);
-    let key = [0; 4];
+    let key = vec![0; 4];
 
     let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set)
         .await
         .unwrap();
-    mem.update_state(&address, &key, Some(42)).await.unwrap();
+    mem.update_state(&address, &key, vec![42]).await.unwrap();
 
     let TestServer {
         client,
@@ -201,7 +200,11 @@ async fn test_query_state() {
     let a = url
         .join(&format!(
             "/query-state/{address}/{}",
-            essential_types::serde::hash::BASE64.encode(u8_32_from_word_4(key)),
+            essential_types::serde::hash::BASE64.encode(
+                key.into_iter()
+                    .flat_map(bytes_from_word)
+                    .collect::<Vec<u8>>()
+            ),
         ))
         .unwrap();
     let response = client.get(a).send().await.unwrap();

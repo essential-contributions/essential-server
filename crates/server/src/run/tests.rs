@@ -30,7 +30,7 @@ async fn test_run() {
     let solution_signature = solution.signature.clone();
 
     let first_state_mutation = &solution.data.state_mutations[0];
-    let mutation_key = first_state_mutation.mutations[0].key;
+    let mutation_key = first_state_mutation.mutations[0].key.clone();
     let mutation_address = solution.data.data[first_state_mutation.pathway as usize]
         .intent_to_solve
         .set
@@ -42,7 +42,7 @@ async fn test_run() {
         .query_state(&mutation_address, &mutation_key)
         .await
         .unwrap();
-    assert!(pre_state.is_none());
+    assert!(pre_state.is_empty());
 
     run(&storage).await.unwrap();
 
@@ -50,8 +50,7 @@ async fn test_run() {
         .query_state(&mutation_address, &mutation_key)
         .await
         .unwrap();
-    assert!(post_state.is_some());
-    assert_eq!(post_state.unwrap(), 42);
+    assert_eq!(post_state, vec![42]);
 
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
@@ -84,22 +83,22 @@ async fn test_counter() {
     let intent = counter_intent(1);
     let (intent_address, storage) = deploy_intent(intent.clone()).await;
 
-    let unsigned_solution = counter_solution(intent_address.clone(), 1, 1).await;
+    let unsigned_solution = counter_solution(intent_address.clone(), 1).await;
     let solution = sign_with_random_keypair(unsigned_solution.clone());
     let solution_signature = &solution.signature;
-    let mutation_key = solution.data.state_mutations[0].mutations[0].key;
+    let mutation_key = solution.data.state_mutations[0].mutations[0].key.clone();
 
     let solution_clone = solution.clone();
 
-    let solution2 = counter_solution(intent_address.clone(), 1, 2).await;
+    let solution2 = counter_solution(intent_address.clone(), 2).await;
     let solution2 = sign_with_random_keypair(solution2.clone());
     let solution2_signature = &solution2.signature;
 
-    let solution3 = counter_solution(intent_address.clone(), 1, 3).await;
+    let solution3 = counter_solution(intent_address.clone(), 3).await;
     let solution3 = sign_with_random_keypair(solution3.clone());
     let solution3_signature = &solution3.signature;
 
-    let solution4 = counter_solution(intent_address.clone(), 1, 4).await;
+    let solution4 = counter_solution(intent_address.clone(), 4).await;
     let solution4 = sign_with_random_keypair(solution4.clone());
     let solution4_signature = &solution4.signature;
 
@@ -114,7 +113,7 @@ async fn test_counter() {
         .query_state(&intent_address.set, &mutation_key)
         .await
         .unwrap();
-    assert!(pre_state.is_none());
+    assert!(pre_state.is_empty());
 
     run(&storage).await.unwrap();
 
@@ -122,8 +121,7 @@ async fn test_counter() {
         .query_state(&intent_address.set, &mutation_key)
         .await
         .unwrap();
-    assert!(post_state.is_some());
-    assert_eq!(post_state.unwrap(), 2);
+    assert_eq!(post_state, vec![2]);
 
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
@@ -146,8 +144,7 @@ async fn test_counter() {
         .query_state(&intent_address.set, &mutation_key)
         .await
         .unwrap();
-    assert!(post_state.is_some());
-    assert_eq!(post_state.unwrap(), 4);
+    assert_eq!(post_state, vec![4]);
 
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
