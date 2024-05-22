@@ -14,13 +14,13 @@ fn test_insert_solutions() {
     // Double insert is a noop
     conn.execute(
         include_sql!("insert", "solutions_pool"),
-        ["hash1", "solution1", "signature1"],
+        ["hash1", "solution1"],
     )
     .unwrap();
 
     conn.execute(
         include_sql!("insert", "solutions_pool"),
-        ["hash1", "solution1", "signature1"],
+        ["hash1", "solution1"],
     )
     .unwrap();
 
@@ -29,23 +29,17 @@ fn test_insert_solutions() {
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),
             row.get::<_, String>(2).unwrap(),
-            row.get::<_, String>(3).unwrap(),
         )
     });
     assert_eq!(
         result,
-        vec![(
-            1,
-            "hash1".to_string(),
-            "solution1".to_string(),
-            "signature1".to_string()
-        )]
+        vec![(1, "hash1".to_string(), "solution1".to_string(),)]
     );
 
     // Can insert a second solution
     conn.execute(
         include_sql!("insert", "solutions_pool"),
-        ["hash2", "solution2", "signature2"],
+        ["hash2", "solution2"],
     )
     .unwrap();
 
@@ -54,24 +48,13 @@ fn test_insert_solutions() {
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),
             row.get::<_, String>(2).unwrap(),
-            row.get::<_, String>(3).unwrap(),
         )
     });
     assert_eq!(
         result,
         vec![
-            (
-                1,
-                "hash1".to_string(),
-                "solution1".to_string(),
-                "signature1".to_string()
-            ),
-            (
-                2,
-                "hash2".to_string(),
-                "solution2".to_string(),
-                "signature2".to_string()
-            ),
+            (1, "hash1".to_string(), "solution1".to_string(),),
+            (2, "hash2".to_string(), "solution2".to_string(),),
         ]
     );
 
@@ -80,19 +63,11 @@ fn test_insert_solutions() {
         &conn,
         include_sql!("query", "list_solutions_pool"),
         [],
-        |row| {
-            (
-                row.get::<_, String>(0).unwrap(),
-                row.get::<_, String>(1).unwrap(),
-            )
-        },
+        |row| (row.get::<_, String>(0).unwrap(),),
     );
     assert_eq!(
         result,
-        vec![
-            ("signature1".to_string(), "solution1".to_string(),),
-            ("signature2".to_string(), "solution2".to_string(),),
-        ]
+        vec![("solution1".to_string(),), ("solution2".to_string(),),]
     );
 
     // Move solutions to solved
@@ -142,9 +117,8 @@ fn test_insert_solutions() {
             (
                 row.get::<_, usize>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
                 row.get::<_, usize>(3).unwrap(),
-                row.get::<_, usize>(4).unwrap(),
             )
         },
     );
@@ -152,8 +126,8 @@ fn test_insert_solutions() {
     assert_eq!(
         result,
         vec![
-            (1, "solution1".to_string(), "signature1".to_string(), 0, 0),
-            (1, "solution2".to_string(), "signature2".to_string(), 0, 0),
+            (1, "solution1".to_string(), 0, 0),
+            (1, "solution2".to_string(), 0, 0),
         ]
     );
 
@@ -164,22 +138,13 @@ fn test_insert_solutions() {
         |row| {
             (
                 row.get::<_, String>(0).unwrap(),
-                row.get::<_, String>(1).unwrap(),
-                row.get::<_, Option<u64>>(2).unwrap(),
-                row.get::<_, Option<String>>(3).unwrap(),
+                row.get::<_, Option<u64>>(1).unwrap(),
+                row.get::<_, Option<String>>(2).unwrap(),
             )
         },
     );
 
-    assert_eq!(
-        result,
-        vec![(
-            "signature1".to_string(),
-            "solution1".to_string(),
-            Some(1),
-            None,
-        ),]
-    );
+    assert_eq!(result, vec![("solution1".to_string(), Some(1), None,),]);
 }
 
 #[test]
@@ -189,13 +154,13 @@ fn test_move_solutions_to_failed() {
 
     conn.execute(
         include_sql!("insert", "solutions_pool"),
-        ["hash1", "solution1", "signature1"],
+        ["hash1", "solution1"],
     )
     .unwrap();
 
     conn.execute(
         include_sql!("insert", "solutions_pool"),
-        ["hash2", "solution2", "signature2"],
+        ["hash2", "solution2"],
     )
     .unwrap();
 
@@ -206,12 +171,7 @@ fn test_move_solutions_to_failed() {
         &conn,
         include_sql!("query", "list_solutions_pool"),
         [],
-        |row| {
-            (
-                row.get::<_, String>(0).unwrap(),
-                row.get::<_, String>(1).unwrap(),
-            )
-        },
+        |row| (row.get::<_, String>(0).unwrap(),),
     );
     assert_eq!(result, vec![]);
 
@@ -223,7 +183,6 @@ fn test_move_solutions_to_failed() {
             (
                 row.get::<_, String>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
             )
         },
     );
@@ -231,16 +190,8 @@ fn test_move_solutions_to_failed() {
     assert_eq!(
         result,
         vec![
-            (
-                "signature1".to_string(),
-                "solution1".to_string(),
-                "reason1".to_string(),
-            ),
-            (
-                "signature2".to_string(),
-                "solution2".to_string(),
-                "reason2".to_string(),
-            ),
+            ("solution1".to_string(), "reason1".to_string(),),
+            ("solution2".to_string(), "reason2".to_string(),),
         ]
     );
 
@@ -251,21 +202,15 @@ fn test_move_solutions_to_failed() {
         |row| {
             (
                 row.get::<_, String>(0).unwrap(),
-                row.get::<_, String>(1).unwrap(),
-                row.get::<_, Option<u64>>(2).unwrap(),
-                row.get::<_, Option<String>>(3).unwrap(),
+                row.get::<_, Option<u64>>(1).unwrap(),
+                row.get::<_, Option<String>>(2).unwrap(),
             )
         },
     );
 
     assert_eq!(
         result,
-        vec![(
-            "signature1".to_string(),
-            "solution1".to_string(),
-            None,
-            Some("reason1".to_string()),
-        ),]
+        vec![("solution1".to_string(), None, Some("reason1".to_string()),),]
     );
 
     conn.execute(include_sql!("update", "prune_failed"), [15])
@@ -279,18 +224,13 @@ fn test_move_solutions_to_failed() {
             (
                 row.get::<_, String>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
             )
         },
     );
 
     assert_eq!(
         result,
-        vec![(
-            "signature2".to_string(),
-            "solution2".to_string(),
-            "reason2".to_string(),
-        ),]
+        vec![("solution2".to_string(), "reason2".to_string(),),]
     );
 }
 
@@ -309,11 +249,7 @@ fn test_batch_paging() {
         for (hash, i) in hashes.iter().zip(start..end) {
             conn.execute(
                 include_sql!("insert", "solutions_pool"),
-                [
-                    hash.to_string(),
-                    format!("solution{}", i),
-                    format!("signature{}", i),
-                ],
+                [hash.to_string(), format!("solution{}", i)],
             )
             .unwrap();
         }
@@ -337,31 +273,18 @@ fn test_batch_paging() {
             (
                 row.get::<_, usize>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
                 row.get::<_, usize>(3).unwrap(),
-                row.get::<_, usize>(4).unwrap(),
             )
         },
     );
     assert_eq!(
         result,
         vec![
-            (1, "solution0".to_string(), "signature0".to_string(), 0, 0),
-            (1, "solution1".to_string(), "signature1".to_string(), 0, 0),
-            (
-                2,
-                "solution2".to_string(),
-                "signature2".to_string(),
-                100,
-                100
-            ),
-            (
-                2,
-                "solution3".to_string(),
-                "signature3".to_string(),
-                100,
-                100
-            ),
+            (1, "solution0".to_string(), 0, 0),
+            (1, "solution1".to_string(), 0, 0),
+            (2, "solution2".to_string(), 100, 100),
+            (2, "solution3".to_string(), 100, 100),
         ]
     );
 
@@ -376,43 +299,18 @@ fn test_batch_paging() {
             (
                 row.get::<_, usize>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
                 row.get::<_, usize>(3).unwrap(),
-                row.get::<_, usize>(4).unwrap(),
             )
         },
     );
     assert_eq!(
         result,
         vec![
-            (
-                3,
-                "solution4".to_string(),
-                "signature4".to_string(),
-                200,
-                200
-            ),
-            (
-                3,
-                "solution5".to_string(),
-                "signature5".to_string(),
-                200,
-                200
-            ),
-            (
-                4,
-                "solution6".to_string(),
-                "signature6".to_string(),
-                300,
-                300
-            ),
-            (
-                4,
-                "solution7".to_string(),
-                "signature7".to_string(),
-                300,
-                300
-            ),
+            (3, "solution4".to_string(), 200, 200),
+            (3, "solution5".to_string(), 200, 200),
+            (4, "solution6".to_string(), 300, 300),
+            (4, "solution7".to_string(), 300, 300),
         ]
     );
 
@@ -427,43 +325,18 @@ fn test_batch_paging() {
             (
                 row.get::<_, usize>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
                 row.get::<_, usize>(3).unwrap(),
-                row.get::<_, usize>(4).unwrap(),
             )
         },
     );
     assert_eq!(
         result,
         vec![
-            (
-                41,
-                "solution80".to_string(),
-                "signature80".to_string(),
-                40 * 100,
-                40 * 100
-            ),
-            (
-                41,
-                "solution81".to_string(),
-                "signature81".to_string(),
-                40 * 100,
-                40 * 100,
-            ),
-            (
-                42,
-                "solution82".to_string(),
-                "signature82".to_string(),
-                41 * 100,
-                41 * 100,
-            ),
-            (
-                42,
-                "solution83".to_string(),
-                "signature83".to_string(),
-                41 * 100,
-                41 * 100,
-            ),
+            (41, "solution80".to_string(), 40 * 100, 40 * 100),
+            (41, "solution81".to_string(), 40 * 100, 40 * 100,),
+            (42, "solution82".to_string(), 41 * 100, 41 * 100,),
+            (42, "solution83".to_string(), 41 * 100, 41 * 100,),
         ]
     );
 
@@ -482,29 +355,16 @@ fn test_batch_paging() {
             (
                 row.get::<_, usize>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
                 row.get::<_, usize>(3).unwrap(),
-                row.get::<_, usize>(4).unwrap(),
             )
         },
     );
     assert_eq!(
         result,
         vec![
-            (
-                43,
-                "solution84".to_string(),
-                "signature84".to_string(),
-                42 * 100,
-                42 * 100
-            ),
-            (
-                43,
-                "solution85".to_string(),
-                "signature85".to_string(),
-                42 * 100,
-                42 * 100,
-            ),
+            (43, "solution84".to_string(), 42 * 100, 42 * 100),
+            (43, "solution85".to_string(), 42 * 100, 42 * 100,),
         ]
     );
 
@@ -523,29 +383,16 @@ fn test_batch_paging() {
             (
                 row.get::<_, usize>(0).unwrap(),
                 row.get::<_, String>(1).unwrap(),
-                row.get::<_, String>(2).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
                 row.get::<_, usize>(3).unwrap(),
-                row.get::<_, usize>(4).unwrap(),
             )
         },
     );
     assert_eq!(
         result,
         vec![
-            (
-                43,
-                "solution84".to_string(),
-                "signature84".to_string(),
-                42 * 100,
-                42 * 100
-            ),
-            (
-                43,
-                "solution85".to_string(),
-                "signature85".to_string(),
-                42 * 100,
-                42 * 100,
-            ),
+            (43, "solution84".to_string(), 42 * 100, 42 * 100),
+            (43, "solution85".to_string(), 42 * 100, 42 * 100,),
         ]
     );
 }

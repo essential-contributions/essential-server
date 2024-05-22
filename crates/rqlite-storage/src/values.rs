@@ -112,30 +112,21 @@ pub fn get_solution(
     };
 
     match &columns[..] {
-        [Value::String(solution), Value::String(signature), Value::Number(block_number), Value::Null] =>
-        {
+        [Value::String(solution), Value::Number(block_number), Value::Null] => {
             let solution = decode(solution)?;
-            let signature = decode(signature)?;
             let block_number = block_number
                 .as_u64()
                 .ok_or_else(|| anyhow::anyhow!("failed to parse block_number"))?;
             Ok(Some(SolutionOutcome {
-                solution: Signed {
-                    data: solution,
-                    signature,
-                },
+                solution,
                 outcome: CheckOutcome::Success(block_number),
             }))
         }
-        [Value::String(solution), Value::String(signature), Value::Null, Value::String(reason)] => {
+        [Value::String(solution), Value::Null, Value::String(reason)] => {
             let solution = decode(solution)?;
-            let signature = decode(signature)?;
             let reason = decode(reason)?;
             Ok(Some(SolutionOutcome {
-                solution: Signed {
-                    data: solution,
-                    signature,
-                },
+                solution,
                 outcome: CheckOutcome::Fail(reason),
             }))
         }
@@ -187,11 +178,11 @@ pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<
     Ok(out)
 }
 
-pub fn list_solutions_pool(queries: QueryValues) -> anyhow::Result<Vec<Signed<Solution>>> {
+pub fn list_solutions_pool(queries: QueryValues) -> anyhow::Result<Vec<Solution>> {
     list_solutions(queries)
 }
 
-fn list_solutions<S>(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Signed<S>>>
+fn list_solutions<S>(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<S>>
 where
     S: DeserializeOwned,
 {
@@ -207,22 +198,15 @@ where
         bail!("expected at least one row")
     }
 
-    // Decode signature and solution from each row.
+    // Decode solution from each row.
     rows.iter()
         .map(|Columns { columns }| match &columns[..] {
-            [signature, solution] => {
-                let signature = match signature {
-                    serde_json::Value::String(signature) => decode(signature)?,
-                    _ => bail!("unexpected column type {:?} for signature", signature),
-                };
+            [solution] => {
                 let solution = match solution {
                     serde_json::Value::String(solution) => decode(solution)?,
                     _ => bail!("unexpected column type {:?} for solution", solution),
                 };
-                Ok(Signed {
-                    data: solution,
-                    signature,
-                })
+                Ok(solution)
             }
             _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
         })
@@ -244,14 +228,10 @@ pub fn list_failed_solutions(
         bail!("expected at least one row")
     }
 
-    // Decode signature and solution from each row.
+    // Decode solution from each row.
     rows.iter()
         .map(|Columns { columns }| match &columns[..] {
-            [signature, solution, reason] => {
-                let signature = match signature {
-                    serde_json::Value::String(signature) => decode(signature)?,
-                    _ => bail!("unexpected column type {:?} for signature", signature),
-                };
+            [solution, reason] => {
                 let solution = match solution {
                     serde_json::Value::String(solution) => decode(solution)?,
                     _ => bail!("unexpected column type {:?} for solution", solution),
@@ -260,13 +240,7 @@ pub fn list_failed_solutions(
                     serde_json::Value::String(reason) => decode(reason)?,
                     _ => bail!("unexpected column type {:?} for reason", reason),
                 };
-                Ok(FailedSolution {
-                    solution: Signed {
-                        data: solution,
-                        signature,
-                    },
-                    reason,
-                })
+                Ok(FailedSolution { solution, reason })
             }
             _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
         })
@@ -303,7 +277,7 @@ fn map_solution_to_block(
     columns: &[Value],
 ) -> anyhow::Result<BTreeMap<u64, Block>> {
     match columns {
-        [Value::Number(batch_id), Value::String(solution), Value::String(signature), Value::Number(created_at_secs), Value::Number(created_at_nanos)] => {
+        [Value::Number(batch_id), Value::String(solution), Value::Number(created_at_secs), Value::Number(created_at_nanos)] => {
             match (
                 batch_id.as_u64(),
                 created_at_secs.as_u64(),
@@ -311,7 +285,6 @@ fn map_solution_to_block(
             ) {
                 (Some(batch_id), Some(created_at_secs), Some(created_at_nanos)) => {
                     let solution = decode(solution)?;
-                    let signature = decode(signature)?;
                     let Some(number) = batch_id.checked_sub(1) else {
                         bail!("batch_id must be greater than 0");
                     };
@@ -325,10 +298,7 @@ fn map_solution_to_block(
                         })
                         .batch
                         .solutions
-                        .push(Signed {
-                            data: solution,
-                            signature,
-                        });
+                        .push(solution);
                     Ok(map)
                 }
                 _ => bail!("Failed to parse batch_id, created_at_secs, or created_at_nanos"),

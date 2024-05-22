@@ -128,7 +128,7 @@ async fn test_deploy_intent_set() {
 
 #[tokio::test]
 async fn test_submit_solution() {
-    let mut intent = Intent::empty();
+    let intent = Intent::empty();
     let intent_addr = essential_hash::content_addr(&intent);
     let intent_set = sign_with_random_keypair(vec![intent]);
     let set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.data);
@@ -149,7 +149,6 @@ async fn test_submit_solution() {
         set: set_addr,
         intent: intent_addr,
     };
-    let solution = sign_with_random_keypair(solution);
     let response = client
         .post(url.join("/submit-solution").unwrap())
         .json(&solution)
@@ -161,7 +160,7 @@ async fn test_submit_solution() {
         .json::<essential_types::ContentAddress>()
         .await
         .unwrap();
-    assert_eq!(ca, essential_hash::content_addr(&solution.data));
+    assert_eq!(ca, essential_hash::content_addr(&solution));
 
     let response = client
         .get(url.join("list-solutions-pool").unwrap())
@@ -169,10 +168,10 @@ async fn test_submit_solution() {
         .await
         .unwrap();
     assert_eq!(response.status(), 200);
-    let solutions = response.json::<Vec<Signed<Solution>>>().await.unwrap();
+    let solutions = response.json::<Vec<Solution>>().await.unwrap();
 
     assert_eq!(solutions.len(), 1);
-    assert_eq!(essential_hash::content_addr(&solutions[0].data), ca);
+    assert_eq!(essential_hash::content_addr(&solutions[0]), ca);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
@@ -219,8 +218,8 @@ async fn test_query_state() {
 
 #[tokio::test]
 async fn test_list_winning_blocks() {
-    let solution = sign_with_random_keypair(Solution::empty());
-    let hash = essential_hash::hash(&solution.data);
+    let solution = Solution::empty();
+    let hash = essential_hash::hash(&solution);
 
     let mem = MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
@@ -239,10 +238,7 @@ async fn test_list_winning_blocks() {
     assert_eq!(response.status(), 200);
     let blocks = response.json::<Vec<Block>>().await.unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(
-        essential_hash::hash(&blocks[0].batch.solutions[0].data),
-        hash
-    );
+    assert_eq!(essential_hash::hash(&blocks[0].batch.solutions[0]), hash);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
@@ -250,8 +246,8 @@ async fn test_list_winning_blocks() {
 
 #[tokio::test]
 async fn test_solution_outcome() {
-    let solution = sign_with_random_keypair(Solution::empty());
-    let ca = essential_hash::content_addr(&solution.data);
+    let solution = Solution::empty();
+    let ca = essential_hash::content_addr(&solution);
 
     let mem = MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
@@ -304,7 +300,6 @@ async fn test_check_solution() {
         },
         decision_variables: vec![],
     });
-    let solution = sign_with_random_keypair(solution);
     let response = client
         .post(url.join("/check-solution").unwrap())
         .json(&solution)
@@ -334,7 +329,7 @@ async fn test_check_solution() {
 async fn test_check_solution_with_data() {
     #[derive(serde::Serialize)]
     struct CheckSolution {
-        solution: Signed<Solution>,
+        solution: Solution,
         intents: Vec<Intent>,
     }
     let TestServer {
@@ -356,7 +351,7 @@ async fn test_check_solution_with_data() {
         decision_variables: vec![],
     });
     let input = CheckSolution {
-        solution: sign_with_random_keypair(solution),
+        solution,
         intents: intent_set,
     };
     let response = client

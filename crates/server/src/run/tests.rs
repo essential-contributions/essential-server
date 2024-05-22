@@ -1,12 +1,14 @@
-use std::time::Duration;
-
 use crate::{
+    deploy::deploy,
     solution::submit_solution,
     test_utils::{counter_intent, counter_solution, deploy_intent, test_solution},
 };
+use essential_memory_storage::MemoryStorage;
 use essential_state_read_vm::StateRead;
 use essential_storage::{QueryState, Storage};
-use test_utils::sign_with_random_keypair;
+use essential_types::{intent::Intent, ContentAddress, IntentAddress, Word};
+use std::time::Duration;
+use test_utils::{empty::Empty, sign_with_random_keypair};
 
 async fn run<S>(storage: &S) -> anyhow::Result<()>
 where
@@ -25,18 +27,16 @@ where
 
 #[tokio::test]
 async fn test_run() {
-    let (unsigned_solution, storage) = test_solution(None, 1).await;
-    let solution = sign_with_random_keypair(unsigned_solution.clone());
-    let solution_signature = solution.signature.clone();
+    let (solution, storage) = test_solution(None, 1).await;
 
-    let first_state_mutation = &solution.data.state_mutations[0];
+    let first_state_mutation = &solution.state_mutations[0];
     let mutation_key = first_state_mutation.mutations[0].key.clone();
-    let mutation_address = solution.data.data[first_state_mutation.pathway as usize]
+    let mutation_address = solution.data[first_state_mutation.pathway as usize]
         .intent_to_solve
         .set
         .clone();
 
-    submit_solution(&storage, solution).await.unwrap();
+    submit_solution(&storage, solution.clone()).await.unwrap();
 
     let pre_state = storage
         .query_state(&mutation_address, &mutation_key)
@@ -55,27 +55,20 @@ async fn test_run() {
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].batch.solutions.len(), 1);
-    assert_eq!(blocks[0].batch.solutions[0].signature, solution_signature);
+    assert_eq!(blocks[0].batch.solutions[0], solution);
 
-    let solution2 = unsigned_solution; // same as solution
+    let solution2 = solution; // same as solution
     let (solution3, _) = test_solution(Some(storage.clone()), 2).await;
-    let solution2 = sign_with_random_keypair(solution2);
-    let solution3 = sign_with_random_keypair(solution3);
-    let solution3_signature = solution3.signature.clone();
 
     submit_solution(&storage, solution2).await.unwrap();
-    submit_solution(&storage, solution3).await.unwrap();
+    submit_solution(&storage, solution3.clone()).await.unwrap();
 
     run(&storage).await.unwrap();
 
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[1].batch.solutions.len(), 1);
-    assert!(blocks[1]
-        .batch
-        .solutions
-        .iter()
-        .any(|s| s.signature == solution3_signature));
+    assert!(blocks[1].batch.solutions.iter().any(|s| s == &solution3));
 }
 
 #[tokio::test]
@@ -83,24 +76,13 @@ async fn test_counter() {
     let intent = counter_intent(1);
     let (intent_address, storage) = deploy_intent(intent.clone()).await;
 
-    let unsigned_solution = counter_solution(intent_address.clone(), 1).await;
-    let solution = sign_with_random_keypair(unsigned_solution.clone());
-    let solution_signature = &solution.signature;
-    let mutation_key = solution.data.state_mutations[0].mutations[0].key.clone();
-
-    let solution_clone = solution.clone();
-
+    let solution = counter_solution(intent_address.clone(), 1).await;
     let solution2 = counter_solution(intent_address.clone(), 2).await;
-    let solution2 = sign_with_random_keypair(solution2.clone());
-    let solution2_signature = &solution2.signature;
-
     let solution3 = counter_solution(intent_address.clone(), 3).await;
-    let solution3 = sign_with_random_keypair(solution3.clone());
-    let solution3_signature = &solution3.signature;
-
     let solution4 = counter_solution(intent_address.clone(), 4).await;
-    let solution4 = sign_with_random_keypair(solution4.clone());
-    let solution4_signature = &solution4.signature;
+
+    let mutation_key = solution.state_mutations[0].mutations[0].key.clone();
+    let solution_clone = solution.clone();
 
     submit_solution(&storage, solution.clone()).await.unwrap();
     submit_solution(&storage, solution_clone.clone())
@@ -126,14 +108,9 @@ async fn test_counter() {
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].batch.solutions.len(), 2);
-    let signatures: Vec<&essential_types::Signature> = blocks[0]
-        .batch
-        .solutions
-        .iter()
-        .map(|s| &s.signature)
-        .collect();
-    assert!(signatures.contains(&solution_signature));
-    assert!(signatures.contains(&solution2_signature));
+    let solutions = &blocks[0].batch.solutions;
+    assert!(solutions.contains(&solution));
+    assert!(solutions.contains(&solution2));
 
     submit_solution(&storage, solution3.clone()).await.unwrap();
     submit_solution(&storage, solution4.clone()).await.unwrap();
@@ -149,12 +126,74 @@ async fn test_counter() {
     let blocks = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[1].batch.solutions.len(), 2);
-    let signatures: Vec<&essential_types::Signature> = blocks[1]
-        .batch
-        .solutions
-        .iter()
-        .map(|s| &s.signature)
-        .collect();
-    assert!(signatures.contains(&solution3_signature));
-    assert!(signatures.contains(&solution4_signature));
+    let solutions = &blocks[1].batch.solutions;
+    assert!(solutions.contains(&solution3));
+    assert!(solutions.contains(&solution4));
+}
+
+fn state_read_error_intent(salt: Word) -> Intent {
+    let mut intent = Intent::empty();
+    intent.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(4).into(),
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::StateRead::KeyRange,
+        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+    ])
+    .collect()];
+    intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
+        essential_constraint_vm::asm::Stack::Push(salt).into(),
+        essential_constraint_vm::asm::Stack::Pop.into(),
+        // Jump distance
+        essential_constraint_vm::asm::Stack::Push(2).into(),
+        // Check if the state is not empty
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Access::StateLen.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Pred::Eq.into(),
+        essential_constraint_vm::asm::Pred::Not.into(),
+        // If not empty skip pushing 0
+        essential_constraint_vm::asm::TotalControlFlow::JumpForwardIf.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        // Add 1 to the state or zero.
+        // If state is empty then it won't push anything on the stack.
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Access::State.into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
+        essential_constraint_vm::asm::Alu::Add.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
+        essential_constraint_vm::asm::Access::State.into(),
+        essential_constraint_vm::asm::Pred::Eq.into(),
+    ])
+    .collect()];
+    intent
+}
+
+#[tokio::test]
+async fn test_tracing() {
+    std::env::set_var("RUST_LOG", "trace");
+    #[cfg(feature = "tracing")]
+    let _ = tracing_subscriber::fmt::try_init();
+    let intent: Intent = state_read_error_intent(1);
+
+    let storage = MemoryStorage::default();
+    let intent_hash = ContentAddress(essential_hash::hash(&intent));
+    let intent = sign_with_random_keypair(vec![intent]);
+    let result = deploy(&storage, intent).await.unwrap();
+    let intent_address = IntentAddress {
+        set: result,
+        intent: intent_hash,
+    };
+    let solution = counter_solution(intent_address.clone(), 1).await;
+    submit_solution(&storage, solution.clone()).await.unwrap();
+    run(&storage).await.unwrap();
 }

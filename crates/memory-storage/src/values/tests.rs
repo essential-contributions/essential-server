@@ -120,11 +120,7 @@ fn test_paging_blocks() {
                     timestamp: duration_secs(i),
                     batch: Batch {
                         solutions: ((i * 10)..(i * 10 + 10))
-                            .map(|i| {
-                                sign_with_random_keypair(solution_with_decision_variables(
-                                    i as usize,
-                                ))
-                            })
+                            .map(|i| solution_with_decision_variables(i as usize))
                             .collect(),
                     },
                 },
