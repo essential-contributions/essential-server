@@ -522,7 +522,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "essential-asm-spec",
  "essential-types",
@@ -534,7 +534,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -543,7 +543,7 @@ dependencies = [
 [[package]]
 name = "essential-check"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "essential-constraint-vm",
  "essential-hash",
@@ -559,7 +559,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "essential-asm-gen",
  "essential-types",
@@ -569,7 +569,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
@@ -584,7 +584,7 @@ dependencies = [
 [[package]]
 name = "essential-hash"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "essential-types",
  "postcard",
@@ -595,7 +595,7 @@ dependencies = [
 [[package]]
 name = "essential-lock"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 
 [[package]]
 name = "essential-memory-storage"
@@ -683,7 +683,7 @@ dependencies = [
 [[package]]
 name = "essential-sign"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "essential-hash",
  "essential-types",
@@ -694,7 +694,7 @@ dependencies = [
 [[package]]
 name = "essential-state-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "essential-asm-gen",
  "essential-constraint-asm",
@@ -704,7 +704,7 @@ dependencies = [
 [[package]]
 name = "essential-state-read-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "essential-constraint-vm",
  "essential-state-asm",
@@ -742,7 +742,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/remove-dec-var-transient#d25eea62d8ff4bfdb9d3e6b647bb3a8b0efb9e50"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git#d7a19021714d407564153dbbd281ba51c3379284"
 dependencies = [
  "base64",
  "hex",
