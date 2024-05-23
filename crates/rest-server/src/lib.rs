@@ -5,16 +5,17 @@
 
 use std::{net::SocketAddr, time::Duration};
 
+use anyhow::anyhow;
 use axum::{
     extract::{Path, Query, State},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use base64::Engine as _;
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_types::{
-    convert::word_4_from_u8_32, intent::Intent, solution::Solution, Block, ContentAddress, Hash,
+    convert::word_4_from_u8_32, intent::Intent, solution::Solution, Block, ContentAddress,
     IntentAddress, Signed, Word,
 };
 use serde::Deserialize;
@@ -137,7 +138,7 @@ where
 
 /// The get intent set get endpoint.
 ///
-/// Takes a content address (encoded as base64) as a path parameter.
+/// Takes a content address (encoded as URL-safe base64 without padding) as a path parameter.
 async fn get_intent_set<S>(
     State(essential): State<Essential<S>>,
     Path(address): Path<String>,
@@ -147,12 +148,9 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let address = ContentAddress(
-        URL_SAFE
-            .decode(address)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
+    let address: ContentAddress = address
+        .parse()
+        .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
     let set = essential.get_intent_set(&address).await?;
     Ok(Json(set))
 }
@@ -160,7 +158,7 @@ where
 /// The get intent get endpoint.
 ///
 /// Takes a set content address and an intent content address as path parameters.
-/// Both are encoded as base64.
+/// Both are encoded as URL-safe base64 without padding.
 async fn get_intent<S>(
     State(essential): State<Essential<S>>,
     Path((set, address)): Path<(String, String)>,
@@ -170,18 +168,12 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let set = ContentAddress(
-        URL_SAFE
-            .decode(set)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
-    let intent = ContentAddress(
-        URL_SAFE
-            .decode(address)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
+    let set: ContentAddress = set
+        .parse()
+        .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
+    let intent: ContentAddress = address
+        .parse()
+        .map_err(|e| anyhow!("failed to parse intent content address: {e}"))?;
     let intent = essential.get_intent(&IntentAddress { set, intent }).await?;
     Ok(Json(intent))
 }
@@ -245,10 +237,8 @@ where
 
 /// The query state get endpoint.
 ///
-/// Takes a content address and a key as path parameters.
-/// Both are encoded as base64.
-///
-/// Note the key is a 32 byte array of u8 encoded as base64.
+/// Takes a content address and a 32-byte key as path parameters.
+/// Both are encoded as URL-safe base64 without padding.
 async fn query_state<S>(
     State(essential): State<Essential<S>>,
     Path((address, key)): Path<(String, String)>,
@@ -258,16 +248,14 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let address = ContentAddress(
-        URL_SAFE
-            .decode(address)?
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Content Address wrong size"))?,
-    );
-    let key: [u8; 32] = URL_SAFE
-        .decode(key)?
+    let address: ContentAddress = address
+        .parse()
+        .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
+    let key: [u8; 32] = essential_types::serde::hash::BASE64
+        .decode(key)
+        .map_err(|e| anyhow!("failed to decode key: {e}"))?
         .try_into()
-        .map_err(|_| anyhow::anyhow!("State key wrong size"))?;
+        .map_err(|_| anyhow!("invalid state key size"))?;
 
     // Convert the key to four words.
     let key = word_4_from_u8_32(key);
@@ -278,23 +266,21 @@ where
 
 /// The solution outcome get endpoint.
 ///
-/// Takes a solution hash as a path parameter.
-///
-/// The solution hash is a 32 byte array encoded as base64.
+/// Takes a solution content address as a path parameter encoded as URL-safe
+/// base64 without padding.
 async fn solution_outcome<S>(
     State(essential): State<Essential<S>>,
-    Path(hash): Path<String>,
+    Path(address): Path<String>,
 ) -> Result<Json<Option<SolutionOutcome>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let hash: Hash = URL_SAFE
-        .decode(hash)?
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("Hash is wrong size"))?;
-    let outcome = essential.solution_outcome(&hash).await?;
+    let address: ContentAddress = address
+        .parse()
+        .map_err(|e| anyhow!("failed to parse solution content address: {e}"))?;
+    let outcome = essential.solution_outcome(&address.0).await?;
     Ok(Json(outcome))
 }
 
