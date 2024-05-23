@@ -3,7 +3,7 @@ use essential_lock::StdLock;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcome},
-    word_range, QueryState, StateStorage, Storage,
+    key_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{
     intent::Intent, solution::Solution, Batch, Block, ContentAddress, Hash, IntentAddress, Key,
@@ -41,14 +41,14 @@ impl Default for MemoryStorage {
 struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
     intent_time_index: BTreeMap<Duration, ContentAddress>,
-    solution_pool: HashMap<Hash, Signed<Solution>>,
+    solution_pool: HashMap<Hash, Solution>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, FailedSolution>,
     failed_solution_time_index: HashMap<Duration, Vec<Hash>>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
     solution_block_time_index: HashMap<Hash, Duration>,
-    state: HashMap<ContentAddress, BTreeMap<Key, Word>>,
+    state: HashMap<ContentAddress, BTreeMap<Key, Vec<Word>>>,
 }
 
 #[derive(Debug)]
@@ -72,33 +72,37 @@ impl StateStorage for MemoryStorage {
         &self,
         address: &ContentAddress,
         key: &Key,
-        value: Option<Word>,
-    ) -> anyhow::Result<Option<Word>> {
+        value: Vec<Word>,
+    ) -> anyhow::Result<Vec<Word>> {
         self.inner.apply(|i| {
             let Some(map) = i.state.get_mut(address) else {
                 bail!("No state for address, {:?}", address);
             };
-            let v = match value {
-                None => map.remove(key),
-                Some(value) => map.insert(*key, value),
+            let v = if value.is_empty() {
+                map.remove(key)
+            } else {
+                map.insert(key.clone(), value)
             };
+            let v = v.unwrap_or_default();
             Ok(v)
         })
     }
 
-    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Option<Word>>>
+    async fn update_state_batch<U>(&self, updates: U) -> anyhow::Result<Vec<Vec<Word>>>
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send,
+        U: IntoIterator<Item = (ContentAddress, Key, Vec<Word>)> + Send,
     {
         let v = self.inner.apply(|i| {
             updates
                 .into_iter()
                 .map(|(address, key, value)| {
                     let map = i.state.entry(address).or_default();
-                    match value {
-                        None => map.remove(&key),
-                        Some(value) => map.insert(key, value),
-                    }
+                    let v = if value.is_empty() {
+                        map.remove(&key)
+                    } else {
+                        map.insert(key, value)
+                    };
+                    v.unwrap_or_default()
                 })
                 .collect()
         });
@@ -107,17 +111,13 @@ impl StateStorage for MemoryStorage {
 }
 
 impl QueryState for MemoryStorage {
-    async fn query_state(
-        &self,
-        address: &ContentAddress,
-        key: &Key,
-    ) -> anyhow::Result<Option<Word>> {
+    async fn query_state(&self, address: &ContentAddress, key: &Key) -> anyhow::Result<Vec<Word>> {
         let v = self.inner.apply(|i| {
             let map = i.state.get(address)?;
             let v = map.get(key)?;
-            Some(*v)
+            Some(v.clone())
         });
-        Ok(v)
+        Ok(v.unwrap_or_default())
     }
 }
 
@@ -156,9 +156,9 @@ impl Storage for MemoryStorage {
         })
     }
 
-    async fn insert_solution_into_pool(&self, solution: Signed<Solution>) -> anyhow::Result<()> {
+    async fn insert_solution_into_pool(&self, solution: Solution) -> anyhow::Result<()> {
         let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-        let hash = essential_hash::hash(&solution.data);
+        let hash = essential_hash::hash(&solution);
         self.inner.apply(|i| {
             if i.solution_pool.insert(hash, solution).is_none() {
                 i.solution_time_index
@@ -287,7 +287,7 @@ impl Storage for MemoryStorage {
         }
     }
 
-    async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
+    async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Solution>> {
         Ok(self.inner.apply(|i| {
             i.solution_time_index
                 .values()
@@ -349,7 +349,7 @@ impl Storage for MemoryStorage {
                 .batch
                 .solutions
                 .iter()
-                .find(|s| essential_hash::hash(&s.data) == solution_hash)
+                .find(|s| essential_hash::hash(&s) == solution_hash)
                 .cloned()
                 .map(|s| SolutionOutcome {
                     solution: s,
@@ -388,10 +388,10 @@ impl StateRead for MemoryStorage {
     type Error = MemoryStorageError;
 
     type Future =
-        Pin<Box<dyn std::future::Future<Output = Result<Vec<Option<Word>>, Self::Error>> + Send>>;
+        Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<Word>>, Self::Error>> + Send>>;
 
-    fn word_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+    fn key_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { word_range(&storage, set_addr, key, num_words).await }.boxed()
+        async move { key_range(&storage, set_addr, key, num_words).await }.boxed()
     }
 }

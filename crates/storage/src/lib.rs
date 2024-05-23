@@ -28,7 +28,7 @@ pub trait Storage: StateStorage {
     /// Add a solution to the pool of unsolved solutions.
     fn insert_solution_into_pool(
         &self,
-        solution: Signed<Solution>,
+        solution: Solution,
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
     /// Move these solutions from the pool to the solved state.
@@ -67,9 +67,7 @@ pub trait Storage: StateStorage {
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Intent>>>> + Send;
 
     /// List all solutions in the pool.
-    fn list_solutions_pool(
-        &self,
-    ) -> impl Future<Output = anyhow::Result<Vec<Signed<Solution>>>> + Send;
+    fn list_solutions_pool(&self) -> impl Future<Output = anyhow::Result<Vec<Solution>>> + Send;
 
     /// List all failed solutions in the pool.
     fn list_failed_solutions_pool(
@@ -109,16 +107,16 @@ pub trait StateStorage: QueryState {
         &self,
         address: &ContentAddress,
         key: &Key,
-        value: Option<Word>,
-    ) -> impl std::future::Future<Output = anyhow::Result<Option<Word>>> + Send;
+        value: Vec<Word>,
+    ) -> impl std::future::Future<Output = anyhow::Result<Vec<Word>>> + Send;
 
     /// Update a batch of state in one transaction.
     fn update_state_batch<U>(
         &self,
         updates: U,
-    ) -> impl std::future::Future<Output = anyhow::Result<Vec<Option<Word>>>> + Send
+    ) -> impl std::future::Future<Output = anyhow::Result<Vec<Vec<Word>>>> + Send
     where
-        U: IntoIterator<Item = (ContentAddress, Key, Option<Word>)> + Send;
+        U: IntoIterator<Item = (ContentAddress, Key, Vec<Word>)> + Send;
 }
 
 /// Storage trait for reading state.
@@ -128,24 +126,24 @@ pub trait QueryState {
         &self,
         address: &ContentAddress,
         key: &Key,
-    ) -> impl std::future::Future<Output = anyhow::Result<Option<Word>>> + Send;
+    ) -> impl std::future::Future<Output = anyhow::Result<Vec<Word>>> + Send;
 }
 
 /// Get a range of words from the state.
-pub async fn word_range<S, E>(
+pub async fn key_range<S, E>(
     storage: &S,
     set_addr: ContentAddress,
     mut key: Key,
     num_words: usize,
-) -> Result<Vec<Option<Word>>, E>
+) -> Result<Vec<Vec<Word>>, E>
 where
     S: QueryState + Send,
     E: From<anyhow::Error>,
 {
     let mut words = vec![];
     for _ in 0..num_words {
-        let opt = storage.query_state(&set_addr, &key).await?;
-        words.push(opt);
+        let slot = storage.query_state(&set_addr, &key).await?;
+        words.push(slot);
         key = next_key(key).ok_or_else(|| anyhow::anyhow!("Failed to find next key"))?
     }
     Ok(words)

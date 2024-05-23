@@ -1,17 +1,16 @@
 use super::*;
 use crate::encode;
 use serde_json::Number;
-use test_utils::{empty::Empty, sign_with_random_keypair};
+use test_utils::empty::Empty;
 
 #[test]
 fn test_valid_query() {
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     let r = map_solution_to_block(
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
         ],
@@ -19,26 +18,16 @@ fn test_valid_query() {
     .unwrap();
     assert_eq!(r.len(), 1);
     assert_eq!(r[&1].batch.solutions.len(), 1);
-    assert_eq!(
-        r[&1].batch.solutions[0],
-        Signed {
-            data: data.clone(),
-            signature: signature.clone()
-        }
-    );
+    assert_eq!(r[&1].batch.solutions[0], solution);
     assert_eq!(r[&1].number, 0);
     assert_eq!(r[&1].timestamp, Duration::new(2, 3));
 
-    let Signed {
-        data: data2,
-        signature: signature2,
-    } = sign_with_random_keypair(Solution::empty());
+    let solution2 = Solution::empty();
     let r = map_solution_to_block(
         r,
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data2)),
-            Value::String(encode(&signature2)),
+            Value::String(encode(&solution2)),
             Value::Number(Number::from(9)),
             Value::Number(Number::from(10)),
         ],
@@ -46,33 +35,17 @@ fn test_valid_query() {
     .unwrap();
     assert_eq!(r.len(), 1);
     assert_eq!(r[&1].batch.solutions.len(), 2);
-    assert_eq!(
-        r[&1].batch.solutions[0],
-        Signed {
-            data: data.clone(),
-            signature: signature.clone()
-        }
-    );
-    assert_eq!(
-        r[&1].batch.solutions[1],
-        Signed {
-            data: data2.clone(),
-            signature: signature2.clone()
-        }
-    );
+    assert_eq!(r[&1].batch.solutions[0], solution);
+    assert_eq!(r[&1].batch.solutions[1], solution);
     assert_eq!(r[&1].number, 0);
     assert_eq!(r[&1].timestamp, Duration::new(2, 3));
 
-    let Signed {
-        data: data3,
-        signature: signature3,
-    } = sign_with_random_keypair(Solution::empty());
+    let solution3 = Solution::empty();
     let r = map_solution_to_block(
         r,
         &[
             Value::Number(Number::from(2)),
-            Value::String(encode(&data3)),
-            Value::String(encode(&signature3)),
+            Value::String(encode(&solution3)),
             Value::Number(Number::from(11)),
             Value::Number(Number::from(12)),
         ],
@@ -80,21 +53,9 @@ fn test_valid_query() {
     .unwrap();
     assert_eq!(r.len(), 2);
     assert_eq!(r[&1].batch.solutions.len(), 2);
-    assert_eq!(r[&1].batch.solutions[0], Signed { data, signature });
-    assert_eq!(
-        r[&1].batch.solutions[1],
-        Signed {
-            data: data2,
-            signature: signature2
-        }
-    );
-    assert_eq!(
-        r[&2].batch.solutions[0],
-        Signed {
-            data: data3,
-            signature: signature3
-        }
-    );
+    assert_eq!(r[&1].batch.solutions[0], solution);
+    assert_eq!(r[&1].batch.solutions[1], solution);
+    assert_eq!(r[&2].batch.solutions[0], solution);
     assert_eq!(r[&1].number, 0);
     assert_eq!(r[&1].timestamp, Duration::new(2, 3));
     assert_eq!(r[&2].number, 1);
@@ -103,13 +64,12 @@ fn test_valid_query() {
 
 #[test]
 fn test_block_id_zero() {
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     map_solution_to_block(
         Default::default(),
         &[
             Value::Number(Number::from(0)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(1)),
             Value::Number(Number::from(1)),
         ],
@@ -120,14 +80,13 @@ fn test_block_id_zero() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxx".to_string();
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
 
     map_solution_to_block(
         Default::default(),
         &[
             Value::Bool(true),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
         ],
@@ -139,7 +98,7 @@ fn test_invalid_data() {
         &[
             Value::Number(Number::from(1)),
             Value::Bool(true),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
         ],
@@ -150,7 +109,7 @@ fn test_invalid_data() {
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
+            Value::String(encode(&solution)),
             Value::Bool(true),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
@@ -162,8 +121,7 @@ fn test_invalid_data() {
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Bool(true),
             Value::Number(Number::from(3)),
         ],
@@ -174,8 +132,7 @@ fn test_invalid_data() {
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Bool(true),
         ],
@@ -187,7 +144,7 @@ fn test_invalid_data() {
         &[
             Value::Number(Number::from(1)),
             Value::String(invalid.clone()),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
         ],
@@ -198,7 +155,7 @@ fn test_invalid_data() {
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
+            Value::String(encode(&solution)),
             Value::String(invalid.clone()),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
@@ -210,8 +167,7 @@ fn test_invalid_data() {
         Default::default(),
         &[
             Value::Number(Number::from_f64(1.0).unwrap()),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
         ],
@@ -222,8 +178,7 @@ fn test_invalid_data() {
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from_f64(1.0).unwrap()),
             Value::Number(Number::from(3)),
         ],
@@ -234,8 +189,7 @@ fn test_invalid_data() {
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Number(Number::from_f64(1.0).unwrap()),
         ],
@@ -245,13 +199,12 @@ fn test_invalid_data() {
 
 #[test]
 fn test_wrong_num_columns() {
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     map_solution_to_block(
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
         ],
     )
@@ -261,8 +214,7 @@ fn test_wrong_num_columns() {
         Default::default(),
         &[
             Value::Number(Number::from(1)),
-            Value::String(encode(&data)),
-            Value::String(encode(&signature)),
+            Value::String(encode(&solution)),
             Value::Number(Number::from(2)),
             Value::Number(Number::from(3)),
             Value::Number(Number::from(3)),

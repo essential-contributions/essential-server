@@ -1,10 +1,11 @@
 [package]
 edition = "2021"
 name = "test-utils"
-version = "0.1.0"
 publish = false
+version = "0.1.0"
 
 [dependencies]
+essential-constraint-vm = { workspace = true }
 essential-hash = { workspace = true }
 essential-sign = { workspace = true }
 essential-types = { workspace = true }

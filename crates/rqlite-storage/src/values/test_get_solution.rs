@@ -2,7 +2,7 @@ use super::*;
 use crate::encode;
 use essential_storage::failed_solution::{CheckOutcome, SolutionFailReason};
 use serde_json::Number;
-use test_utils::{empty::Empty, sign_with_random_keypair};
+use test_utils::empty::Empty;
 
 #[test]
 fn test_empty_query() {
@@ -28,14 +28,13 @@ fn test_invalid_query() {
 
 #[test]
 fn test_valid_solution() {
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
+                    Value::String(encode(&solution)),
                     Value::Number(1.into()),
                     Value::Null,
                 ],
@@ -45,10 +44,7 @@ fn test_valid_solution() {
 
     let r = get_solution(queries).unwrap().unwrap();
     let expected = SolutionOutcome {
-        solution: Signed {
-            data: data.clone(),
-            signature: signature.clone(),
-        },
+        solution: solution.clone(),
         outcome: CheckOutcome::Success(1),
     };
     assert_eq!(r, expected);
@@ -57,8 +53,7 @@ fn test_valid_solution() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
+                    Value::String(encode(&solution)),
                     Value::Null,
                     Value::String(encode(&reason)),
                 ],
@@ -68,7 +63,7 @@ fn test_valid_solution() {
 
     let r = get_solution(queries).unwrap().unwrap();
     let expected = SolutionOutcome {
-        solution: Signed { data, signature },
+        solution,
         outcome: CheckOutcome::Fail(reason),
     };
     assert_eq!(r, expected);
@@ -76,14 +71,13 @@ fn test_valid_solution() {
 
 #[test]
 fn test_invalid_solution() {
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
                     Value::Bool(true),
-                    Value::String(encode(&signature)),
                     Value::Number(1.into()),
                     Value::String(encode(&reason)),
                 ],
@@ -97,7 +91,7 @@ fn test_invalid_solution() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
+                    Value::String(encode(&solution)),
                     Value::Bool(true),
                     Value::Number(1.into()),
                     Value::String(encode(&reason)),
@@ -112,8 +106,7 @@ fn test_invalid_solution() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
+                    Value::String(encode(&solution)),
                     Value::Bool(true),
                     Value::String(encode(&reason)),
                 ],
@@ -127,8 +120,7 @@ fn test_invalid_solution() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
+                    Value::String(encode(&solution)),
                     Value::Number(1.into()),
                     Value::Bool(true),
                 ],
@@ -142,8 +134,7 @@ fn test_invalid_solution() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
+                    Value::String(encode(&solution)),
                     Value::Number(1.into()),
                     Value::String(encode(&reason)),
                 ],
@@ -157,8 +148,7 @@ fn test_invalid_solution() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx".to_string();
-    let Signed { data, signature } =
-        sign_with_random_keypair(essential_types::solution::SolutionData::empty());
+    let solution = essential_types::solution::SolutionData::empty();
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
 
     let queries = QueryValues {
@@ -166,7 +156,6 @@ fn test_invalid_data() {
             rows: vec![Columns {
                 columns: vec![
                     Value::String(invalid.clone()),
-                    Value::String(encode(&signature)),
                     Value::Null,
                     Value::String(encode(&reason)),
                 ],
@@ -179,7 +168,7 @@ fn test_invalid_data() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
+                    Value::String(encode(&solution)),
                     Value::String(invalid.clone()),
                     Value::Null,
                     Value::String(encode(&reason)),
@@ -193,8 +182,7 @@ fn test_invalid_data() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
+                    Value::String(encode(&solution)),
                     Value::Number(Number::from_f64(1.0).unwrap()),
                     Value::Null,
                 ],
@@ -207,8 +195,7 @@ fn test_invalid_data() {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
+                    Value::String(encode(&solution)),
                     Value::Null,
                     Value::String(invalid.clone()),
                 ],
@@ -220,14 +207,13 @@ fn test_invalid_data() {
 
 #[test]
 fn test_wrong_num_columns() {
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
-                    Value::String(encode(&data)),
-                    Value::String(encode(&signature)),
-                    Value::String(encode(&data)),
+                    Value::String(encode(&solution)),
+                    Value::String(encode(&solution)),
                 ],
             }],
         })],
@@ -238,21 +224,15 @@ fn test_wrong_num_columns() {
 
 #[test]
 fn test_wrong_num_rows() {
-    let Signed { data, signature } = sign_with_random_keypair(Solution::empty());
+    let solution = Solution::empty();
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![
                 Columns {
-                    columns: vec![
-                        Value::String(encode(&data)),
-                        Value::String(encode(&signature)),
-                    ],
+                    columns: vec![Value::String(encode(&solution))],
                 },
                 Columns {
-                    columns: vec![
-                        Value::String(encode(&data)),
-                        Value::String(encode(&signature)),
-                    ],
+                    columns: vec![Value::String(encode(&solution))],
                 },
             ],
         })],

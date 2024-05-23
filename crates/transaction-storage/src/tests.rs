@@ -11,8 +11,8 @@ async fn test_can_query() {
     let intent = Intent::empty();
     let address = essential_hash::intent_set_addr::from_intents(&vec![intent.clone()]);
     let signed = sign_with_random_keypair(vec![intent]);
-    let key = [0; 4];
-    let value = Some(1);
+    let key = vec![0; 4];
+    let value = vec![1];
     storage
         .insert_intent_set(StorageLayout {}, signed)
         .await
@@ -22,58 +22,73 @@ async fn test_can_query() {
     let mut storage = storage.transaction();
 
     let r = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(1));
+    assert_eq!(r, vec![1]);
 
-    let r = storage.update_state(&address, &key, Some(2)).await.unwrap();
-    assert_eq!(r, Some(1));
-
-    let r = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(2));
-
-    let r = storage.storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(1));
-
-    let r = storage.update_state(&address, &key, None).await.unwrap();
-    assert_eq!(r, Some(2));
-
-    let r = storage.storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(1));
+    let r = storage
+        .update_state(&address, key.clone(), vec![2])
+        .await
+        .unwrap();
+    assert_eq!(r, vec![1]);
 
     let r = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, None);
+    assert_eq!(r, vec![2]);
+
+    let r = storage.storage.query_state(&address, &key).await.unwrap();
+    assert_eq!(r, vec![1]);
+
+    let r = storage
+        .update_state(&address, key.clone(), vec![])
+        .await
+        .unwrap();
+    assert_eq!(r, vec![2]);
+
+    let r = storage.storage.query_state(&address, &key).await.unwrap();
+    assert_eq!(r, vec![1]);
+
+    let r = storage.query_state(&address, &key).await.unwrap();
+    assert!(r.is_empty());
 
     storage.commit().await.unwrap();
 
     let r = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, None);
+    assert!(r.is_empty());
 
     let r = storage.storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, None);
+    assert!(r.is_empty());
 
-    let r = storage.update_state(&address, &key, Some(3)).await.unwrap();
-    assert_eq!(r, None);
+    let r = storage
+        .update_state(&address, key.clone(), vec![3])
+        .await
+        .unwrap();
+    assert!(r.is_empty());
 
-    let r = storage.update_state(&address, &key, Some(4)).await.unwrap();
-    assert_eq!(r, Some(3));
+    let r = storage
+        .update_state(&address, key.clone(), vec![4])
+        .await
+        .unwrap();
+    assert_eq!(r, vec![3]);
 
     storage.commit().await.unwrap();
 
     let r = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(4));
+    assert_eq!(r, vec![4]);
 
     let r = storage.storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(4));
+    assert_eq!(r, vec![4]);
 
-    storage.update_state(&address, &key, Some(5)).await.unwrap();
+    storage
+        .update_state(&address, key.clone(), vec![5])
+        .await
+        .unwrap();
     storage.rollback();
 
     let r = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(4));
+    assert_eq!(r, vec![4]);
 
     storage.commit().await.unwrap();
     let r = storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(4));
+    assert_eq!(r, vec![4]);
 
     let r = storage.storage.query_state(&address, &key).await.unwrap();
-    assert_eq!(r, Some(4));
+    assert_eq!(r, vec![4]);
 }

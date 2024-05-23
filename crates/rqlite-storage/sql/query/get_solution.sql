@@ -1,5 +1,4 @@
 SELECT
-    signature,
     solution,
     batch_id AS block_number,
     NULL AS reason
@@ -10,7 +9,6 @@ WHERE
 UNION
 ALL
 SELECT
-    signature,
     solution,
     NULL AS block_number,
     reason

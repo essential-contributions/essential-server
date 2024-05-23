@@ -64,7 +64,7 @@ Returns: `Vec<Vec<Intent>>` as JSON
 curl -X GET -H "Content-Type: application/json" "http://localhost:59498/list-intent-sets?start=0&end=1&page=0"
 ```
 ### POST `/submit-solution`
-Body: `Signed<Solution>` as JSON \
+Body: `Solution` as JSON \
 Returns: `Hash` as JSON
 
 **Example:**
@@ -72,7 +72,7 @@ Returns: `Hash` as JSON
 curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[]},"signature":[[]]}' http://localhost:59498/submit-solution
 ```
 ### GET `/list-solutions-pool`
-Returns: `Vec<Signed<Solution>>` as JSON
+Returns: `Vec<Solution>` as JSON
 
 **Example:**
 ```bash
@@ -119,7 +119,7 @@ curl -X GET -H "Content-Type: application/json" "http://localhost:59498/solution
 ### Post `/check-solution`
 Check a solution against deployed intents without changing state.\
 This is a dry run of the solution.\
-Body: `Signed<Solution>` as JSON \
+Body: `Solution` as JSON \
 Returns: `CheckSolutionOutput` as JSON
 ```rust
 pub struct CheckSolutionOutput {
@@ -138,7 +138,7 @@ This is a dry run of the solution.\
 Body: `CheckSolution` as JSON \
 ```rust
 struct CheckSolution {
-    solution: Signed<Solution>,
+    solution: Solution,
     intents: Vec<Intent>,
 }
 ```

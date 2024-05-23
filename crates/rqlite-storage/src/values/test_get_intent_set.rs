@@ -1,6 +1,6 @@
 use super::*;
 use crate::encode;
-use test_utils::{empty::Empty, intent_with_decision_variables, sign_with_random_keypair};
+use test_utils::{empty::Empty, intent_with_salt, sign_with_random_keypair};
 
 #[test]
 fn test_empty_query() {
@@ -127,10 +127,8 @@ fn test_single_intent_without_sig() {
 
 #[test]
 fn test_signature_multiple_intent() {
-    let Signed { data, signature } = sign_with_random_keypair(vec![
-        intent_with_decision_variables(1),
-        intent_with_decision_variables(2),
-    ]);
+    let Signed { data, signature } =
+        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -151,10 +149,7 @@ fn test_signature_multiple_intent() {
 
     let r = get_intent_set(queries).unwrap().unwrap();
     let expected = Signed {
-        data: vec![
-            intent_with_decision_variables(1),
-            intent_with_decision_variables(2),
-        ],
+        data: vec![intent_with_salt(1), intent_with_salt(2)],
         signature,
     };
     assert_eq!(r, expected);
@@ -162,10 +157,8 @@ fn test_signature_multiple_intent() {
 
 #[test]
 fn test_invalid_signature_multiple_intent() {
-    let Signed { data, signature: _ } = sign_with_random_keypair(vec![
-        intent_with_decision_variables(1),
-        intent_with_decision_variables(2),
-    ]);
+    let Signed { data, signature: _ } =
+        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -189,10 +182,8 @@ fn test_invalid_signature_multiple_intent() {
 
 #[test]
 fn test_signature_multiple_intent_invalid() {
-    let Signed { data, signature } = sign_with_random_keypair(vec![
-        intent_with_decision_variables(1),
-        intent_with_decision_variables(2),
-    ]);
+    let Signed { data, signature } =
+        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -213,10 +204,8 @@ fn test_signature_multiple_intent_invalid() {
 
 #[test]
 fn test_multi_column_sig() {
-    let Signed { data, signature } = sign_with_random_keypair(vec![
-        intent_with_decision_variables(1),
-        intent_with_decision_variables(2),
-    ]);
+    let Signed { data, signature } =
+        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -243,10 +232,8 @@ fn test_multi_column_sig() {
 
 #[test]
 fn test_multi_row_sig() {
-    let Signed { data, signature } = sign_with_random_keypair(vec![
-        intent_with_decision_variables(1),
-        intent_with_decision_variables(2),
-    ]);
+    let Signed { data, signature } =
+        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -275,10 +262,8 @@ fn test_multi_row_sig() {
 
 #[test]
 fn test_multi_row_intent() {
-    let Signed { data, signature } = sign_with_random_keypair(vec![
-        intent_with_decision_variables(1),
-        intent_with_decision_variables(2),
-    ]);
+    let Signed { data, signature } =
+        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {

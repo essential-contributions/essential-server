@@ -21,7 +21,7 @@ mod test_list_solutions;
 #[cfg(test)]
 mod test_list_winning_blocks;
 #[cfg(test)]
-mod test_map_execute_to_word;
+mod test_map_execute_to_values;
 #[cfg(test)]
 mod test_map_query_to_query_values;
 #[cfg(test)]
@@ -112,30 +112,21 @@ pub fn get_solution(
     };
 
     match &columns[..] {
-        [Value::String(solution), Value::String(signature), Value::Number(block_number), Value::Null] =>
-        {
+        [Value::String(solution), Value::Number(block_number), Value::Null] => {
             let solution = decode(solution)?;
-            let signature = decode(signature)?;
             let block_number = block_number
                 .as_u64()
                 .ok_or_else(|| anyhow::anyhow!("failed to parse block_number"))?;
             Ok(Some(SolutionOutcome {
-                solution: Signed {
-                    data: solution,
-                    signature,
-                },
+                solution,
                 outcome: CheckOutcome::Success(block_number),
             }))
         }
-        [Value::String(solution), Value::String(signature), Value::Null, Value::String(reason)] => {
+        [Value::String(solution), Value::Null, Value::String(reason)] => {
             let solution = decode(solution)?;
-            let signature = decode(signature)?;
             let reason = decode(reason)?;
             Ok(Some(SolutionOutcome {
-                solution: Signed {
-                    data: solution,
-                    signature,
-                },
+                solution,
                 outcome: CheckOutcome::Fail(reason),
             }))
         }
@@ -147,7 +138,7 @@ pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<
     // Only expecting a single query.
     let rows = match &queries[..] {
         [Some(Rows { rows })] => rows,
-        [None] => return Ok(Vec::with_capacity(0)),
+        [None] => return Ok(Vec::new()),
         _ => bail!("expected a single query {:?}", queries),
     };
 
@@ -187,18 +178,18 @@ pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<
     Ok(out)
 }
 
-pub fn list_solutions_pool(queries: QueryValues) -> anyhow::Result<Vec<Signed<Solution>>> {
+pub fn list_solutions_pool(queries: QueryValues) -> anyhow::Result<Vec<Solution>> {
     list_solutions(queries)
 }
 
-fn list_solutions<S>(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Signed<S>>>
+fn list_solutions<S>(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<S>>
 where
     S: DeserializeOwned,
 {
     // Only expecting a single query.
     let rows = match &queries[..] {
         [Some(Rows { rows })] => rows,
-        [None] => return Ok(Vec::with_capacity(0)),
+        [None] => return Ok(Vec::new()),
         _ => bail!("expected a single query {:?}", queries),
     };
 
@@ -207,22 +198,15 @@ where
         bail!("expected at least one row")
     }
 
-    // Decode signature and solution from each row.
+    // Decode solution from each row.
     rows.iter()
         .map(|Columns { columns }| match &columns[..] {
-            [signature, solution] => {
-                let signature = match signature {
-                    serde_json::Value::String(signature) => decode(signature)?,
-                    _ => bail!("unexpected column type {:?} for signature", signature),
-                };
+            [solution] => {
                 let solution = match solution {
                     serde_json::Value::String(solution) => decode(solution)?,
                     _ => bail!("unexpected column type {:?} for solution", solution),
                 };
-                Ok(Signed {
-                    data: solution,
-                    signature,
-                })
+                Ok(solution)
             }
             _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
         })
@@ -235,7 +219,7 @@ pub fn list_failed_solutions(
     // Only expecting a single query.
     let rows = match &queries[..] {
         [Some(Rows { rows })] => rows,
-        [None] => return Ok(Vec::with_capacity(0)),
+        [None] => return Ok(Vec::new()),
         _ => bail!("expected a single query {:?}", queries),
     };
 
@@ -244,14 +228,10 @@ pub fn list_failed_solutions(
         bail!("expected at least one row")
     }
 
-    // Decode signature and solution from each row.
+    // Decode solution from each row.
     rows.iter()
         .map(|Columns { columns }| match &columns[..] {
-            [signature, solution, reason] => {
-                let signature = match signature {
-                    serde_json::Value::String(signature) => decode(signature)?,
-                    _ => bail!("unexpected column type {:?} for signature", signature),
-                };
+            [solution, reason] => {
                 let solution = match solution {
                     serde_json::Value::String(solution) => decode(solution)?,
                     _ => bail!("unexpected column type {:?} for solution", solution),
@@ -260,13 +240,7 @@ pub fn list_failed_solutions(
                     serde_json::Value::String(reason) => decode(reason)?,
                     _ => bail!("unexpected column type {:?} for reason", reason),
                 };
-                Ok(FailedSolution {
-                    solution: Signed {
-                        data: solution,
-                        signature,
-                    },
-                    reason,
-                })
+                Ok(FailedSolution { solution, reason })
             }
             _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
         })
@@ -277,7 +251,7 @@ pub fn list_winning_blocks(QueryValues { queries }: QueryValues) -> anyhow::Resu
     // Only expecting a single query.
     let rows = match &queries[..] {
         [Some(Rows { rows })] => rows,
-        [None] => return Ok(Vec::with_capacity(0)),
+        [None] => return Ok(Vec::new()),
         _ => bail!("expected a single query {:?}", queries),
     };
 
@@ -303,7 +277,7 @@ fn map_solution_to_block(
     columns: &[Value],
 ) -> anyhow::Result<BTreeMap<u64, Block>> {
     match columns {
-        [Value::Number(batch_id), Value::String(solution), Value::String(signature), Value::Number(created_at_secs), Value::Number(created_at_nanos)] => {
+        [Value::Number(batch_id), Value::String(solution), Value::Number(created_at_secs), Value::Number(created_at_nanos)] => {
             match (
                 batch_id.as_u64(),
                 created_at_secs.as_u64(),
@@ -311,7 +285,6 @@ fn map_solution_to_block(
             ) {
                 (Some(batch_id), Some(created_at_secs), Some(created_at_nanos)) => {
                     let solution = decode(solution)?;
-                    let signature = decode(signature)?;
                     let Some(number) = batch_id.checked_sub(1) else {
                         bail!("batch_id must be greater than 0");
                     };
@@ -325,10 +298,7 @@ fn map_solution_to_block(
                         })
                         .batch
                         .solutions
-                        .push(Signed {
-                            data: solution,
-                            signature,
-                        });
+                        .push(solution);
                     Ok(map)
                 }
                 _ => bail!("Failed to parse batch_id, created_at_secs, or created_at_nanos"),
@@ -338,9 +308,9 @@ fn map_solution_to_block(
     }
 }
 
-pub fn map_execute_to_word(
+pub fn map_execute_to_values(
     mut value: serde_json::Map<String, serde_json::Value>,
-) -> anyhow::Result<Option<Word>> {
+) -> anyhow::Result<Vec<Word>> {
     // Must have results key
     let Some(results) = value.remove(RESULTS_KEY) else {
         bail!("Query results are invalid");
@@ -358,7 +328,7 @@ pub fn map_execute_to_word(
 
     // If the results doesn't contain the values key, return None
     let Some(serde_json::Value::Array(rows)) = results.get("values") else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
 
     // There must be a single row which is an array
@@ -366,24 +336,24 @@ pub fn map_execute_to_word(
         bail!("expected a single row");
     };
 
-    // There must be a single column which is a number
-    let [serde_json::Value::Number(word)] = &columns[..] else {
+    // There must be a single column which is a blob
+    let [serde_json::Value::String(words)] = &columns[..] else {
         bail!("expected a single column");
     };
 
-    // Parse the word
-    let Some(word) = word.as_i64() else {
-        bail!("failed to parse word");
-    };
+    // Parse the words
+    let words: Vec<Word> = decode(words)?;
 
-    Ok(Some(word))
+    Ok(words)
 }
 
-/// Map the execute query results to words.
+/// Map the execute query results to values.
 ///
 /// Note this is designed for queries where the first query is a read query
 /// then it alternates between write and read queries.
-pub fn map_execute_to_words(QueryValues { queries }: QueryValues) -> Vec<Option<Word>> {
+pub fn map_execute_to_multiple_values(
+    QueryValues { queries }: QueryValues,
+) -> anyhow::Result<Vec<Vec<Word>>> {
     queries
         .into_iter()
         .enumerate()
@@ -391,13 +361,17 @@ pub fn map_execute_to_words(QueryValues { queries }: QueryValues) -> Vec<Option<
         // and not the read queries that we are interested in.
         .filter(|(i, _)| i % 2 == 0)
         .map(|(_, row)| {
-            row.and_then(|Rows { rows }| {
-                let col = rows.into_iter().next()?.columns.into_iter().next()?;
-                match col {
-                    Value::Number(n) => n.as_i64(),
-                    _ => None,
-                }
-            })
+            // If the row is None, return an empty vec
+            let Some(Rows { rows }) = row else {
+                return Ok(Vec::new());
+            };
+            let [Columns { columns }] = &rows[..] else {
+                bail!("expected a single column per value")
+            };
+            let [Value::String(words)] = &columns[..] else {
+                bail!("expected a single value per column")
+            };
+            decode(words)
         })
         .collect()
 }
@@ -436,6 +410,6 @@ pub fn map_query_to_query_values(
         }
         _ => None,
     };
-    let queries = queries.unwrap_or_else(|| Vec::with_capacity(0));
+    let queries = queries.unwrap_or_default();
     Ok(QueryValues { queries })
 }

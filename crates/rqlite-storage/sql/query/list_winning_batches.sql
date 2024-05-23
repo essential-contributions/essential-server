@@ -1,7 +1,6 @@
 SELECT
     solved.batch_id,
     solved.solution,
-    solved.signature,
     batch.created_at_seconds,
     batch.created_at_nanos
 FROM

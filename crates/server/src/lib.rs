@@ -82,14 +82,11 @@ where
         deploy::deploy(&self.storage, intents).await
     }
 
-    pub async fn check_solution(
-        &self,
-        solution: Signed<Solution>,
-    ) -> anyhow::Result<CheckSolutionOutput> {
-        check::solution::check_signed(&solution)?;
-        let intents = read_intents_from_storage(&solution.data, &self.storage).await?;
+    pub async fn check_solution(&self, solution: Solution) -> anyhow::Result<CheckSolutionOutput> {
+        check::solution::check(&solution)?;
+        let intents = read_intents_from_storage(&solution, &self.storage).await?;
         let transaction = self.storage.clone().transaction();
-        let solution = Arc::new(solution.data);
+        let solution = Arc::new(solution);
         let config = self.config.clone();
         let (_post_state, utility, gas) =
             checked_state_transition(&transaction, solution, &intents, config).await?;
@@ -98,7 +95,7 @@ where
 
     pub async fn check_solution_with_data(
         &self,
-        solution: Signed<Solution>,
+        solution: Solution,
         intents: Vec<Intent>,
     ) -> anyhow::Result<CheckSolutionOutput> {
         let set = ContentAddress(essential_hash::hash(&intents));
@@ -115,20 +112,17 @@ where
             })
             .collect();
 
-        check::solution::check_signed(&solution)?;
+        check::solution::check(&solution)?;
 
         let transaction = self.storage.clone().transaction();
         let config = self.config.clone();
-        let solution = Arc::new(solution.data);
+        let solution = Arc::new(solution);
         let (_post_state, utility, gas) =
             checked_state_transition(&transaction, solution, &intents, config).await?;
         Ok(CheckSolutionOutput { utility, gas })
     }
 
-    pub async fn submit_solution(
-        &self,
-        solution: Signed<Solution>,
-    ) -> anyhow::Result<ContentAddress> {
+    pub async fn submit_solution(&self, solution: Solution) -> anyhow::Result<ContentAddress> {
         solution::submit_solution(&self.storage, solution).await
     }
 
@@ -165,7 +159,7 @@ where
         self.storage.list_intent_sets(time_range, page).await
     }
 
-    pub async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Signed<Solution>>> {
+    pub async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Solution>> {
         self.storage.list_solutions_pool().await
     }
 
@@ -181,7 +175,7 @@ where
         &self,
         address: &ContentAddress,
         key: &Key,
-    ) -> anyhow::Result<Option<Word>> {
+    ) -> anyhow::Result<Vec<Word>> {
         self.storage.query_state(address, key).await
     }
 
