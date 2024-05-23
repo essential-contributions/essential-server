@@ -81,7 +81,7 @@ curl -X GET -H "Content-Type: application/json" "http://localhost:59498/list-sol
 ### GET `/query-state/:address/:key`
 Parameters: 
 - `:address` = `[u8; 32]` as base64 string. This is the content address of the intent set.
-- `:key` = `[u8; 32]` as base64 string. This is the key of the state.
+- `:key` = `Vec<u8>` as base64 string. This is the key of the state.
 
 Returns: `Option<Word>` as JSON
 
