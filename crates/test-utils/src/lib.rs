@@ -4,7 +4,7 @@ use empty::Empty;
 use essential_sign::sign;
 use essential_types::{
     intent::{Directive, Intent},
-    solution::{DecisionVariable, Solution, SolutionData},
+    solution::{Solution, SolutionData},
     IntentAddress, Signature, Signed, Word,
 };
 use secp256k1::{rand::rngs::OsRng, PublicKey, Secp256k1, SecretKey};
@@ -62,10 +62,7 @@ pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
     Solution {
         data: vec![SolutionData {
             intent_to_solve: IntentAddress::empty(),
-            decision_variables: vec![
-                DecisionVariable::Inline(decision_variables as Word);
-                decision_variables
-            ],
+            decision_variables: vec![decision_variables as Word; decision_variables],
         }],
         state_mutations: Default::default(),
     }

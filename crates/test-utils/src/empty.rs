@@ -1,7 +1,7 @@
 use essential_types::{
     intent::{Directive, Intent},
-    solution::{DecisionVariable, Solution, SolutionData, StateMutation},
-    ContentAddress, IntentAddress, Word,
+    solution::{Solution, SolutionData, StateMutation},
+    ContentAddress, IntentAddress,
 };
 
 /// Utility trait to provide empty instantiaters for essential types
@@ -50,12 +50,6 @@ impl Empty for SolutionData {
             intent_to_solve: IntentAddress::empty(),
             decision_variables: Default::default(),
         }
-    }
-}
-
-impl Empty for DecisionVariable {
-    fn empty() -> Self {
-        Self::Inline(0 as Word)
     }
 }
 
