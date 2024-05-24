@@ -17,7 +17,7 @@ struct Cli {
     /// Address of the rqlite server, if using rqlite.
     rqlite_address: String,
 
-    #[arg(default_value_t = true)]
+    #[arg(long, short, default_value_t = true)]
     tracing: bool,
 }
 

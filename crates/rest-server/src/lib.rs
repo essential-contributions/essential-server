@@ -69,6 +69,7 @@ where
 
     // Create all the endpoints.
     let app = Router::new()
+        .route("/", get(health_check))
         .route("/deploy-intent-set", post(deploy_intent_set))
         .route("/get-intent-set/:address", get(get_intent_set))
         .route("/get-intent/:set/:address", get(get_intent))
@@ -103,6 +104,9 @@ where
 
     Ok(())
 }
+
+/// The return a health check response.
+async fn health_check() {}
 
 /// The deploy intent set post endpoint.
 ///
