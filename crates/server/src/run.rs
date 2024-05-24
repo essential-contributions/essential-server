@@ -26,7 +26,6 @@ struct Solutions {
 }
 
 /// The main loop that builds blocks.
-#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
 pub async fn run<S>(storage: &S, mut shutdown: Shutdown) -> anyhow::Result<()>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
@@ -44,48 +43,62 @@ where
             _ = &mut shutdown.0 => return Ok(()),
         }
 
-        // Build a block.
-        let (solutions, mut transaction) =
-            build_block(storage).await.context("error building block")?;
-
-        // FIXME: These 3 database commits should be atomic. If one fails they should all fail.
-        // We don't have transactions for storage yet so that will be required to implement this.
-
-        // Move failed solutions.
-        let failed_solutions: Vec<(Hash, SolutionFailReason)> = solutions
-            .failed_solutions
-            .iter()
-            .map(|(solution, reason)| (hash(solution.as_ref()), reason.clone()))
-            .collect();
-
-        storage
-            .move_solutions_to_failed(&failed_solutions)
-            .await
-            .context("error marking solutions as failed")?;
-
-        // Move valid solutions.
-        let solved_solutions: Vec<Hash> = solutions
-            .valid_solutions
-            .iter()
-            .map(|s| hash(s.0.as_ref()))
-            .collect();
-
-        storage
-            .move_solutions_to_solved(&solved_solutions)
-            .await
-            .context("error marking solutions as solved")?;
-
-        // Commit the state updates transaction.
-        transaction
-            .commit()
-            .await
-            .context("error committing state changes")?;
-
-        storage
-            .prune_failed_solutions(PRUNE_FAILED_STORAGE_OLDER_THAN)
-            .await
-            .context("error pruning failed solutions")?;
+        if run_loop(storage).await.is_err() {
+            continue;
+        }
     }
+}
+
+#[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
+async fn run_loop<S>(storage: &S) -> anyhow::Result<()>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    // Build a block.
+    let (solutions, mut transaction) =
+        build_block(storage).await.context("error building block")?;
+
+    // FIXME: These 3 database commits should be atomic. If one fails they should all fail.
+    // We don't have transactions for storage yet so that will be required to implement this.
+
+    // Move failed solutions.
+    let failed_solutions: Vec<(Hash, SolutionFailReason)> = solutions
+        .failed_solutions
+        .iter()
+        .map(|(solution, reason)| (hash(solution.as_ref()), reason.clone()))
+        .collect();
+
+    storage
+        .move_solutions_to_failed(&failed_solutions)
+        .await
+        .context("error marking solutions as failed")?;
+
+    // Move valid solutions.
+    let solved_solutions: Vec<Hash> = solutions
+        .valid_solutions
+        .iter()
+        .map(|s| hash(s.0.as_ref()))
+        .collect();
+
+    storage
+        .move_solutions_to_solved(&solved_solutions)
+        .await
+        .context("error marking solutions as solved")?;
+
+    // Commit the state updates transaction.
+    transaction
+        .commit()
+        .await
+        .context("error committing state changes")?;
+
+    storage
+        .prune_failed_solutions(PRUNE_FAILED_STORAGE_OLDER_THAN)
+        .await
+        .context("error pruning failed solutions")?;
+
+    Ok(())
 }
 
 /// Build a block from the solutions pool.
