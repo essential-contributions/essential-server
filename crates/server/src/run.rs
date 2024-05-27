@@ -43,9 +43,8 @@ where
             _ = &mut shutdown.0 => return Ok(()),
         }
 
-        if run_loop(storage).await.is_err() {
-            continue;
-        }
+        // Errors are emitted via `tracing`.
+        let _ = run_loop(storage).await;
     }
 }
 
