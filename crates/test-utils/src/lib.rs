@@ -43,6 +43,7 @@ pub fn solution_with_intent(intent_to_solve: IntentAddress) -> Solution {
             decision_variables: Default::default(),
         }],
         state_mutations: Default::default(),
+        transient_data: Default::default(),
     }
 }
 
@@ -65,5 +66,6 @@ pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
             decision_variables: vec![decision_variables as Word; decision_variables],
         }],
         state_mutations: Default::default(),
+        transient_data: Default::default(),
     }
 }

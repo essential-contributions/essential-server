@@ -40,6 +40,7 @@ impl Empty for Solution {
         Self {
             data: Default::default(),
             state_mutations: Default::default(),
+            transient_data: Default::default(),
         }
     }
 }
