@@ -25,9 +25,7 @@ async fn test_insert_intent_set() {
 
     // Order intents by their CA, as that's how `list_intent_sets` will return them.
     for signed in &mut intent_sets {
-        signed
-            .set
-            .sort_by_key(|intent| essential_hash::content_addr(intent));
+        signed.set.sort_by_key(essential_hash::content_addr);
     }
 
     storage

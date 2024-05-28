@@ -69,9 +69,7 @@ impl IntentSet {
 
     /// All intents in the set, ordered by their CA.
     fn intents(&self) -> impl '_ + Iterator<Item = &Intent> {
-        self.intent_addrs()
-            .into_iter()
-            .map(|addr| &self.data[&addr])
+        self.intent_addrs().into_iter().map(|addr| &self.data[addr])
     }
 
     /// Re-construct the `intent::SignedSet`.

@@ -25,7 +25,7 @@ fn list_of_intent_sets(
 ) -> (Vec<ContentAddress>, HashMap<ContentAddress, IntentSet>) {
     let order = intents
         .iter()
-        .map(|intents| essential_hash::intent_set_addr::from_intents(intents))
+        .map(essential_hash::intent_set_addr::from_intents)
         .collect();
     let map = intents
         .into_iter()
@@ -57,7 +57,7 @@ fn test_page_intents() {
 
     // Paging yields intents ordered by CA, so make sure we expect this order.
     for set in &mut expected {
-        set.sort_by_key(|intent| essential_hash::content_addr(intent));
+        set.sort_by_key(essential_hash::content_addr);
     }
 
     let (order, intents) = list_of_intent_sets(expected.clone());
@@ -88,7 +88,7 @@ fn test_page_intents_by_time() {
 
     // Paging yields intents ordered by CA, so make sure we expect this order.
     for set in &mut expected {
-        set.sort_by_key(|intent| essential_hash::content_addr(intent));
+        set.sort_by_key(essential_hash::content_addr);
     }
 
     let (order, intents) = list_of_intent_sets(expected.clone());
