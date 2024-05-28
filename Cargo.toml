@@ -9,13 +9,13 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 base64 = "0.22.0"
 clap = { version = "4.5.4", features = ["derive"] }
-essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-lock = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/signed-intent-set" }
+essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/signed-intent-set" }
+essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/signed-intent-set" }
+essential-lock = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/signed-intent-set" }
+essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/signed-intent-set" }
+essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/signed-intent-set" }
+essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "mitchmindtree/signed-intent-set" }
 futures = "0.3.30"
 imbl = "3.0.0"
 postcard = { version = "1.0.8", default-featues = false, features = ["alloc"] }

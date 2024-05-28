@@ -5,7 +5,7 @@ use essential_types::{
     solution::{Mutation, Mutations, Solution, SolutionData},
     ContentAddress, IntentAddress, Word,
 };
-use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
+use test_utils::{empty::Empty, sign_intent_set_with_random_keypair, solution_with_intent};
 
 // Empty valid solution.
 // Sign an empty valid intent and deploy it to newly created memory storage,
@@ -27,7 +27,7 @@ pub async fn deploy_intent_to_storage(
     intent: Intent,
 ) -> (IntentAddress, MemoryStorage) {
     let intent_hash = ContentAddress(essential_hash::hash(&intent));
-    let intent = sign_with_random_keypair(vec![intent]);
+    let intent = sign_intent_set_with_random_keypair(vec![intent]);
     let result = deploy(&storage, intent).await.unwrap();
     (
         IntentAddress {

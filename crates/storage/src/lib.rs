@@ -6,8 +6,9 @@
 use std::{future::Future, ops::Range, time::Duration};
 
 use essential_types::{
-    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
-    StorageLayout, Word,
+    intent::{self, Intent},
+    solution::Solution,
+    Block, ContentAddress, Hash, IntentAddress, Key, StorageLayout, Word,
 };
 use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome};
 
@@ -22,7 +23,7 @@ pub trait Storage: StateStorage {
     fn insert_intent_set(
         &self,
         storage_layout: StorageLayout,
-        intent: Signed<Vec<Intent>>,
+        intent: intent::SignedSet,
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
     /// Add a solution to the pool of unsolved solutions.
@@ -55,7 +56,7 @@ pub trait Storage: StateStorage {
     fn get_intent_set(
         &self,
         address: &ContentAddress,
-    ) -> impl Future<Output = anyhow::Result<Option<Signed<Vec<Intent>>>>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Option<intent::SignedSet>>> + Send;
 
     /// List all intents. This will paginate the results. The page is 0-indexed.
     /// A time range can optionally be provided to filter the results.

@@ -6,8 +6,9 @@ use essential_storage::{
     key_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{
-    intent::Intent, solution::Solution, Batch, Block, ContentAddress, Hash, IntentAddress, Key,
-    Signature, Signed, StorageLayout, Word,
+    intent::{self, Intent},
+    solution::Solution,
+    Batch, Block, ContentAddress, Hash, IntentAddress, Key, Signature, StorageLayout, Word,
 };
 use futures::future::FutureExt;
 use std::{
@@ -54,9 +55,33 @@ struct Inner {
 #[derive(Debug)]
 struct IntentSet {
     storage_layout: StorageLayout,
-    order: Vec<ContentAddress>,
     data: HashMap<ContentAddress, Intent>,
     signature: Signature,
+}
+
+impl IntentSet {
+    /// All intent addresses ordered by their CA.
+    fn intent_addrs(&self) -> Vec<&ContentAddress> {
+        let mut addrs: Vec<_> = self.data.keys().collect();
+        addrs.sort();
+        addrs
+    }
+
+    /// All intents in the set, ordered by their CA.
+    fn intents(&self) -> impl '_ + Iterator<Item = &Intent> {
+        self.intent_addrs()
+            .into_iter()
+            .map(|addr| &self.data[&addr])
+    }
+
+    /// Re-construct the `intent::SignedSet`.
+    ///
+    /// Intents in the returned set will be ordered by their CA.
+    fn signed_set(&self) -> intent::SignedSet {
+        let signature = self.signature.clone();
+        let set = self.intents().cloned().collect();
+        intent::SignedSet { set, signature }
+    }
 }
 
 impl MemoryStorage {
@@ -125,21 +150,20 @@ impl Storage for MemoryStorage {
     async fn insert_intent_set(
         &self,
         storage_layout: StorageLayout,
-        intent: Signed<Vec<Intent>>,
+        signed: intent::SignedSet,
     ) -> anyhow::Result<()> {
-        let Signed { data, signature } = intent;
-        // TODO: Refactor upon solving essential-contributions/essential-base#116.
-        let order: Vec<_> = data
-            .iter()
-            .map(|intent| essential_hash::content_addr(&intent))
+        let intent::SignedSet { set, signature } = signed;
+
+        let data: HashMap<_, _> = set
+            .into_iter()
+            .map(|intent| (essential_hash::content_addr(&intent), intent))
             .collect();
-        let map = order.iter().cloned().zip(data).collect();
-        let set_addr = essential_hash::intent_set_addr::from_intent_addrs(order.iter().cloned());
+
+        let set_addr = essential_hash::intent_set_addr::from_intent_addrs(data.keys().cloned());
 
         let set = IntentSet {
             storage_layout,
-            order,
-            data: map,
+            data,
             signature,
         };
         let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
@@ -243,19 +267,10 @@ impl Storage for MemoryStorage {
     async fn get_intent_set(
         &self,
         address: &ContentAddress,
-    ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
-        let v = self.inner.apply(|i| {
-            let set = i.intents.get(address)?;
-            let data = set
-                .order
-                .iter()
-                .map(|i| set.data.get(i).cloned())
-                .collect::<Option<Vec<_>>>()?;
-            Some(Signed {
-                data,
-                signature: set.signature.clone(),
-            })
-        });
+    ) -> anyhow::Result<Option<intent::SignedSet>> {
+        let v = self
+            .inner
+            .apply(|i| Some(i.intents.get(address)?.signed_set()));
         Ok(v)
     }
 

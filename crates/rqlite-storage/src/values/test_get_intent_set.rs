@@ -1,6 +1,6 @@
 use super::*;
 use crate::encode;
-use test_utils::{empty::Empty, intent_with_salt, sign_with_random_keypair};
+use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
 
 #[test]
 fn test_empty_query() {
@@ -46,7 +46,8 @@ fn test_signature_only() {
 
 #[test]
 fn test_signature_single_intent() {
-    let Signed { data, signature } = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent::SignedSet { set, signature } =
+        sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -56,15 +57,15 @@ fn test_signature_single_intent() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&data[0]))],
+                    columns: vec![Value::String(encode(&set[0]))],
                 }],
             }),
         ],
     };
 
     let r = get_intent_set(queries).unwrap().unwrap();
-    let expected = Signed {
-        data: vec![Intent::empty()],
+    let expected = intent::SignedSet {
+        set: vec![Intent::empty()],
         signature,
     };
     assert_eq!(r, expected);
@@ -73,7 +74,8 @@ fn test_signature_single_intent() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx".to_string();
-    let Signed { data, signature } = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent::SignedSet { set, signature } =
+        sign_intent_set_with_random_keypair(vec![Intent::empty()]);
 
     let queries = QueryValues {
         queries: vec![
@@ -84,7 +86,7 @@ fn test_invalid_data() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&data[0]))],
+                    columns: vec![Value::String(encode(&set[0]))],
                 }],
             }),
         ],
@@ -110,13 +112,14 @@ fn test_invalid_data() {
 
 #[test]
 fn test_single_intent_without_sig() {
-    let Signed { data, signature: _ } = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent::SignedSet { set, signature: _ } =
+        sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     let queries = QueryValues {
         queries: vec![
             None,
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&data[0]))],
+                    columns: vec![Value::String(encode(&set[0]))],
                 }],
             }),
         ],
@@ -127,8 +130,8 @@ fn test_single_intent_without_sig() {
 
 #[test]
 fn test_signature_multiple_intent() {
-    let Signed { data, signature } =
-        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let intent::SignedSet { set, signature } =
+        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -139,8 +142,8 @@ fn test_signature_multiple_intent() {
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![
-                        Value::String(encode(&data[0])),
-                        Value::String(encode(&data[1])),
+                        Value::String(encode(&set[0])),
+                        Value::String(encode(&set[1])),
                     ],
                 }],
             }),
@@ -148,8 +151,8 @@ fn test_signature_multiple_intent() {
     };
 
     let r = get_intent_set(queries).unwrap().unwrap();
-    let expected = Signed {
-        data: vec![intent_with_salt(1), intent_with_salt(2)],
+    let expected = intent::SignedSet {
+        set: vec![intent_with_salt(1), intent_with_salt(2)],
         signature,
     };
     assert_eq!(r, expected);
@@ -157,8 +160,8 @@ fn test_signature_multiple_intent() {
 
 #[test]
 fn test_invalid_signature_multiple_intent() {
-    let Signed { data, signature: _ } =
-        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let intent::SignedSet { set, signature: _ } =
+        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -169,8 +172,8 @@ fn test_invalid_signature_multiple_intent() {
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![
-                        Value::String(encode(&data[0])),
-                        Value::String(encode(&data[1])),
+                        Value::String(encode(&set[0])),
+                        Value::String(encode(&set[1])),
                     ],
                 }],
             }),
@@ -182,8 +185,8 @@ fn test_invalid_signature_multiple_intent() {
 
 #[test]
 fn test_signature_multiple_intent_invalid() {
-    let Signed { data, signature } =
-        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let intent::SignedSet { set, signature } =
+        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -193,7 +196,7 @@ fn test_signature_multiple_intent_invalid() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&data[0])), Value::Bool(true)],
+                    columns: vec![Value::String(encode(&set[0])), Value::Bool(true)],
                 }],
             }),
         ],
@@ -204,8 +207,8 @@ fn test_signature_multiple_intent_invalid() {
 
 #[test]
 fn test_multi_column_sig() {
-    let Signed { data, signature } =
-        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let intent::SignedSet { set, signature } =
+        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -219,8 +222,8 @@ fn test_multi_column_sig() {
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![
-                        Value::String(encode(&data[0])),
-                        Value::String(encode(&data[1])),
+                        Value::String(encode(&set[0])),
+                        Value::String(encode(&set[1])),
                     ],
                 }],
             }),
@@ -232,8 +235,8 @@ fn test_multi_column_sig() {
 
 #[test]
 fn test_multi_row_sig() {
-    let Signed { data, signature } =
-        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let intent::SignedSet { set, signature } =
+        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -249,8 +252,8 @@ fn test_multi_row_sig() {
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![
-                        Value::String(encode(&data[0])),
-                        Value::String(encode(&data[1])),
+                        Value::String(encode(&set[0])),
+                        Value::String(encode(&set[1])),
                     ],
                 }],
             }),
@@ -262,8 +265,8 @@ fn test_multi_row_sig() {
 
 #[test]
 fn test_multi_row_intent() {
-    let Signed { data, signature } =
-        sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let intent::SignedSet { set, signature } =
+        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -275,14 +278,14 @@ fn test_multi_row_intent() {
                 rows: vec![
                     Columns {
                         columns: vec![
-                            Value::String(encode(&data[0])),
-                            Value::String(encode(&data[1])),
+                            Value::String(encode(&set[0])),
+                            Value::String(encode(&set[1])),
                         ],
                     },
                     Columns {
                         columns: vec![
-                            Value::String(encode(&data[0])),
-                            Value::String(encode(&data[1])),
+                            Value::String(encode(&set[0])),
+                            Value::String(encode(&set[1])),
                         ],
                     },
                 ],

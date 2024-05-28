@@ -7,13 +7,15 @@ use essential_server::{CheckSolutionOutput, SolutionOutcome};
 use essential_storage::{StateStorage, Storage};
 use essential_types::{
     convert::bytes_from_word,
-    intent::Intent,
+    intent::{self, Intent},
     solution::{Solution, SolutionData},
-    Block, ContentAddress, IntentAddress, Signed, StorageLayout, Word,
+    Block, ContentAddress, IntentAddress, StorageLayout, Word,
 };
 use reqwest::Client;
 use server::run;
-use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_decision_variables};
+use test_utils::{
+    empty::Empty, sign_intent_set_with_random_keypair, solution_with_decision_variables,
+};
 
 static SERVER: &str = "localhost:0";
 static CLIENT: &str = "http://localhost";
@@ -59,7 +61,7 @@ async fn test_deploy_intent_set() {
         jh,
     } = setup().await;
 
-    let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     let response = client
         .post(url.join("/deploy-intent-set").unwrap())
         .json(&intent_set)
@@ -68,14 +70,14 @@ async fn test_deploy_intent_set() {
         .unwrap();
     assert_eq!(response.status(), 200);
     let address = response.json::<ContentAddress>().await.unwrap();
-    let expected = essential_hash::intent_set_addr::from_intents(&intent_set.data);
+    let expected = essential_hash::intent_set_addr::from_intents(&intent_set.set);
     assert_eq!(address, expected);
 
     let a = url.join(&format!("/get-intent-set/{address}")).unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
     let set = response
-        .json::<Option<Signed<Vec<Intent>>>>()
+        .json::<Option<intent::SignedSet>>()
         .await
         .unwrap()
         .unwrap();
@@ -84,7 +86,7 @@ async fn test_deploy_intent_set() {
 
     let intent_address = IntentAddress {
         set: address,
-        intent: essential_hash::content_addr(&intent_set.data[0]),
+        intent: essential_hash::content_addr(&intent_set.set[0]),
     };
     let a = url
         .join(&format!(
@@ -96,7 +98,7 @@ async fn test_deploy_intent_set() {
     assert_eq!(response.status(), 200);
     let intent = response.json::<Option<Intent>>().await.unwrap().unwrap();
 
-    assert_eq!(intent, intent_set.data[0]);
+    assert_eq!(intent, intent_set.set[0]);
 
     let mut a = url.join("/list-intent-sets").unwrap();
     let time = std::time::UNIX_EPOCH.elapsed().unwrap() + Duration::from_secs(600);
@@ -107,13 +109,13 @@ async fn test_deploy_intent_set() {
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
     let intents = response.json::<Vec<Vec<Intent>>>().await.unwrap();
-    assert_eq!(intents, vec![intent_set.data.clone()]);
+    assert_eq!(intents, vec![intent_set.set.clone()]);
 
     let a = url.join("/list-intent-sets").unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
     let intents = response.json::<Vec<Vec<Intent>>>().await.unwrap();
-    assert_eq!(intents, vec![intent_set.data.clone()]);
+    assert_eq!(intents, vec![intent_set.set.clone()]);
 
     let mut a = url.join("/list-intent-sets").unwrap();
     a.query_pairs_mut().append_pair("page", "1");
@@ -130,8 +132,8 @@ async fn test_deploy_intent_set() {
 async fn test_submit_solution() {
     let intent = Intent::empty();
     let intent_addr = essential_hash::content_addr(&intent);
-    let intent_set = sign_with_random_keypair(vec![intent]);
-    let set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.data);
+    let intent_set = sign_intent_set_with_random_keypair(vec![intent]);
+    let set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.set);
 
     let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set)
@@ -179,8 +181,8 @@ async fn test_submit_solution() {
 
 #[tokio::test]
 async fn test_query_state() {
-    let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
-    let address = essential_hash::intent_set_addr::from_intents(&intent_set.data);
+    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
+    let address = essential_hash::intent_set_addr::from_intents(&intent_set.set);
     let key = vec![0; 4];
 
     let mem = MemoryStorage::new();
@@ -277,7 +279,7 @@ async fn test_solution_outcome() {
 
 #[tokio::test]
 async fn test_check_solution() {
-    let intent_set = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     let mem = MemoryStorage::new();
     mem.insert_intent_set(StorageLayout {}, intent_set.clone())
         .await
@@ -290,8 +292,8 @@ async fn test_check_solution() {
         jh,
     } = setup_with_mem(mem).await;
 
-    let set = essential_hash::intent_set_addr::from_intents(&intent_set.data);
-    let address = essential_hash::content_addr(&intent_set.data[0]);
+    let set = essential_hash::intent_set_addr::from_intents(&intent_set.set);
+    let address = essential_hash::content_addr(&intent_set.set[0]);
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
         intent_to_solve: IntentAddress {

@@ -13,8 +13,9 @@ use essential_storage::failed_solution::CheckOutcome;
 pub use essential_storage::Storage;
 use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{
-    intent::Intent, solution::Solution, Block, ContentAddress, Hash, IntentAddress, Key, Signed,
-    StorageLayout, Word,
+    intent::{self, Intent},
+    solution::Solution,
+    Block, ContentAddress, Hash, IntentAddress, Key, StorageLayout, Word,
 };
 use run::{Handle, Shutdown};
 use solution::read::read_intents_from_storage;
@@ -77,7 +78,7 @@ where
 
     pub async fn deploy_intent_set(
         &self,
-        intents: Signed<Vec<Intent>>,
+        intents: intent::SignedSet,
     ) -> anyhow::Result<ContentAddress> {
         deploy::deploy(&self.storage, intents).await
     }
@@ -147,7 +148,7 @@ where
     pub async fn get_intent_set(
         &self,
         address: &ContentAddress,
-    ) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
+    ) -> anyhow::Result<Option<intent::SignedSet>> {
         self.storage.get_intent_set(address).await
     }
 
