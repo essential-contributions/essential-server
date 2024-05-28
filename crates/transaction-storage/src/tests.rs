@@ -1,7 +1,7 @@
 use essential_memory_storage::MemoryStorage;
 use essential_storage::{QueryState, Storage};
 use essential_types::{intent::Intent, StorageLayout};
-use test_utils::{empty::Empty, sign_with_random_keypair};
+use test_utils::{empty::Empty, sign_intent_set_with_random_keypair};
 
 use super::*;
 
@@ -10,7 +10,7 @@ async fn test_can_query() {
     let storage = MemoryStorage::new();
     let intent = Intent::empty();
     let address = essential_hash::intent_set_addr::from_intents(&vec![intent.clone()]);
-    let signed = sign_with_random_keypair(vec![intent]);
+    let signed = sign_intent_set_with_random_keypair(vec![intent]);
     let key = vec![0; 4];
     let value = vec![1];
     storage

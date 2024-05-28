@@ -22,12 +22,7 @@ pub fn page_intents<'a>(
         .skip(start)
         .filter_map(|v| {
             let set = intents.get(v)?;
-            Some(
-                set.order
-                    .iter()
-                    .filter_map(|i| set.data.get(i).cloned())
-                    .collect(),
-            )
+            Some(set.intents().cloned().collect())
         })
         .take(page_size)
         .collect()
@@ -46,12 +41,7 @@ pub fn page_intents_by_time(
         .skip(start)
         .filter_map(|(_, v)| {
             let set = intents.get(v)?;
-            Some(
-                set.order
-                    .iter()
-                    .filter_map(|i| set.data.get(i).cloned())
-                    .collect(),
-            )
+            Some(set.intents().cloned().collect())
         })
         .take(page_size)
         .collect()

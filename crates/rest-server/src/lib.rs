@@ -15,8 +15,10 @@ use axum::{
 use base64::Engine as _;
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_types::{
-    convert::word_from_bytes, intent::Intent, solution::Solution, Block, ContentAddress,
-    IntentAddress, Signed, Word,
+    convert::word_from_bytes,
+    intent::{self, Intent},
+    solution::Solution,
+    Block, ContentAddress, IntentAddress, Word,
 };
 use serde::Deserialize;
 use tokio::{
@@ -113,7 +115,7 @@ async fn health_check() {}
 /// Takes a signed vector of intents as a json payload.
 async fn deploy_intent_set<S>(
     State(essential): State<Essential<S>>,
-    Json(payload): Json<Signed<Vec<Intent>>>,
+    Json(payload): Json<intent::SignedSet>,
 ) -> Result<Json<ContentAddress>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
@@ -146,7 +148,7 @@ where
 async fn get_intent_set<S>(
     State(essential): State<Essential<S>>,
     Path(address): Path<String>,
-) -> Result<Json<Option<Signed<Vec<Intent>>>>, Error>
+) -> Result<Json<Option<intent::SignedSet>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,

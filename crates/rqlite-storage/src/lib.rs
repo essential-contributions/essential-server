@@ -12,7 +12,7 @@ use essential_storage::{
     failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
     key_range, QueryState, StateStorage, Storage,
 };
-use essential_types::{Block, ContentAddress, Hash, Key, Signed, StorageLayout, Word};
+use essential_types::{intent, Block, ContentAddress, Hash, Key, StorageLayout, Word};
 use futures::FutureExt;
 use std::{pin::Pin, time::Duration};
 use thiserror::Error;
@@ -284,20 +284,20 @@ impl Storage for RqliteStorage {
     async fn insert_intent_set(
         &self,
         storage_layout: StorageLayout,
-        intents: Signed<Vec<essential_types::intent::Intent>>,
+        intents: intent::SignedSet,
     ) -> anyhow::Result<()> {
         // Get the time this intent set was created at.
         let created_at = std::time::SystemTime::now();
         let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
 
         // Encode the data into base64 blobs.
-        let set_addr = essential_hash::intent_set_addr::from_intents(&intents.data);
+        let set_addr = essential_hash::intent_set_addr::from_intents(&intents.set);
         let address = encode(&set_addr);
         let signature = encode(&intents.signature);
         let storage_layout = encode(&storage_layout);
 
         // For each intent, insert the intent and the intent set pairing.
-        let intents = intents.data.iter().flat_map(|intent| {
+        let intents = intents.set.iter().flat_map(|intent| {
             let hash = encode(&hash(&intent));
             let intent = encode(&intent);
             [
@@ -422,7 +422,7 @@ impl Storage for RqliteStorage {
     async fn get_intent_set(
         &self,
         address: &essential_types::ContentAddress,
-    ) -> anyhow::Result<Option<Signed<Vec<essential_types::intent::Intent>>>> {
+    ) -> anyhow::Result<Option<intent::SignedSet>> {
         let address = encode(address);
         let sql = &[
             include_sql!("query/get_intent_set_signature.sql", address.clone()),

@@ -2,7 +2,11 @@ use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::bail;
 use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcome};
-use essential_types::{intent::Intent, solution::Solution, Batch, Block, Signature, Signed, Word};
+use essential_types::{
+    intent::{self, Intent},
+    solution::Solution,
+    Batch, Block, Signature, Word,
+};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
@@ -57,7 +61,7 @@ pub fn single_value(queries: &QueryValues) -> Option<&Value> {
     None
 }
 
-pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<Signed<Vec<Intent>>>> {
+pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::SignedSet>> {
     // Expecting two results because we made two queries
     let (signature, intents) = match &queries.queries[..] {
         [Some(Rows { rows: signature }), Some(Rows { rows: intents })] => (signature, intents),
@@ -92,8 +96,8 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<Signed<Vec<
         })
         .collect::<Result<_, _>>()?;
 
-    Ok(Some(Signed {
-        data: intents,
+    Ok(Some(intent::SignedSet {
+        set: intents,
         signature,
     }))
 }

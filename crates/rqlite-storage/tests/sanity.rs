@@ -5,14 +5,14 @@ use essential_types::{
     intent::Intent, solution::Solution, ContentAddress, IntentAddress, StorageLayout,
 };
 use std::vec;
-use test_utils::{empty::Empty, intent_with_salt, sign_with_random_keypair};
+use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
 
 #[tokio::test]
 #[ignore]
 async fn test_create() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
     let storage_layout = StorageLayout;
-    let intent = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
@@ -24,7 +24,7 @@ async fn test_create() {
 async fn test_update_state() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
     let storage_layout = StorageLayout;
-    let intent = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
@@ -67,12 +67,12 @@ async fn test_update_state() {
 async fn test_update_state_batch() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
     let storage_layout = StorageLayout;
-    let intent = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     storage
         .insert_intent_set(storage_layout.clone(), intent)
         .await
         .unwrap();
-    let intent = sign_with_random_keypair(vec![intent_with_salt(3)]);
+    let intent = sign_intent_set_with_random_keypair(vec![intent_with_salt(3)]);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
@@ -124,12 +124,13 @@ async fn test_update_state_batch() {
 async fn test_insert_intent_set() {
     let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
     let storage_layout = StorageLayout;
-    let intent_0 = sign_with_random_keypair(vec![Intent::empty()]);
+    let intent_0 = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     storage
         .insert_intent_set(storage_layout.clone(), intent_0.clone())
         .await
         .unwrap();
-    let intent_1 = sign_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let intent_1 =
+        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
     storage
         .insert_intent_set(storage_layout, intent_1)
         .await

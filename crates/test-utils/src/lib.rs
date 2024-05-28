@@ -3,7 +3,7 @@ pub mod empty;
 use empty::Empty;
 use essential_sign::sign;
 use essential_types::{
-    intent::{Directive, Intent},
+    intent::{self, Directive, Intent},
     solution::{Solution, SolutionData},
     IntentAddress, Signature, Signed, Word,
 };
@@ -26,12 +26,16 @@ pub fn keypair(key: [u8; 32]) -> (SecretKey, PublicKey) {
     (secret_key, public_key)
 }
 
+pub fn sign_intent_set_with_random_keypair(set: Vec<Intent>) -> intent::SignedSet {
+    essential_sign::intent_set::sign(set, &random_keypair().0)
+}
+
 pub fn sign_with_random_keypair<T: Serialize>(data: T) -> Signed<T> {
-    sign(data, random_keypair().0)
+    sign(data, &random_keypair().0)
 }
 
 pub fn sign_corrupted<T: Serialize>(data: T) -> Signed<T> {
-    let mut signed = sign(data, random_keypair().0);
+    let mut signed = sign(data, &random_keypair().0);
     signed.signature = Signature([0u8; 64], 0);
     signed
 }

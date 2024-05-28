@@ -8,7 +8,7 @@ use essential_state_read_vm::StateRead;
 use essential_storage::{QueryState, Storage};
 use essential_types::{intent::Intent, ContentAddress, IntentAddress, Word};
 use std::time::Duration;
-use test_utils::{empty::Empty, sign_with_random_keypair};
+use test_utils::{empty::Empty, sign_intent_set_with_random_keypair};
 
 async fn run<S>(storage: &S) -> anyhow::Result<()>
 where
@@ -187,8 +187,8 @@ async fn test_tracing() {
 
     let storage = MemoryStorage::default();
     let intent_hash = ContentAddress(essential_hash::hash(&intent));
-    let intent = sign_with_random_keypair(vec![intent]);
-    let result = deploy(&storage, intent).await.unwrap();
+    let set = sign_intent_set_with_random_keypair(vec![intent]);
+    let result = deploy(&storage, set).await.unwrap();
     let intent_address = IntentAddress {
         set: result,
         intent: intent_hash,

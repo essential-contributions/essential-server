@@ -2,22 +2,20 @@ use super::*;
 use essential_types::Batch;
 use std::vec;
 use test_utils::{
-    duration_secs, intent_with_salt, sign_with_random_keypair, solution_with_decision_variables,
+    duration_secs, intent_with_salt, sign_intent_set_with_random_keypair,
+    solution_with_decision_variables,
 };
 
 fn intent_set(intents: Vec<Intent>) -> IntentSet {
-    let order = intents
-        .iter()
-        .map(|intent| ContentAddress(essential_hash::hash(intent)))
-        .collect();
-    let signature = sign_with_random_keypair(&intents).signature;
+    let signed = sign_intent_set_with_random_keypair(intents);
+    let signature = signed.signature;
     IntentSet {
-        data: intents
+        data: signed
+            .set
             .into_iter()
             .map(|intent| (ContentAddress(essential_hash::hash(&intent)), intent))
             .collect(),
         storage_layout: essential_types::StorageLayout,
-        order,
         signature,
     }
 }
@@ -27,13 +25,13 @@ fn list_of_intent_sets(
 ) -> (Vec<ContentAddress>, HashMap<ContentAddress, IntentSet>) {
     let order = intents
         .iter()
-        .map(|intents| ContentAddress(essential_hash::hash(&intents)))
+        .map(essential_hash::intent_set_addr::from_intents)
         .collect();
     let map = intents
         .into_iter()
         .map(|intents| {
-            let address = ContentAddress(essential_hash::hash(&intents));
-            (address, intent_set(intents))
+            let addr = essential_hash::intent_set_addr::from_intents(&intents);
+            (addr, intent_set(intents))
         })
         .collect();
     (order, map)
@@ -51,45 +49,49 @@ fn create_blocks(blocks: Vec<(u64, Block)>) -> BTreeMap<Duration, Block> {
 
 #[test]
 fn test_page_intents() {
-    let (order, intents) = list_of_intent_sets(vec![
+    let mut expected = vec![
         vec![intent_with_salt(0)],
         vec![intent_with_salt(1)],
         vec![intent_with_salt(2), intent_with_salt(3)],
-    ]);
+    ];
+
+    // Paging yields intents ordered by CA, so make sure we expect this order.
+    for set in &mut expected {
+        set.sort_by_key(essential_hash::content_addr);
+    }
+
+    let (order, intents) = list_of_intent_sets(expected.clone());
 
     let r = page_intents(order.iter(), &intents, 0, 1);
-    assert_eq!(r, vec![vec![intent_with_salt(0)]]);
+    assert_eq!(r, vec![expected[0].clone()]);
 
     let r = page_intents(order.iter(), &intents, 1, 1);
-    assert_eq!(r, vec![vec![intent_with_salt(1)]]);
+    assert_eq!(r, vec![expected[1].clone()]);
 
     let r = page_intents(order.iter(), &intents, 1, 2);
-    assert_eq!(r, vec![vec![intent_with_salt(2), intent_with_salt(3)]]);
+    assert_eq!(r, vec![expected[2].clone()]);
 
     let r = page_intents(order.iter(), &intents, 0, 2);
-    assert_eq!(
-        r,
-        vec![vec![intent_with_salt(0)], vec![intent_with_salt(1)]]
-    );
+    assert_eq!(r, vec![expected[0].clone(), expected[1].clone()]);
 
     let r = page_intents(order.iter(), &intents, 0, 3);
-    assert_eq!(
-        r,
-        vec![
-            vec![intent_with_salt(0)],
-            vec![intent_with_salt(1)],
-            vec![intent_with_salt(2), intent_with_salt(3)]
-        ]
-    );
+    assert_eq!(r, expected);
 }
 
 #[test]
 fn test_page_intents_by_time() {
-    let (order, intents) = list_of_intent_sets(vec![
+    let mut expected = vec![
         vec![intent_with_salt(0)],
         vec![intent_with_salt(1)],
         vec![intent_with_salt(2), intent_with_salt(3)],
-    ]);
+    ];
+
+    // Paging yields intents ordered by CA, so make sure we expect this order.
+    for set in &mut expected {
+        set.sort_by_key(essential_hash::content_addr);
+    }
+
+    let (order, intents) = list_of_intent_sets(expected.clone());
     let order: BTreeMap<_, _> = order
         .into_iter()
         .enumerate()
@@ -97,13 +99,13 @@ fn test_page_intents_by_time() {
         .collect();
 
     let r = page_intents_by_time(&order, &intents, duration_secs(0)..duration_secs(1), 0, 1);
-    assert_eq!(r, vec![vec![intent_with_salt(0)]]);
+    assert_eq!(r, vec![expected[0].clone()]);
 
     let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(2), 0, 1);
-    assert_eq!(r, vec![vec![intent_with_salt(1)]]);
+    assert_eq!(r, vec![expected[1].clone()]);
 
     let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(10), 1, 1);
-    assert_eq!(r, vec![vec![intent_with_salt(2), intent_with_salt(3)]]);
+    assert_eq!(r, vec![expected[2].clone()]);
 
     let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(1), 0, 1);
     assert!(r.is_empty());
