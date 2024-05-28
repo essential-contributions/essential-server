@@ -1,6 +1,6 @@
 use essential_types::{
     intent::{Directive, Intent},
-    solution::{Solution, SolutionData, StateMutation},
+    solution::{Mutations, Solution, SolutionData},
     ContentAddress, IntentAddress,
 };
 
@@ -54,7 +54,7 @@ impl Empty for SolutionData {
     }
 }
 
-impl Empty for StateMutation {
+impl Empty for Mutations {
     fn empty() -> Self {
         Self {
             pathway: Default::default(),

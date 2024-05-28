@@ -2,7 +2,7 @@ use crate::deploy::deploy;
 use essential_memory_storage::MemoryStorage;
 use essential_types::{
     intent::Intent,
-    solution::{Mutation, Solution, SolutionData, StateMutation},
+    solution::{Mutation, Mutations, Solution, SolutionData},
     ContentAddress, IntentAddress, Word,
 };
 use test_utils::{empty::Empty, sign_with_random_keypair, solution_with_intent};
@@ -91,7 +91,7 @@ pub async fn test_solution(
         decision_variables: solution_decision_variables,
     }];
     // State mutation to satisfy the intent.
-    solution.state_mutations = vec![StateMutation {
+    solution.state_mutations = vec![Mutations {
         pathway: 0,
         mutations: vec![Mutation {
             key: vec![0, 0, 0, 0],
@@ -164,7 +164,7 @@ pub async fn counter_solution(intent_address: IntentAddress, final_value: Word) 
         intent_to_solve: intent_address.clone(),
         decision_variables: solution_decision_variables,
     }];
-    solution.state_mutations = vec![StateMutation {
+    solution.state_mutations = vec![Mutations {
         pathway: 0,
         mutations: vec![Mutation {
             key: vec![0, 0, 0, 0],
