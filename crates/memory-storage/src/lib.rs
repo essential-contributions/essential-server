@@ -2,7 +2,7 @@ use anyhow::bail;
 use essential_lock::StdLock;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
-    failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcome},
+    failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcomes},
     key_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{
@@ -12,11 +12,10 @@ use essential_types::{
 };
 use futures::future::FutureExt;
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     pin::Pin,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
-    vec,
 };
 use thiserror::Error;
 
@@ -41,7 +40,7 @@ impl Default for MemoryStorage {
 #[derive(Default)]
 struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
-    intent_time_index: BTreeMap<Duration, ContentAddress>,
+    intent_time_index: BTreeMap<Duration, Vec<ContentAddress>>,
     solution_pool: HashSet<Hash>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, Vec<SolutionFailReason>>,
@@ -172,14 +171,14 @@ impl Storage for MemoryStorage {
             data,
             signature,
         };
-        let mut time = SystemTime::now().duration_since(UNIX_EPOCH)?;
+        let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
         self.inner.apply(|i| {
-            while i.intent_time_index.contains_key(&time) {
-                time += Duration::from_nanos(1);
-            }
             let contains = i.intents.insert(set_addr.clone(), set);
             if contains.is_none() {
-                i.intent_time_index.insert(time, set_addr.clone());
+                i.intent_time_index
+                    .entry(time)
+                    .or_default()
+                    .push(set_addr.clone());
             }
             i.state.entry(set_addr).or_default();
             Ok(())
@@ -253,14 +252,10 @@ impl Storage for MemoryStorage {
 
             for (hash, reason) in solutions {
                 i.failed_solution_pool.entry(hash).or_default().push(reason);
-                match i.failed_solution_time_index.entry(time) {
-                    Entry::Occupied(mut occupied_entry) => {
-                        occupied_entry.get_mut().push(hash);
-                    }
-                    Entry::Vacant(vacant_entry) => {
-                        vacant_entry.insert(vec![hash]);
-                    }
-                }
+                i.failed_solution_time_index
+                    .entry(time)
+                    .or_default()
+                    .push(hash);
             }
 
             Ok(())
@@ -307,7 +302,12 @@ impl Storage for MemoryStorage {
             }
             None => {
                 let v = self.inner.apply(|i| {
-                    values::page_intents(i.intent_time_index.values(), &i.intents, page, PAGE_SIZE)
+                    values::page_intents(
+                        i.intent_time_index.values().flatten(),
+                        &i.intents,
+                        page,
+                        PAGE_SIZE,
+                    )
                 });
                 Ok(v)
             }
@@ -362,7 +362,7 @@ impl Storage for MemoryStorage {
         Ok(v)
     }
 
-    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
+    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {
         let r = self.inner.apply(|i| {
             i.solutions.get(&solution_hash).cloned().map(|s| {
                 let outcome = i
@@ -383,7 +383,7 @@ impl Storage for MemoryStorage {
                             }),
                     )
                     .collect();
-                SolutionOutcome {
+                SolutionOutcomes {
                     solution: s.clone(),
                     outcome,
                 }

@@ -29,7 +29,7 @@ pub fn page_intents<'a>(
 }
 
 pub fn page_intents_by_time(
-    intent_times: &BTreeMap<Duration, ContentAddress>,
+    intent_times: &BTreeMap<Duration, Vec<ContentAddress>>,
     intents: &HashMap<ContentAddress, IntentSet>,
     range: Range<Duration>,
     page: usize,
@@ -39,9 +39,11 @@ pub fn page_intents_by_time(
     intent_times
         .range(range)
         .skip(start)
-        .filter_map(|(_, v)| {
-            let set = intents.get(v)?;
-            Some(set.intents().cloned().collect())
+        .flat_map(|(_, v)| {
+            v.iter().filter_map(|v| {
+                let set = intents.get(v)?;
+                Some(set.intents().cloned().collect())
+            })
         })
         .take(page_size)
         .collect()

@@ -9,7 +9,7 @@ use base64::Engine;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
-    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
+    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes},
     key_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{intent, Block, ContentAddress, Hash, Key, StorageLayout, Word};
@@ -550,8 +550,7 @@ impl Storage for RqliteStorage {
         }
     }
 
-    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
-        // FIXME: Solution can have multiple outcomes.
+    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {
         let hash = encode(&solution_hash);
         let sql = &[
             include_sql!("query/get_solution.sql", hash.clone()),

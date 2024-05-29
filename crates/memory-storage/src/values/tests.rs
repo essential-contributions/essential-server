@@ -95,7 +95,7 @@ fn test_page_intents_by_time() {
     let order: BTreeMap<_, _> = order
         .into_iter()
         .enumerate()
-        .map(|(i, v)| (duration_secs(i as u64), v))
+        .map(|(i, v)| (duration_secs(i as u64), vec![v]))
         .collect();
 
     let r = page_intents_by_time(&order, &intents, duration_secs(0)..duration_secs(1), 0, 1);

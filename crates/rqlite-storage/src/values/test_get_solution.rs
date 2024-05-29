@@ -46,7 +46,7 @@ fn test_valid_solution() {
     };
 
     let r = get_solution(queries).unwrap().unwrap();
-    let expected = SolutionOutcome {
+    let expected = SolutionOutcomes {
         solution: solution.clone(),
         outcome: vec![CheckOutcome::Success(1)],
     };
@@ -68,7 +68,7 @@ fn test_valid_solution() {
     };
 
     let r = get_solution(queries).unwrap().unwrap();
-    let expected = SolutionOutcome {
+    let expected = SolutionOutcomes {
         solution,
         outcome: vec![CheckOutcome::Fail(reason)],
     };

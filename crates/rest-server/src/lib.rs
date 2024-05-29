@@ -118,19 +118,24 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
     // Continuously accept new connections up to max connections.
     loop {
         // Accept a new connection or wait for a shutdown signal.
-        let (socket, _remote_addr) = tokio::select! {
+        let (socket, remote_addr) = tokio::select! {
             _ = &mut shut => {
                 break;
             }
             v = listener.accept() => {
                 match v {
                     Ok(v) => v,
-                    Err(_) => {
+                    Err(err) => {
+                        #[cfg(feature = "tracing")]
+                        tracing::trace!("Failed to accept connection {}", err);
                         continue;
                     }
                 }
             }
         };
+
+        #[cfg(feature = "tracing")]
+        tracing::trace!("Accepted new connection from: {}", remote_addr);
 
         // We don't need to call `poll_ready` because `Router` is always ready.
         let tower_service = app.clone();
@@ -164,6 +169,8 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
 
         // Wait for existing connection to close or wait for a shutdown signal.
         if conn_set.len() > MAX_CONNECTIONS {
+            #[cfg(feature = "tracing")]
+            tracing::info!("Max number of connections reached: {}", MAX_CONNECTIONS);
             tokio::select! {
                 _ = &mut shut => {
                     break;

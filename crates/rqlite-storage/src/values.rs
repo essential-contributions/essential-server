@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::bail;
-use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcome};
+use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcomes};
 use essential_types::{
     intent::{self, Intent},
     solution::Solution,
@@ -104,11 +104,11 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::Sig
 
 pub fn get_solution(
     QueryValues { queries }: QueryValues,
-) -> Result<Option<SolutionOutcome>, anyhow::Error> {
+) -> Result<Option<SolutionOutcomes>, anyhow::Error> {
     let (solution, outcomes) = match &queries[..] {
         [Some(Rows { rows: solution }), Some(Rows { rows: outcomes })] => (solution, outcomes),
         [None, None] => return Ok(None),
-        _ => bail!("expected a two queries {:?}", queries),
+        _ => bail!("expected two queries {:?}", queries),
     };
 
     let [Columns { columns: solution }] = &solution[..] else {
@@ -133,7 +133,7 @@ pub fn get_solution(
 
     let solution = decode(solution)?;
 
-    Ok(Some(SolutionOutcome {
+    Ok(Some(SolutionOutcomes {
         solution,
         outcome: outcomes,
     }))

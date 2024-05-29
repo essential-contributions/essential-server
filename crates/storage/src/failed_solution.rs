@@ -31,7 +31,7 @@ pub enum CheckOutcome {
 }
 /// A solution with its outcome.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SolutionOutcome {
+pub struct SolutionOutcomes {
     /// The solution.
     pub solution: Solution,
     /// The outcomes of the solution.

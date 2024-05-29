@@ -10,7 +10,7 @@ use essential_types::{
     solution::Solution,
     Block, ContentAddress, Hash, IntentAddress, Key, StorageLayout, Word,
 };
-use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome};
+use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes};
 
 /// Module for failed solution struct.
 pub mod failed_solution;
@@ -92,7 +92,7 @@ pub trait Storage: StateStorage {
     fn get_solution(
         &self,
         solution_hash: Hash,
-    ) -> impl std::future::Future<Output = anyhow::Result<Option<SolutionOutcome>>> + Send;
+    ) -> impl std::future::Future<Output = anyhow::Result<Option<SolutionOutcomes>>> + Send;
 
     /// Prune failed solutions that failed before the provided duration.
     fn prune_failed_solutions(
