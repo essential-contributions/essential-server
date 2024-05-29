@@ -37,7 +37,7 @@ fn list_of_intent_sets(
     (order, map)
 }
 
-fn create_blocks(blocks: Vec<(u64, Block)>) -> BTreeMap<Duration, Block> {
+fn create_blocks(blocks: Vec<(u64, crate::Block)>) -> BTreeMap<Duration, crate::Block> {
     blocks
         .into_iter()
         .map(|(number, block)| {
@@ -113,54 +113,107 @@ fn test_page_intents_by_time() {
 
 #[test]
 fn test_paging_blocks() {
+    let solutions: Vec<Vec<_>> = (0..10)
+        .map(|i| {
+            ((i * 10)..(i * 10 + 10))
+                .map(|i| solution_with_decision_variables(i as usize))
+                .map(|s| (essential_hash::hash(&s), s))
+                .collect()
+        })
+        .collect();
+
     let blocks = (0..10)
         .map(|i| {
             (
                 i,
-                Block {
+                crate::Block {
                     number: i,
                     timestamp: duration_secs(i),
-                    batch: Batch {
-                        solutions: ((i * 10)..(i * 10 + 10))
-                            .map(|i| solution_with_decision_variables(i as usize))
-                            .collect(),
-                    },
+                    hashes: solutions[i as usize]
+                        .iter()
+                        .map(|(h, _)| h)
+                        .copied()
+                        .collect(),
                 },
             )
         })
         .collect();
     let blocks = create_blocks(blocks);
+    let solutions: HashMap<_, _> = solutions.into_iter().flatten().collect();
+    let expected: HashMap<_, _> = blocks
+        .iter()
+        .map(|(d, b)| {
+            (
+                *d,
+                essential_types::Block {
+                    number: b.number,
+                    timestamp: *d,
+                    batch: Batch {
+                        solutions: b.hashes.iter().map(|h| solutions[h].clone()).collect(),
+                    },
+                },
+            )
+        })
+        .collect();
 
-    let r = page_winning_blocks(&blocks, None, 0, 1);
-    assert_eq!(r, vec![blocks.get(&duration_secs(0)).unwrap().clone()]);
+    let r = page_winning_blocks(&blocks, &solutions, None, 0, 1).unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(0)).unwrap().clone()]);
 
-    let r = page_winning_blocks(&blocks, None, 1, 1);
-    assert_eq!(r, vec![blocks.get(&duration_secs(1)).unwrap().clone()]);
+    let r = page_winning_blocks(&blocks, &solutions, None, 1, 1).unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(1)).unwrap().clone()]);
 
-    let r = page_winning_blocks(&blocks, None, 1, 2);
+    let r = page_winning_blocks(&blocks, &solutions, None, 1, 2).unwrap();
     assert_eq!(
         r,
         vec![
-            blocks.get(&duration_secs(2)).unwrap().clone(),
-            blocks.get(&duration_secs(3)).unwrap().clone()
+            expected.get(&duration_secs(2)).unwrap().clone(),
+            expected.get(&duration_secs(3)).unwrap().clone()
         ]
     );
 
-    let r = page_winning_blocks(&blocks, Some(duration_secs(0)..duration_secs(10)), 0, 1);
-    assert_eq!(r, vec![blocks.get(&duration_secs(0)).unwrap().clone()]);
+    let r = page_winning_blocks(
+        &blocks,
+        &solutions,
+        Some(duration_secs(0)..duration_secs(10)),
+        0,
+        1,
+    )
+    .unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(0)).unwrap().clone()]);
 
-    let r = page_winning_blocks(&blocks, Some(duration_secs(0)..duration_secs(10)), 0, 2);
+    let r = page_winning_blocks(
+        &blocks,
+        &solutions,
+        Some(duration_secs(0)..duration_secs(10)),
+        0,
+        2,
+    )
+    .unwrap();
     assert_eq!(
         r,
         vec![
-            blocks.get(&duration_secs(0)).unwrap().clone(),
-            blocks.get(&duration_secs(1)).unwrap().clone()
+            expected.get(&duration_secs(0)).unwrap().clone(),
+            expected.get(&duration_secs(1)).unwrap().clone()
         ]
     );
 
-    let r = page_winning_blocks(&blocks, Some(duration_secs(1)..duration_secs(2)), 0, 2);
-    assert_eq!(r, vec![blocks.get(&duration_secs(1)).unwrap().clone()]);
+    let r = page_winning_blocks(
+        &blocks,
+        &solutions,
+        Some(duration_secs(1)..duration_secs(2)),
+        0,
+        2,
+    )
+    .unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(1)).unwrap().clone()]);
 
-    let r = page_winning_blocks(&blocks, Some(duration_secs(1)..duration_secs(1)), 0, 2);
+    let r = page_winning_blocks(
+        &blocks,
+        &solutions,
+        Some(duration_secs(1)..duration_secs(1)),
+        0,
+        2,
+    )
+    .unwrap();
     assert_eq!(r, vec![]);
 }

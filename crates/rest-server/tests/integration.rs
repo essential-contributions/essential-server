@@ -268,13 +268,9 @@ async fn test_solution_outcome() {
     let a = url.join(&format!("/solution-outcome/{ca}")).unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let value = response
-        .json::<Option<SolutionOutcome>>()
-        .await
-        .unwrap()
-        .unwrap();
+    let value = response.json::<Vec<SolutionOutcome>>().await.unwrap();
 
-    assert_eq!(value, SolutionOutcome::Success(0));
+    assert_eq!(value, vec![SolutionOutcome::Success(0)]);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();

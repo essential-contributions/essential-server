@@ -346,7 +346,7 @@ where
 async fn solution_outcome<S>(
     State(essential): State<Essential<S>>,
     Path(address): Path<String>,
-) -> Result<Json<Option<SolutionOutcome>>, Error>
+) -> Result<Json<Vec<SolutionOutcome>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,

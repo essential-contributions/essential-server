@@ -130,15 +130,24 @@ where
     pub async fn solution_outcome(
         &self,
         solution_hash: &Hash,
-    ) -> anyhow::Result<Option<SolutionOutcome>> {
+    ) -> anyhow::Result<Vec<SolutionOutcome>> {
         Ok(self
             .storage
             .get_solution(*solution_hash)
             .await?
-            .map(|outcome| match outcome.outcome {
-                CheckOutcome::Success(block_number) => SolutionOutcome::Success(block_number),
-                CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
-            }))
+            .map(|outcome| {
+                outcome
+                    .outcome
+                    .into_iter()
+                    .map(|outcome| match outcome {
+                        CheckOutcome::Success(block_number) => {
+                            SolutionOutcome::Success(block_number)
+                        }
+                        CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default())
     }
 
     pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {

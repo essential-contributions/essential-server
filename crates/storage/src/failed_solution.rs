@@ -34,8 +34,8 @@ pub enum CheckOutcome {
 pub struct SolutionOutcome {
     /// The solution.
     pub solution: Solution,
-    /// The outcome of the solution.
-    pub outcome: CheckOutcome,
+    /// The outcomes of the solution.
+    pub outcome: Vec<CheckOutcome>,
 }
 
 impl Display for SolutionFailReason {

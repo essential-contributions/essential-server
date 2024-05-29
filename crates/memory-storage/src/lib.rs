@@ -8,7 +8,7 @@ use essential_storage::{
 use essential_types::{
     intent::{self, Intent},
     solution::Solution,
-    Batch, Block, ContentAddress, Hash, IntentAddress, Key, Signature, StorageLayout, Word,
+    ContentAddress, Hash, IntentAddress, Key, Signature, StorageLayout, Word,
 };
 use futures::future::FutureExt;
 use std::{
@@ -42,14 +42,22 @@ impl Default for MemoryStorage {
 struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
     intent_time_index: BTreeMap<Duration, ContentAddress>,
-    solution_pool: HashMap<Hash, Solution>,
+    solution_pool: HashSet<Hash>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
-    failed_solution_pool: HashMap<Hash, FailedSolution>,
+    failed_solution_pool: HashMap<Hash, Vec<SolutionFailReason>>,
     failed_solution_time_index: HashMap<Duration, Vec<Hash>>,
+    solutions: HashMap<Hash, Solution>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
-    solution_block_time_index: HashMap<Hash, Duration>,
+    solution_block_time_index: HashMap<Hash, Vec<Duration>>,
     state: HashMap<ContentAddress, BTreeMap<Key, Vec<Word>>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+struct Block {
+    number: u64,
+    timestamp: Duration,
+    hashes: Vec<Hash>,
 }
 
 #[derive(Debug)]
@@ -182,12 +190,13 @@ impl Storage for MemoryStorage {
         let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
         let hash = essential_hash::hash(&solution);
         self.inner.apply(|i| {
-            if i.solution_pool.insert(hash, solution).is_none() {
+            if i.solution_pool.insert(hash) {
                 i.solution_time_index
                     .entry(timestamp)
                     .or_default()
                     .push(hash);
             }
+            i.solutions.insert(hash, solution);
         });
         Ok(())
     }
@@ -201,17 +210,22 @@ impl Storage for MemoryStorage {
             if i.solved.contains_key(&timestamp) {
                 bail!("Two blocks created at the same time");
             }
-            i.solution_block_time_index
-                .extend(solutions.iter().map(|h| (*h, timestamp)));
+            for hash in solutions {
+                i.solution_block_time_index
+                    .entry(*hash)
+                    .or_default()
+                    .push(timestamp);
+            }
             let solutions = solutions
                 .iter()
-                .filter_map(|h| i.solution_pool.remove(h))
+                .filter(|h| i.solution_pool.remove(*h))
+                .cloned()
                 .collect();
             let number = i.solved.len() as u64;
             let batch = Block {
                 number,
                 timestamp,
-                batch: Batch { solutions },
+                hashes: solutions,
             };
             i.solved.insert(timestamp, batch);
             Ok(())
@@ -225,26 +239,26 @@ impl Storage for MemoryStorage {
         let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
         let hashes: HashSet<_> = solutions.iter().map(|(h, _)| h).collect();
         self.inner.apply(|i| {
-            let solutions = solutions
-                .iter()
-                .filter_map(|(h, r)| i.solution_pool.remove(h).map(|s| (*h, s, r.to_owned())));
+            let solutions = solutions.iter().filter_map(|(h, r)| {
+                if i.solution_pool.remove(h) {
+                    Some((*h, r.clone()))
+                } else {
+                    None
+                }
+            });
             for v in i.solution_time_index.values_mut() {
                 v.retain(|h| !hashes.contains(h));
             }
             i.solution_time_index.retain(|_, v| !v.is_empty());
 
-            for (hash, solution, reason) in solutions {
-                let contains = i
-                    .failed_solution_pool
-                    .insert(hash, FailedSolution { solution, reason });
-                if contains.is_none() {
-                    match i.failed_solution_time_index.entry(time) {
-                        Entry::Occupied(mut occupied_entry) => {
-                            occupied_entry.get_mut().push(hash);
-                        }
-                        Entry::Vacant(vacant_entry) => {
-                            vacant_entry.insert(vec![hash]);
-                        }
+            for (hash, reason) in solutions {
+                i.failed_solution_pool.entry(hash).or_default().push(reason);
+                match i.failed_solution_time_index.entry(time) {
+                    Entry::Occupied(mut occupied_entry) => {
+                        occupied_entry.get_mut().push(hash);
+                    }
+                    Entry::Vacant(vacant_entry) => {
+                        vacant_entry.insert(vec![hash]);
                     }
                 }
             }
@@ -305,28 +319,36 @@ impl Storage for MemoryStorage {
             i.solution_time_index
                 .values()
                 .flatten()
-                .filter_map(|h| i.solution_pool.get(h))
-                .cloned()
+                .filter(|h| i.solution_pool.contains(*h))
+                .filter_map(|h| i.solutions.get(h).cloned())
                 .collect()
         }))
     }
 
     async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>> {
-        Ok(self
-            .inner
-            .apply(|i| i.failed_solution_pool.values().cloned().collect()))
+        Ok(self.inner.apply(|i| {
+            i.failed_solution_pool
+                .iter()
+                .filter_map(|(h, r)| i.solutions.get(h).cloned().map(|s| (s, r)))
+                .flat_map(|(s, r)| {
+                    r.iter().map(move |r| FailedSolution {
+                        solution: s.clone(),
+                        reason: r.clone(),
+                    })
+                })
+                .collect()
+        }))
     }
 
     async fn list_winning_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
         page: Option<usize>,
-    ) -> anyhow::Result<Vec<Block>> {
+    ) -> anyhow::Result<Vec<essential_types::Block>> {
         let page = page.unwrap_or(0);
-        let v = self
-            .inner
-            .apply(|i| values::page_winning_blocks(&i.solved, time_range, page, PAGE_SIZE));
-        Ok(v)
+        self.inner.apply(|i| {
+            values::page_winning_blocks(&i.solved, &i.solutions, time_range, page, PAGE_SIZE)
+        })
     }
 
     async fn get_storage_layout(
@@ -342,34 +364,31 @@ impl Storage for MemoryStorage {
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
         let r = self.inner.apply(|i| {
-            i.failed_solution_pool
-                .get(&solution_hash)
-                .cloned()
-                .map(Result::Err)
-                .or_else(|| {
-                    let time = i.solution_block_time_index.get(&solution_hash)?;
-                    Some(Result::Ok(i.solved.get(time).cloned()?))
-                })
+            i.solutions.get(&solution_hash).cloned().map(|s| {
+                let outcome = i
+                    .failed_solution_pool
+                    .get(&solution_hash)
+                    .into_iter()
+                    .flatten()
+                    .cloned()
+                    .map(CheckOutcome::Fail)
+                    .chain(
+                        i.solution_block_time_index
+                            .get(&solution_hash)
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|time| {
+                                let b = i.solved.get(time)?;
+                                Some(CheckOutcome::Success(b.number))
+                            }),
+                    )
+                    .collect();
+                SolutionOutcome {
+                    solution: s.clone(),
+                    outcome,
+                }
+            })
         });
-
-        let r = match r {
-            Some(Err(failed)) => Some(SolutionOutcome {
-                solution: failed.solution,
-                outcome: CheckOutcome::Fail(failed.reason),
-            }),
-            // Do this find outside the lock to save the total amount of time the lock is held.
-            Some(Ok(success)) => success
-                .batch
-                .solutions
-                .iter()
-                .find(|s| essential_hash::hash(&s) == solution_hash)
-                .cloned()
-                .map(|s| SolutionOutcome {
-                    solution: s,
-                    outcome: CheckOutcome::Success(success.number),
-                }),
-            None => None,
-        };
         Ok(r)
     }
 

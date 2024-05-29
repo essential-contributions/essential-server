@@ -148,17 +148,25 @@ fn test_insert_solutions() {
     let result = query(
         &conn,
         include_sql!("query", "get_solution"),
+        ["hash1"],
+        |row| row.get::<_, String>(0).unwrap(),
+    );
+
+    assert_eq!(result, vec!["solution1".to_string()]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_solution_outcomes"),
         ["hash1", "hash1"],
         |row| {
             (
-                row.get::<_, String>(0).unwrap(),
-                row.get::<_, Option<u64>>(1).unwrap(),
-                row.get::<_, Option<String>>(2).unwrap(),
+                row.get::<_, Option<u64>>(0).unwrap(),
+                row.get::<_, Option<String>>(1).unwrap(),
             )
         },
     );
 
-    assert_eq!(result, vec![("solution1".to_string(), Some(1), None,),]);
+    assert_eq!(result, vec![(Some(1), None,),]);
 }
 
 #[test]
@@ -212,20 +220,25 @@ fn test_move_solutions_to_failed() {
     let result = query(
         &conn,
         include_sql!("query", "get_solution"),
+        ["hash1"],
+        |row| row.get::<_, String>(0).unwrap(),
+    );
+
+    assert_eq!(result, vec!["solution1".to_string()]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_solution_outcomes"),
         ["hash1", "hash1"],
         |row| {
             (
-                row.get::<_, String>(0).unwrap(),
-                row.get::<_, Option<u64>>(1).unwrap(),
-                row.get::<_, Option<String>>(2).unwrap(),
+                row.get::<_, Option<u64>>(0).unwrap(),
+                row.get::<_, Option<String>>(1).unwrap(),
             )
         },
     );
 
-    assert_eq!(
-        result,
-        vec![("solution1".to_string(), None, Some("reason1".to_string()),),]
-    );
+    assert_eq!(result, vec![(None, Some("reason1".to_string()),),]);
 
     conn.execute(include_sql!("update", "prune_failed"), [15])
         .unwrap();

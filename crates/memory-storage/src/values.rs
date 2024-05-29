@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 
-use essential_types::{intent::Intent, Block, ContentAddress};
+use essential_types::{intent::Intent, solution::Solution, Batch, ContentAddress};
 
 use crate::IntentSet;
 
@@ -48,24 +48,59 @@ pub fn page_intents_by_time(
 }
 
 pub fn page_winning_blocks(
-    blocks: &BTreeMap<Duration, Block>,
+    blocks: &BTreeMap<Duration, super::Block>,
+    solutions: &HashMap<essential_types::Hash, Solution>,
     range: Option<Range<Duration>>,
     page: usize,
     page_size: usize,
-) -> Vec<Block> {
+) -> anyhow::Result<Vec<essential_types::Block>> {
     let start = page * page_size;
     match range {
         Some(range) => blocks
             .range(range)
             .skip(start)
             .take(page_size)
-            .map(|(_, v)| v.clone())
+            .map(|(_, v)| v)
+            .map(|block| {
+                let super::Block {
+                    number,
+                    timestamp,
+                    hashes,
+                } = block;
+                let solutions = hashes
+                    .iter()
+                    .map(|h| solutions.get(h).cloned())
+                    .collect::<Option<Vec<_>>>()
+                    .ok_or_else(|| anyhow::anyhow!("Missing solution"))?;
+                Ok(essential_types::Block {
+                    number: *number,
+                    timestamp: *timestamp,
+                    batch: Batch { solutions },
+                })
+            })
             .collect(),
         None => blocks
             .iter()
             .skip(start)
             .take(page_size)
-            .map(|(_, v)| v.clone())
+            .map(|(_, v)| v)
+            .map(|block| {
+                let super::Block {
+                    number,
+                    timestamp,
+                    hashes,
+                } = block;
+                let solutions = hashes
+                    .iter()
+                    .map(|h| solutions.get(h).cloned())
+                    .collect::<Option<Vec<_>>>()
+                    .ok_or_else(|| anyhow::anyhow!("Missing solution"))?;
+                Ok(essential_types::Block {
+                    number: *number,
+                    timestamp: *timestamp,
+                    batch: Batch { solutions },
+                })
+            })
             .collect(),
     }
 }

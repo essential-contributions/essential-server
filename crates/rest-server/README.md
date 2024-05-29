@@ -104,7 +104,7 @@ curl -X GET -H "Content-Type: application/json" "http://localhost:59498/list-win
 Parameters: 
 - `:hash` = `[u8; 32]` as base64 string. This is the hash of the solution.
 
-Returns: `Option<SolutionOutcome>` as JSON
+Returns: `Vec<SolutionOutcome>` as JSON
 ```rust
 pub enum SolutionOutcome {
     Success(u64),

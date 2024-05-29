@@ -551,8 +551,12 @@ impl Storage for RqliteStorage {
     }
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
+        // FIXME: Solution can have multiple outcomes.
         let hash = encode(&solution_hash);
-        let sql = &[include_sql!("query/get_solution.sql", hash)];
+        let sql = &[
+            include_sql!("query/get_solution.sql", hash.clone()),
+            include_sql!("query/get_solution_outcomes.sql", hash.clone(), hash),
+        ];
         let queries = self.query_values(sql).await?;
         values::get_solution(queries)
     }
