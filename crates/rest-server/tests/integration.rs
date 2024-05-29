@@ -11,7 +11,7 @@ use essential_types::{
     solution::{Solution, SolutionData},
     Block, ContentAddress, IntentAddress, StorageLayout, Word,
 };
-use reqwest::Client;
+use reqwest::{Client, ClientBuilder};
 use server::run;
 use test_utils::{
     empty::Empty, sign_intent_set_with_random_keypair, solution_with_decision_variables,
@@ -39,7 +39,10 @@ async fn setup_with_mem(mem: MemoryStorage) -> TestServer {
         let essential = essential_server::Essential::new(mem, config);
         run(essential, SERVER, tx, Some(shutdown_rx)).await
     });
-    let client = Client::new();
+    let client = ClientBuilder::new()
+        .http2_prior_knowledge()
+        .build()
+        .unwrap();
     let mut url = reqwest::Url::parse(CLIENT).unwrap();
     let port = rx.await.unwrap().port();
     url.set_port(Some(port)).unwrap();

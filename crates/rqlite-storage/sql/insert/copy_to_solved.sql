@@ -1,8 +1,7 @@
 INSERT
-    OR IGNORE INTO solved (content_hash, solution, batch_id)
+    OR IGNORE INTO solved (content_hash, batch_id)
 SELECT
     content_hash,
-    solution,
     COALESCE(
         (
             SELECT

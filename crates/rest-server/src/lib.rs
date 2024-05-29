@@ -20,11 +20,17 @@ use essential_types::{
     solution::Solution,
     Block, ContentAddress, IntentAddress, Word,
 };
+use hyper::body::Incoming;
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use serde::Deserialize;
 use tokio::{
     net::{TcpListener, ToSocketAddrs},
     sync::oneshot,
+    task::JoinSet,
 };
+use tower::Service;
+
+const MAX_CONNECTIONS: usize = 2000;
 
 #[derive(Deserialize)]
 /// Type to deserialize a time range query parameters.
@@ -96,15 +102,77 @@ where
         .map_err(|_| anyhow::anyhow!("Failed to send local address"))?;
 
     // Serve the app.
-    axum::serve(listener, app)
-        // Attach the shutdown signal.
-        .with_graceful_shutdown(shutdown(shutdown_rx))
-        .await?;
+    serve(app, listener, shutdown_rx).await;
 
     // After the server is done, shutdown essential.
     handle.shutdown().await?;
 
     Ok(())
+}
+
+async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::Receiver<()>>) {
+    let shut = shutdown(shutdown_rx);
+    tokio::pin!(shut);
+
+    let mut conn_set = JoinSet::new();
+    // Continuously accept new connections up to max connections.
+    loop {
+        // Accept a new connection or wait for a shutdown signal.
+        let (socket, _remote_addr) = tokio::select! {
+            _ = &mut shut => {
+                break;
+            }
+            v = listener.accept() => {
+                match v {
+                    Ok(v) => v,
+                    Err(_) => {
+                        continue;
+                    }
+                }
+            }
+        };
+
+        // We don't need to call `poll_ready` because `Router` is always ready.
+        let tower_service = app.clone();
+
+        // Spawn a task to handle the connection. That way we can handle multiple connections
+        // concurrently.
+
+        conn_set.spawn(async move {
+            // Hyper has its own `AsyncRead` and `AsyncWrite` traits and doesn't use tokio.
+            // `TokioIo` converts between them.
+            let socket = TokioIo::new(socket);
+
+            // Hyper also has its own `Service` trait and doesn't use tower. We can use
+            // `hyper::service::service_fn` to create a hyper `Service` that calls our app through
+            // `tower::Service::call`.
+            let hyper_service =
+                hyper::service::service_fn(move |request: axum::extract::Request<Incoming>| {
+                    // We have to clone `tower_service` because hyper's `Service` uses `&self` whereas
+                    // tower's `Service` requires `&mut self`.
+                    //
+                    // We don't need to call `poll_ready` since `Router` is always ready.
+                    tower_service.clone().call(request)
+                });
+
+            // `TokioExecutor` tells hyper to use `tokio::spawn` to spawn tasks.
+            let conn =
+                hyper_util::server::conn::auto::Builder::new(TokioExecutor::new()).http2_only();
+            let conn = conn.serve_connection(socket, hyper_service);
+            let _ = conn.await;
+        });
+
+        // Wait for existing connection to close or wait for a shutdown signal.
+        if conn_set.len() > MAX_CONNECTIONS {
+            tokio::select! {
+                _ = &mut shut => {
+                    break;
+                }
+                _ = conn_set.join_next() => {},
+
+            }
+        }
+    }
 }
 
 /// The return a health check response.

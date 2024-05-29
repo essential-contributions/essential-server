@@ -164,10 +164,10 @@ impl Storage for MemoryStorage {
             data,
             signature,
         };
-        let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
+        let mut time = SystemTime::now().duration_since(UNIX_EPOCH)?;
         self.inner.apply(|i| {
-            if i.intent_time_index.contains_key(&time) {
-                bail!("Two intent sets created at the same time");
+            while i.intent_time_index.contains_key(&time) {
+                time += Duration::from_nanos(1);
             }
             let contains = i.intents.insert(set_addr.clone(), set);
             if contains.is_none() {

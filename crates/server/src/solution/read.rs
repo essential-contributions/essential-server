@@ -13,10 +13,25 @@ where
     let mut intents: HashMap<_, _> = HashMap::new();
     for data in &solution.data {
         let address = data.intent_to_solve.clone();
-        if let Ok(Some(intent)) = storage.get_intent(&address).await {
-            intents.insert(address, Arc::new(intent));
-        } else {
-            anyhow::bail!("Failed to retrieve intent set from storage");
+        match storage.get_intent(&address).await {
+            Ok(Some(intent)) => {
+                intents.insert(address, Arc::new(intent));
+            }
+            Ok(None) => {
+                anyhow::bail!(
+                    "Failed to retrieve intent set from storage. set: {}, intent: {}",
+                    address.set,
+                    address.intent
+                );
+            }
+            Err(err) => {
+                anyhow::bail!(
+                    "Failed to retrieve intent set from storage. set: {}, intent: {}. Error {}",
+                    address.set,
+                    address.intent,
+                    err
+                );
+            }
         }
     }
     #[cfg(feature = "tracing")]
