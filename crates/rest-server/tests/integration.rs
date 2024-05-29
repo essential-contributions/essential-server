@@ -37,7 +37,15 @@ async fn setup_with_mem(mem: MemoryStorage) -> TestServer {
     let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
     let jh = tokio::task::spawn(async {
         let essential = essential_server::Essential::new(mem, config);
-        run(essential, SERVER, tx, Some(shutdown_rx)).await
+        run(
+            essential,
+            SERVER,
+            tx,
+            Some(shutdown_rx),
+            Default::default(),
+            Default::default(),
+        )
+        .await
     });
     let client = Client::new();
     let mut url = reqwest::Url::parse(CLIENT).unwrap();

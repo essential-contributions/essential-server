@@ -5,10 +5,10 @@ use essential_state_read_vm::StateRead;
 use essential_storage::{failed_solution::SolutionFailReason, Storage};
 use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{solution::Solution, Hash};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::sync::oneshot;
 
-const RUN_LOOP_FREQUENCY: std::time::Duration = std::time::Duration::from_secs(10);
+pub(crate) const RUN_LOOP_FREQUENCY: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[cfg(test)]
 pub mod tests;
@@ -26,7 +26,11 @@ struct Solutions {
 }
 
 /// The main loop that builds blocks.
-pub async fn run<S>(storage: &S, mut shutdown: Shutdown) -> anyhow::Result<()>
+pub async fn run<S>(
+    storage: &S,
+    mut shutdown: Shutdown,
+    run_loop_interval: Duration,
+) -> anyhow::Result<()>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -34,7 +38,7 @@ where
 {
     // Run the main loop on a fixed interval.
     // The interval is immediately ready the first time.
-    let mut interval = tokio::time::interval(RUN_LOOP_FREQUENCY);
+    let mut interval = tokio::time::interval(run_loop_interval);
 
     loop {
         // Either wait for the interval to tick or the shutdown signal.

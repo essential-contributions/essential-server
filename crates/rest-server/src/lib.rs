@@ -13,7 +13,10 @@ use axum::{
     Json, Router,
 };
 use base64::Engine as _;
-use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
+use clap::ValueEnum;
+use essential_server::{
+    CheckSolutionOutput, Config, Essential, SolutionOutcome, StateRead, Storage,
+};
 use essential_types::{
     convert::word_from_bytes,
     intent::{self, Intent},
@@ -25,6 +28,16 @@ use tokio::{
     net::{TcpListener, ToSocketAddrs},
     sync::oneshot,
 };
+
+#[derive(ValueEnum, Clone, Copy, Debug, Default)]
+/// The mode this server should run in.
+pub enum BuildMode {
+    #[default]
+    /// Serves requests and builds blocks.
+    BuildBlocks,
+    /// Serves requests only.
+    ServeOnly,
+}
 
 #[derive(Deserialize)]
 /// Type to deserialize a time range query parameters.
@@ -59,6 +72,8 @@ pub async fn run<S, A>(
     addr: A,
     local_addr: oneshot::Sender<SocketAddr>,
     shutdown_rx: Option<oneshot::Receiver<()>>,
+    mode: BuildMode,
+    config: Config,
 ) -> anyhow::Result<()>
 where
     A: ToSocketAddrs,
@@ -67,7 +82,10 @@ where
     <S as StateRead>::Error: Send,
 {
     // Spawn essential and get the handle.
-    let handle = essential.clone().spawn()?;
+    let handle = match mode {
+        BuildMode::BuildBlocks => Some(essential.clone().spawn(config)?),
+        BuildMode::ServeOnly => None,
+    };
 
     // Create all the endpoints.
     let app = Router::new()
@@ -102,7 +120,9 @@ where
         .await?;
 
     // After the server is done, shutdown essential.
-    handle.shutdown().await?;
+    if let Some(handle) = handle {
+        handle.shutdown().await?;
+    }
 
     Ok(())
 }
