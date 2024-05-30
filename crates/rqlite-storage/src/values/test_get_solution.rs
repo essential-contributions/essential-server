@@ -7,7 +7,7 @@ use test_utils::empty::Empty;
 #[test]
 fn test_empty_query() {
     let queries = QueryValues {
-        queries: vec![None],
+        queries: vec![None, None],
     };
 
     assert_eq!(get_solution(queries).unwrap(), None);
@@ -20,7 +20,7 @@ fn test_invalid_query() {
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![None, None],
+        queries: vec![None, None, None],
     };
 
     get_solution(queries).unwrap_err();
@@ -31,40 +31,46 @@ fn test_valid_solution() {
     let solution = Solution::empty();
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Number(1.into()),
-                    Value::Null,
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Number(1.into()), Value::Null],
+                }],
+            }),
+        ],
     };
 
     let r = get_solution(queries).unwrap().unwrap();
-    let expected = SolutionOutcome {
+    let expected = SolutionOutcomes {
         solution: solution.clone(),
-        outcome: CheckOutcome::Success(1),
+        outcome: vec![CheckOutcome::Success(1)],
     };
     assert_eq!(r, expected);
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Null,
-                    Value::String(encode(&reason)),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Null, Value::String(encode(&reason))],
+                }],
+            }),
+        ],
     };
 
     let r = get_solution(queries).unwrap().unwrap();
-    let expected = SolutionOutcome {
+    let expected = SolutionOutcomes {
         solution,
-        outcome: CheckOutcome::Fail(reason),
+        outcome: vec![CheckOutcome::Fail(reason)],
     };
     assert_eq!(r, expected);
 }
@@ -74,72 +80,107 @@ fn test_invalid_solution() {
     let solution = Solution::empty();
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::Bool(true),
-                    Value::Number(1.into()),
-                    Value::String(encode(&reason)),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Bool(true)],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Number(1.into()), Value::String(encode(&reason))],
+                }],
+            }),
+        ],
     };
 
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Bool(true),
-                    Value::Number(1.into()),
-                    Value::String(encode(&reason)),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution)), Value::Bool(true)],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Number(1.into()), Value::String(encode(&reason))],
+                }],
+            }),
+        ],
     };
 
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Bool(true),
-                    Value::String(encode(&reason)),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![
+                        Value::Bool(true),
+                        Value::Number(1.into()),
+                        Value::String(encode(&reason)),
+                    ],
+                }],
+            }),
+        ],
     };
 
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Number(1.into()),
-                    Value::Bool(true),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Bool(true), Value::String(encode(&reason))],
+                }],
+            }),
+        ],
     };
 
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Number(1.into()),
-                    Value::String(encode(&reason)),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Number(1.into()), Value::Bool(true)],
+                }],
+            }),
+        ],
+    };
+
+    get_solution(queries).unwrap_err();
+
+    let queries = QueryValues {
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Number(1.into()), Value::String(encode(&reason))],
+                }],
+            }),
+        ],
     };
 
     get_solution(queries).unwrap_err();
@@ -148,59 +189,73 @@ fn test_invalid_solution() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx".to_string();
-    let solution = essential_types::solution::SolutionData::empty();
+    let solution = Solution::empty();
     let reason = SolutionFailReason::ConstraintsFailed("test".to_string());
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(invalid.clone()),
-                    Value::Null,
-                    Value::String(encode(&reason)),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(invalid.clone())],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Null, Value::String(encode(&reason))],
+                }],
+            }),
+        ],
     };
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::String(invalid.clone()),
-                    Value::Null,
-                    Value::String(encode(&reason)),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![
+                        Value::String(encode(&solution)),
+                        Value::String(invalid.clone()),
+                    ],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Null, Value::String(encode(&reason))],
+                }],
+            }),
+        ],
     };
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Number(Number::from_f64(1.0).unwrap()),
-                    Value::Null,
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Number(Number::from_f64(1.0).unwrap()), Value::Null],
+                }],
+            }),
+        ],
     };
     get_solution(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::String(encode(&solution)),
-                    Value::Null,
-                    Value::String(invalid.clone()),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&solution))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::Null, Value::String(invalid.clone())],
+                }],
+            }),
+        ],
     };
     get_solution(queries).unwrap_err();
 }

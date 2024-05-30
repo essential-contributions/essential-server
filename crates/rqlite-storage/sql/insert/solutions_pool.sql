@@ -1,1 +1,1 @@
-INSERT OR IGNORE INTO solutions_pool (content_hash, solution) VALUES (?, ?)
+INSERT OR IGNORE INTO solutions_pool (content_hash) VALUES (?) 

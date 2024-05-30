@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use anyhow::bail;
-use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcome};
+use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcomes};
 use essential_types::{
     intent::{self, Intent},
     solution::Solution,
@@ -104,38 +104,39 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::Sig
 
 pub fn get_solution(
     QueryValues { queries }: QueryValues,
-) -> Result<Option<SolutionOutcome>, anyhow::Error> {
-    let rows = match &queries[..] {
-        [Some(Rows { rows })] => rows,
-        [None] => return Ok(None),
-        _ => bail!("expected a single query {:?}", queries),
+) -> Result<Option<SolutionOutcomes>, anyhow::Error> {
+    let (solution, outcomes) = match &queries[..] {
+        [Some(Rows { rows: solution }), Some(Rows { rows: outcomes })] => (solution, outcomes),
+        [None, None] => return Ok(None),
+        _ => bail!("expected two queries {:?}", queries),
     };
 
-    let [Columns { columns }] = &rows[..] else {
+    let [Columns { columns: solution }] = &solution[..] else {
         bail!("expected a single row");
     };
 
-    match &columns[..] {
-        [Value::String(solution), Value::Number(block_number), Value::Null] => {
-            let solution = decode(solution)?;
-            let block_number = block_number
+    let [Value::String(solution)] = &solution[..] else {
+        bail!("expected a single column");
+    };
+
+    let outcomes = outcomes
+        .iter()
+        .map(|Columns { columns }| match &columns[..] {
+            [Value::Number(block_number), Value::Null] => block_number
                 .as_u64()
-                .ok_or_else(|| anyhow::anyhow!("failed to parse block_number"))?;
-            Ok(Some(SolutionOutcome {
-                solution,
-                outcome: CheckOutcome::Success(block_number),
-            }))
-        }
-        [Value::String(solution), Value::Null, Value::String(reason)] => {
-            let solution = decode(solution)?;
-            let reason = decode(reason)?;
-            Ok(Some(SolutionOutcome {
-                solution,
-                outcome: CheckOutcome::Fail(reason),
-            }))
-        }
-        _ => bail!("unexpected columns: {:?}", columns),
-    }
+                .map(CheckOutcome::Success)
+                .ok_or_else(|| anyhow::anyhow!("failed to parse block_number")),
+            [Value::Null, Value::String(reason)] => decode(reason).map(CheckOutcome::Fail),
+            _ => bail!("unexpected columns: {:?}", columns),
+        })
+        .collect::<anyhow::Result<_>>()?;
+
+    let solution = decode(solution)?;
+
+    Ok(Some(SolutionOutcomes {
+        solution,
+        outcome: outcomes,
+    }))
 }
 
 pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Vec<Intent>>> {

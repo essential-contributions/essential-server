@@ -12,19 +12,24 @@ fn test_insert_solutions() {
     create_tables(&conn);
 
     // Double insert is a noop
-    conn.execute(
-        include_sql!("insert", "solutions_pool"),
-        ["hash1", "solution1"],
-    )
-    .unwrap();
+    conn.execute(include_sql!("insert", "solutions"), ["hash1", "solution1"])
+        .unwrap();
+    conn.execute(include_sql!("insert", "solutions_pool"), ["hash1"])
+        .unwrap();
 
-    conn.execute(
-        include_sql!("insert", "solutions_pool"),
-        ["hash1", "solution1"],
-    )
-    .unwrap();
+    conn.execute(include_sql!("insert", "solutions"), ["hash1", "solution1"])
+        .unwrap();
+    conn.execute(include_sql!("insert", "solutions_pool"), ["hash1"])
+        .unwrap();
 
     let result = query(&conn, "select * from solutions_pool", [], |row| {
+        (
+            row.get::<_, usize>(0).unwrap(),
+            row.get::<_, String>(1).unwrap(),
+        )
+    });
+    assert_eq!(result, vec![(1, "hash1".to_string())]);
+    let result = query(&conn, "select * from solutions", [], |row| {
         (
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),
@@ -37,13 +42,22 @@ fn test_insert_solutions() {
     );
 
     // Can insert a second solution
-    conn.execute(
-        include_sql!("insert", "solutions_pool"),
-        ["hash2", "solution2"],
-    )
-    .unwrap();
+    conn.execute(include_sql!("insert", "solutions"), ["hash2", "solution2"])
+        .unwrap();
+    conn.execute(include_sql!("insert", "solutions_pool"), ["hash2"])
+        .unwrap();
 
     let result = query(&conn, "select * from solutions_pool", [], |row| {
+        (
+            row.get::<_, usize>(0).unwrap(),
+            row.get::<_, String>(1).unwrap(),
+        )
+    });
+    assert_eq!(
+        result,
+        vec![(1, "hash1".to_string(),), (2, "hash2".to_string(),),]
+    );
+    let result = query(&conn, "select * from solutions", [], |row| {
         (
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),
@@ -134,17 +148,25 @@ fn test_insert_solutions() {
     let result = query(
         &conn,
         include_sql!("query", "get_solution"),
+        ["hash1"],
+        |row| row.get::<_, String>(0).unwrap(),
+    );
+
+    assert_eq!(result, vec!["solution1".to_string()]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_solution_outcomes"),
         ["hash1", "hash1"],
         |row| {
             (
-                row.get::<_, String>(0).unwrap(),
-                row.get::<_, Option<u64>>(1).unwrap(),
-                row.get::<_, Option<String>>(2).unwrap(),
+                row.get::<_, Option<u64>>(0).unwrap(),
+                row.get::<_, Option<String>>(1).unwrap(),
             )
         },
     );
 
-    assert_eq!(result, vec![("solution1".to_string(), Some(1), None,),]);
+    assert_eq!(result, vec![(Some(1), None,),]);
 }
 
 #[test]
@@ -152,17 +174,17 @@ fn test_move_solutions_to_failed() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
 
-    conn.execute(
-        include_sql!("insert", "solutions_pool"),
-        ["hash1", "solution1"],
-    )
-    .unwrap();
+    conn.execute(include_sql!("insert", "solutions"), ["hash1", "solution1"])
+        .unwrap();
 
-    conn.execute(
-        include_sql!("insert", "solutions_pool"),
-        ["hash2", "solution2"],
-    )
-    .unwrap();
+    conn.execute(include_sql!("insert", "solutions"), ["hash2", "solution2"])
+        .unwrap();
+
+    conn.execute(include_sql!("insert", "solutions_pool"), ["hash1"])
+        .unwrap();
+
+    conn.execute(include_sql!("insert", "solutions_pool"), ["hash2"])
+        .unwrap();
 
     move_solutions_to_failed(&conn, &[("hash1", "reason1", 10), ("hash2", "reason2", 20)]);
 
@@ -198,20 +220,25 @@ fn test_move_solutions_to_failed() {
     let result = query(
         &conn,
         include_sql!("query", "get_solution"),
+        ["hash1"],
+        |row| row.get::<_, String>(0).unwrap(),
+    );
+
+    assert_eq!(result, vec!["solution1".to_string()]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_solution_outcomes"),
         ["hash1", "hash1"],
         |row| {
             (
-                row.get::<_, String>(0).unwrap(),
-                row.get::<_, Option<u64>>(1).unwrap(),
-                row.get::<_, Option<String>>(2).unwrap(),
+                row.get::<_, Option<u64>>(0).unwrap(),
+                row.get::<_, Option<String>>(1).unwrap(),
             )
         },
     );
 
-    assert_eq!(
-        result,
-        vec![("solution1".to_string(), None, Some("reason1".to_string()),),]
-    );
+    assert_eq!(result, vec![(None, Some("reason1".to_string()),),]);
 
     conn.execute(include_sql!("update", "prune_failed"), [15])
         .unwrap();
@@ -248,10 +275,12 @@ fn test_batch_paging() {
 
         for (hash, i) in hashes.iter().zip(start..end) {
             conn.execute(
-                include_sql!("insert", "solutions_pool"),
+                include_sql!("insert", "solutions"),
                 [hash.to_string(), format!("solution{}", i)],
             )
             .unwrap();
+            conn.execute(include_sql!("insert", "solutions_pool"), [hash.to_string()])
+                .unwrap();
         }
 
         move_solutions_to_solved(

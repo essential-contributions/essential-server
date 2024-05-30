@@ -9,12 +9,12 @@ use base64::Engine;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
-    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcome},
+    failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes},
     key_range, QueryState, StateStorage, Storage,
 };
 use essential_types::{intent, Block, ContentAddress, Hash, Key, StorageLayout, Word};
 use futures::FutureExt;
-use std::{pin::Pin, time::Duration};
+use std::{pin::Pin, sync::Arc, time::Duration};
 use thiserror::Error;
 
 use values::{single_value, QueryValues};
@@ -32,12 +32,20 @@ const RESULTS_KEY: &str = "results";
 /// The key to errors in the results of a query.
 const ERROR_KEY: &str = "errors";
 
+const MAX_DB_CONNECTIONS: usize = 400;
+
 #[derive(Clone)]
 /// Rqlite storage
 /// Safe to clone connection to the rqlite server.
 pub struct RqliteStorage {
-    http: reqwest::Client,
+    http: Db,
     server: reqwest::Url,
+}
+
+#[derive(Clone)]
+struct Db {
+    semaphore: Arc<tokio::sync::Semaphore>,
+    http: reqwest::Client,
 }
 
 /// Encodes a type into blob data which is then base64 encoded.
@@ -80,11 +88,25 @@ macro_rules! include_sql {
     };
 }
 
+impl Db {
+    async fn acquire<F, Fut, R>(&self, f: F) -> anyhow::Result<R>
+    where
+        F: FnOnce(reqwest::Client) -> Fut,
+        Fut: std::future::Future<Output = anyhow::Result<R>>,
+    {
+        let permit = self.semaphore.acquire().await?;
+        f(self.http.clone()).await
+    }
+}
+
 impl RqliteStorage {
     /// Create a new rqlite storage from the rqlite server address.
     pub async fn new(server: &str) -> anyhow::Result<Self> {
         let s = Self {
-            http: reqwest::Client::new(),
+            http: Db {
+                semaphore: Arc::new(tokio::sync::Semaphore::new(MAX_DB_CONNECTIONS)),
+                http: reqwest::Client::new(),
+            },
             server: reqwest::Url::parse(server)?,
         };
         s.create_tables().await?;
@@ -99,6 +121,7 @@ impl RqliteStorage {
             include_sql!("create/intent_sets.sql"),
             include_sql!("create/intent_set_pairing.sql"),
             include_sql!("create/storage_layout.sql"),
+            include_sql!("create/solutions.sql"),
             include_sql!("create/solutions_pool.sql"),
             include_sql!("create/solved.sql"),
             include_sql!("create/intent_state.sql"),
@@ -110,11 +133,10 @@ impl RqliteStorage {
 
     /// Execute a sql statement on the rqlite server.
     async fn execute(&self, sql: &[&[serde_json::Value]]) -> anyhow::Result<()> {
+        let url = self.server.join("/db/execute?transaction")?;
         let r = self
             .http
-            .post(self.server.join("/db/execute?transaction")?)
-            .json(&sql)
-            .send()
+            .acquire(|http| async move { Ok(http.post(url).json(&sql).send().await?) })
             .await?;
         ensure!(
             r.status().is_success(),
@@ -128,11 +150,10 @@ impl RqliteStorage {
     }
 
     async fn execute_query(&self, sql: &[&[serde_json::Value]]) -> anyhow::Result<QueryValues> {
+        let url = self.server.join("/db/request?transaction&level=strong")?;
         let r = self
             .http
-            .post(self.server.join("/db/request?transaction&level=strong")?)
-            .json(&sql)
-            .send()
+            .acquire(|http| async move { Ok(http.post(url).json(&sql).send().await?) })
             .await?;
         ensure!(
             r.status().is_success(),
@@ -149,11 +170,10 @@ impl RqliteStorage {
     /// This is useful for mixing word queries in the same transaction
     /// as an execute statement.
     async fn execute_query_words(&self, sql: &[&[serde_json::Value]]) -> anyhow::Result<Vec<Word>> {
+        let url = self.server.join("/db/request?transaction&level=strong")?;
         let r = self
             .http
-            .post(self.server.join("/db/request?transaction&level=strong")?)
-            .json(&sql)
-            .send()
+            .acquire(|http| async move { Ok(http.post(url).json(&sql).send().await?) })
             .await?;
         ensure!(
             r.status().is_success(),
@@ -169,11 +189,10 @@ impl RqliteStorage {
     /// Query a sql statement on the rqlite server.
     /// Returns `QueryValues` which is a collection of rows and columns.
     async fn query_values(&self, sql: &[&[serde_json::Value]]) -> anyhow::Result<QueryValues> {
+        let url = self.server.join("/db/query?transaction")?;
         let r = self
             .http
-            .post(self.server.join("/db/query?transaction&level=strong")?)
-            .json(&sql)
-            .send()
+            .acquire(|http| async move { Ok(http.post(url).json(&sql).send().await?) })
             .await?;
         ensure!(
             r.status().is_success(),
@@ -254,6 +273,11 @@ impl StateStorage for RqliteStorage {
             })
             .collect();
 
+        // Return early if there are no updates.
+        if sql.is_empty() {
+            return Ok(Vec::new());
+        }
+
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
         let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| &v[..]).collect();
@@ -298,7 +322,7 @@ impl Storage for RqliteStorage {
 
         // For each intent, insert the intent and the intent set pairing.
         let intents = intents.set.iter().flat_map(|intent| {
-            let hash = encode(&hash(&intent));
+            let hash = encode(&essential_hash::content_addr(&intent));
             let intent = encode(&intent);
             [
                 include_sql!(
@@ -342,7 +366,10 @@ impl Storage for RqliteStorage {
         let hash = encode(&hash(&solution));
         let solution = encode(&solution);
 
-        let inserts = &[include_sql!("insert/solutions_pool.sql", hash, solution)];
+        let inserts = &[
+            include_sql!("insert/solutions.sql", hash.clone(), solution),
+            include_sql!("insert/solutions_pool.sql", hash),
+        ];
         self.execute(&inserts[..]).await
     }
 
@@ -388,6 +415,10 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[(Hash, SolutionFailReason)],
     ) -> anyhow::Result<()> {
+        // Return early if there are no solutions to move.
+        if solutions.is_empty() {
+            return Ok(());
+        }
         let sql: Vec<_> = solutions
             .iter()
             .flat_map(|(hash, reason)| {
@@ -519,9 +550,12 @@ impl Storage for RqliteStorage {
         }
     }
 
-    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcome>> {
+    async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {
         let hash = encode(&solution_hash);
-        let sql = &[include_sql!("query/get_solution.sql", hash)];
+        let sql = &[
+            include_sql!("query/get_solution.sql", hash.clone()),
+            include_sql!("query/get_solution_outcomes.sql", hash.clone(), hash),
+        ];
         let queries = self.query_values(sql).await?;
         values::get_solution(queries)
     }

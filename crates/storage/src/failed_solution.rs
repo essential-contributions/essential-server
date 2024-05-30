@@ -31,11 +31,11 @@ pub enum CheckOutcome {
 }
 /// A solution with its outcome.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SolutionOutcome {
+pub struct SolutionOutcomes {
     /// The solution.
     pub solution: Solution,
-    /// The outcome of the solution.
-    pub outcome: CheckOutcome,
+    /// The outcomes of the solution.
+    pub outcome: Vec<CheckOutcome>,
 }
 
 impl Display for SolutionFailReason {
