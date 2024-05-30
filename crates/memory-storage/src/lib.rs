@@ -314,29 +314,43 @@ impl Storage for MemoryStorage {
         }
     }
 
-    async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Solution>> {
+    async fn list_solutions_pool(&self, page: Option<usize>) -> anyhow::Result<Vec<Solution>> {
         Ok(self.inner.apply(|i| {
-            i.solution_time_index
+            let iter = i
+                .solution_time_index
                 .values()
                 .flatten()
-                .filter(|h| i.solution_pool.contains(*h))
-                .filter_map(|h| i.solutions.get(h).cloned())
-                .collect()
+                .filter(|h| i.solution_pool.contains(*h));
+            values::page_solutions(
+                iter,
+                |h| i.solutions.get(h).cloned(),
+                page.unwrap_or(0),
+                PAGE_SIZE,
+            )
         }))
     }
 
-    async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>> {
+    async fn list_failed_solutions_pool(
+        &self,
+        page: Option<usize>,
+    ) -> anyhow::Result<Vec<FailedSolution>> {
         Ok(self.inner.apply(|i| {
-            i.failed_solution_pool
+            let iter = i
+                .failed_solution_pool
                 .iter()
-                .filter_map(|(h, r)| i.solutions.get(h).cloned().map(|s| (s, r)))
-                .flat_map(|(s, r)| {
-                    r.iter().map(move |r| FailedSolution {
-                        solution: s.clone(),
-                        reason: r.clone(),
+                .flat_map(|(h, r)| r.iter().map(|r| (*h, r.clone())));
+            values::page_solutions(
+                iter,
+                |(h, r)| {
+                    let solution = i.solutions.get(&h).cloned()?;
+                    Some(FailedSolution {
+                        solution,
+                        reason: r,
                     })
-                })
-                .collect()
+                },
+                page.unwrap_or(0),
+                PAGE_SIZE,
+            )
         }))
     }
 

@@ -110,9 +110,7 @@ where
 {
     // Get all solutions from the pool.
     // This returns the solutions in FIFO order.
-    //
-    // TODO: Page this and limit the amount of solutions pulled into memory.
-    let solutions = storage.list_solutions_pool().await?;
+    let solutions = storage.list_solutions_pool(Some(0)).await?;
 
     // Create a state db transaction.
     let mut transaction = storage.clone().transaction();

@@ -306,13 +306,16 @@ where
 /// The list solutions pool get endpoint.
 async fn list_solutions_pool<S>(
     State(essential): State<Essential<S>>,
+    page: Option<Query<Page>>,
 ) -> Result<Json<Vec<Solution>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let solutions = essential.list_solutions_pool().await?;
+    let solutions = essential
+        .list_solutions_pool(page.map(|p| p.page as usize))
+        .await?;
     Ok(Json(solutions))
 }
 

@@ -76,7 +76,10 @@ fn test_insert_solutions() {
     let result = query(
         &conn,
         include_sql!("query", "list_solutions_pool"),
-        [],
+        named_params! {
+            ":page_size": 10,
+            ":page_number": 0,
+        },
         |row| (row.get::<_, String>(0).unwrap(),),
     );
     assert_eq!(
@@ -109,7 +112,10 @@ fn test_insert_solutions() {
     let result = query(
         &conn,
         include_sql!("query", "list_solutions_pool"),
-        [],
+        named_params! {
+            ":page_size": 10,
+            ":page_number": 0,
+        },
         |row| {
             (
                 row.get::<_, String>(0).unwrap(),
@@ -170,6 +176,76 @@ fn test_insert_solutions() {
 }
 
 #[test]
+fn test_list_solutions_pool_page() {
+    let conn = Connection::open_in_memory().unwrap();
+    create_tables(&conn);
+
+    for i in 0..10 {
+        conn.execute(
+            include_sql!("insert", "solutions"),
+            [format!("hash{}", i), format!("solution{}", i)],
+        )
+        .unwrap();
+        conn.execute(
+            include_sql!("insert", "solutions_pool"),
+            [format!("hash{}", i)],
+        )
+        .unwrap();
+    }
+
+    let result = query(
+        &conn,
+        include_sql!("query", "list_solutions_pool"),
+        named_params! {
+            ":page_size": 1,
+            ":page_number": 0,
+        },
+        |row| (row.get::<_, String>(0).unwrap(),),
+    );
+
+    assert_eq!(result, vec![("solution0".to_string(),)]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "list_solutions_pool"),
+        named_params! {
+            ":page_size": 1,
+            ":page_number": 1,
+        },
+        |row| (row.get::<_, String>(0).unwrap(),),
+    );
+
+    assert_eq!(result, vec![("solution1".to_string(),)]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "list_solutions_pool"),
+        named_params! {
+            ":page_size": 2,
+            ":page_number": 1,
+        },
+        |row| (row.get::<_, String>(0).unwrap(),),
+    );
+
+    assert_eq!(
+        result,
+        vec![("solution2".to_string(),), ("solution3".to_string(),)]
+    );
+
+    let result = query(
+        &conn,
+        include_sql!("query", "list_solutions_pool"),
+        named_params! {
+            ":page_size": 3,
+            ":page_number": 3,
+        },
+        |row| (row.get::<_, String>(0).unwrap(),),
+    );
+
+    assert_eq!(result, vec![("solution9".to_string(),)]);
+}
+
+#[test]
 fn test_move_solutions_to_failed() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
@@ -192,7 +268,10 @@ fn test_move_solutions_to_failed() {
     let result = query(
         &conn,
         include_sql!("query", "list_solutions_pool"),
-        [],
+        named_params! {
+            ":page_size": 10,
+            ":page_number": 0,
+        },
         |row| (row.get::<_, String>(0).unwrap(),),
     );
     assert_eq!(result, vec![]);
@@ -200,7 +279,10 @@ fn test_move_solutions_to_failed() {
     let result = query(
         &conn,
         include_sql!("query", "list_failed_solutions"),
-        [],
+        named_params! {
+            ":page_size": 10,
+            ":page_number": 0,
+        },
         |row| {
             (
                 row.get::<_, String>(0).unwrap(),
@@ -246,7 +328,10 @@ fn test_move_solutions_to_failed() {
     let result = query(
         &conn,
         include_sql!("query", "list_failed_solutions"),
-        [],
+        named_params! {
+            ":page_size": 10,
+            ":page_number": 0,
+        },
         |row| {
             (
                 row.get::<_, String>(0).unwrap(),

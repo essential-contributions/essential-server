@@ -494,16 +494,24 @@ impl Storage for RqliteStorage {
 
     async fn list_solutions_pool(
         &self,
+        page: Option<usize>,
     ) -> anyhow::Result<Vec<essential_types::solution::Solution>> {
-        // TODO: Maybe we want to page this?
-        let sql = &[include_sql!("query/list_solutions_pool.sql")];
+        let page = page.unwrap_or(0);
+        let sql = &[
+            include_sql!(named "query/list_solutions_pool.sql", "page_size" => PAGE_SIZE, "page_number" => page),
+        ];
         let queries = self.query_values(sql).await?;
         values::list_solutions_pool(queries)
     }
 
-    async fn list_failed_solutions_pool(&self) -> anyhow::Result<Vec<FailedSolution>> {
-        // TODO: Maybe we want to page this?
-        let sql = &[include_sql!("query/list_failed_solutions.sql")];
+    async fn list_failed_solutions_pool(
+        &self,
+        page: Option<usize>,
+    ) -> anyhow::Result<Vec<FailedSolution>> {
+        let page = page.unwrap_or(0);
+        let sql = &[
+            include_sql!(named "query/list_failed_solutions.sql", "page_size" => PAGE_SIZE, "page_number" => page),
+        ];
         let queries = self.query_values(sql).await?;
         values::list_failed_solutions(queries)
     }

@@ -49,6 +49,23 @@ pub fn page_intents_by_time(
         .collect()
 }
 
+pub fn page_solutions<F, S, I>(
+    solution_hashes: impl Iterator<Item = I>,
+    f: F,
+    page: usize,
+    page_size: usize,
+) -> Vec<S>
+where
+    F: FnMut(I) -> Option<S>,
+{
+    let start = page * page_size;
+    solution_hashes
+        .skip(start)
+        .filter_map(f)
+        .take(page_size)
+        .collect()
+}
+
 pub fn page_winning_blocks(
     blocks: &BTreeMap<Duration, super::Block>,
     solutions: &HashMap<essential_types::Hash, Solution>,
