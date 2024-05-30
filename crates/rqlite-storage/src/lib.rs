@@ -19,6 +19,8 @@ use thiserror::Error;
 
 use values::{single_value, QueryValues};
 
+const CREATE_TABLES_RETRY_DELAY: Duration = Duration::from_secs(1);
+
 #[cfg(test)]
 mod test_encode_decode;
 mod values;
@@ -109,7 +111,11 @@ impl RqliteStorage {
             },
             server: reqwest::Url::parse(server)?,
         };
-        s.create_tables().await?;
+        while let Err(err) = s.create_tables().await {
+            #[cfg(feature = "tracing")]
+            tracing::warn!("Failed to create tables: {:?}. Retrying...", err);
+            tokio::time::sleep(CREATE_TABLES_RETRY_DELAY).await;
+        }
         Ok(s)
     }
 

@@ -17,11 +17,12 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["preserve_order"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
 rusqlite = { version = "0.31.0", features = ["bundled"] }
 test-utils = { workspace = true }
-tokio = { workspace = true }
 
 [features]
 default = []
+tracing = ["dep:tracing"]

@@ -32,4 +32,9 @@ test-utils = { workspace = true }
 
 [features]
 default = ["tracing"]
-tracing = ["dep:tracing", "dep:tracing-subscriber", "essential-server/tracing"]
+tracing = [
+    "dep:tracing",
+    "dep:tracing-subscriber",
+    "essential-rqlite-storage/tracing",
+    "essential-server/tracing",
+]
