@@ -2,7 +2,7 @@ use crate::{solution::read::read_intents_from_storage, PRUNE_FAILED_STORAGE_OLDE
 use anyhow::Context;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
-use essential_storage::{failed_solution::SolutionFailReason, Storage};
+use essential_storage::{failed_solution::SolutionFailReason, CommitData, Storage};
 use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{solution::Solution, Hash};
 use std::sync::Arc;
@@ -56,8 +56,7 @@ where
     <S as StateRead>::Error: Send,
 {
     // Build a block.
-    let (solutions, mut transaction) =
-        build_block(storage).await.context("error building block")?;
+    let (solutions, transaction) = build_block(storage).await.context("error building block")?;
 
     // FIXME: These 3 database commits should be atomic. If one fails they should all fail.
     // We don't have transactions for storage yet so that will be required to implement this.
@@ -69,11 +68,6 @@ where
         .map(|(solution, reason)| (hash(solution.as_ref()), reason.clone()))
         .collect();
 
-    storage
-        .move_solutions_to_failed(&failed_solutions)
-        .await
-        .context("error marking solutions as failed")?;
-
     // Move valid solutions.
     let solved_solutions: Vec<Hash> = solutions
         .valid_solutions
@@ -81,16 +75,17 @@ where
         .map(|s| hash(s.0.as_ref()))
         .collect();
 
-    storage
-        .move_solutions_to_solved(&solved_solutions)
-        .await
-        .context("error marking solutions as solved")?;
+    let data = CommitData {
+        failed: &failed_solutions,
+        solved: &solved_solutions,
+        state_updates: Box::new(transaction.into_updates()),
+    };
 
-    // Commit the state updates transaction.
-    transaction
-        .commit()
+    // Atomically commit the block.
+    storage
+        .commit_block(data)
         .await
-        .context("error committing state changes")?;
+        .context("error committing block")?;
 
     storage
         .prune_failed_solutions(PRUNE_FAILED_STORAGE_OLDER_THAN)

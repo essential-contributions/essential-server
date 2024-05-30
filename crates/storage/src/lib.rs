@@ -15,6 +15,17 @@ use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes};
 /// Module for failed solution struct.
 pub mod failed_solution;
 
+/// Data to commit after a block has been built.
+/// This data should all be committed atomically.
+pub struct CommitData<'a> {
+    /// Failed solutions
+    pub failed: &'a [(Hash, SolutionFailReason)],
+    /// Solved solutions
+    pub solved: &'a [Hash],
+    /// State updates
+    pub state_updates: Box<dyn Iterator<Item = (ContentAddress, Key, Vec<Word>)> + 'a>,
+}
+
 /// Storage trait for the Essential platform.
 /// All inserts and updates are idempotent.
 pub trait Storage: StateStorage {
@@ -98,6 +109,12 @@ pub trait Storage: StateStorage {
     fn prune_failed_solutions(
         &self,
         older_than: Duration,
+    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+
+    /// Commit block data atomically.
+    fn commit_block(
+        &self,
+        data: CommitData,
     ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
 }
 

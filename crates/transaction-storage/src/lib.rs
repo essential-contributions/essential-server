@@ -5,7 +5,7 @@
 
 use essential_state_read_vm::StateRead;
 use essential_storage::{key_range, QueryState, StateStorage};
-use essential_types::{ContentAddress, Key, Word};
+use essential_types::{ContentAddress, Key, Value, Word};
 use futures::future::FutureExt;
 use imbl::HashMap;
 use std::{pin::Pin, sync::Arc};
@@ -122,6 +122,22 @@ impl<S> TransactionStorage<S> {
         self.storage.update_state_batch(updates).await?;
         self.state.clear();
         Ok(())
+    }
+
+    /// Extract the updates from this transaction.
+    pub fn into_updates(self) -> impl Iterator<Item = (ContentAddress, Key, Value)> {
+        self.state.into_iter().flat_map(|(address, m)| {
+            m.into_iter().map(move |(key, mutation)| {
+                (
+                    address.clone(),
+                    key,
+                    match mutation {
+                        Mutation::Insert(v) => v,
+                        Mutation::Delete => Vec::new(),
+                    },
+                )
+            })
+        })
     }
 
     /// Rollback the transaction.
