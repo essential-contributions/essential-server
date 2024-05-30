@@ -79,11 +79,15 @@ pub trait Storage: StateStorage {
     ) -> impl Future<Output = anyhow::Result<Vec<Vec<Intent>>>> + Send;
 
     /// List all solutions in the pool.
-    fn list_solutions_pool(&self) -> impl Future<Output = anyhow::Result<Vec<Solution>>> + Send;
+    fn list_solutions_pool(
+        &self,
+        page: Option<usize>,
+    ) -> impl Future<Output = anyhow::Result<Vec<Solution>>> + Send;
 
     /// List all failed solutions in the pool.
     fn list_failed_solutions_pool(
         &self,
+        page: Option<usize>,
     ) -> impl std::future::Future<Output = anyhow::Result<Vec<FailedSolution>>> + Send;
 
     /// List all blocks of solutions that have been solved.

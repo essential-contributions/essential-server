@@ -169,8 +169,8 @@ where
         self.storage.list_intent_sets(time_range, page).await
     }
 
-    pub async fn list_solutions_pool(&self) -> anyhow::Result<Vec<Solution>> {
-        self.storage.list_solutions_pool().await
+    pub async fn list_solutions_pool(&self, page: Option<usize>) -> anyhow::Result<Vec<Solution>> {
+        self.storage.list_solutions_pool(page).await
     }
 
     pub async fn list_winning_blocks(

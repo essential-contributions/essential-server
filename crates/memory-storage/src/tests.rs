@@ -91,14 +91,14 @@ async fn test_solutions() {
         .await
         .unwrap();
 
-    let result = storage.list_solutions_pool().await.unwrap();
+    let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result, vec![solution.clone()]);
 
     storage
         .insert_solution_into_pool(solution2.clone())
         .await
         .unwrap();
-    let result = storage.list_solutions_pool().await.unwrap();
+    let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 2);
     assert!(result.contains(&solution));
     assert!(result.contains(&solution2));
@@ -108,7 +108,7 @@ async fn test_solutions() {
         .await
         .unwrap();
 
-    let result = storage.list_solutions_pool().await.unwrap();
+    let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 1);
     assert!(result.contains(&solution2));
 
@@ -131,7 +131,7 @@ async fn test_solutions() {
         .await
         .unwrap();
 
-    let result = storage.list_solutions_pool().await.unwrap();
+    let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 1);
     assert!(result.contains(&solution4));
 
@@ -142,7 +142,7 @@ async fn test_solutions() {
         .await
         .unwrap();
 
-    let result = storage.list_failed_solutions_pool().await.unwrap();
+    let result = storage.list_failed_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].solution, solution4);
 
@@ -152,7 +152,7 @@ async fn test_solutions() {
         vec![CheckOutcome::Fail(solution4_fail_reason)]
     );
 
-    let result = storage.list_solutions_pool().await.unwrap();
+    let result = storage.list_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
 
     let result = storage.list_winning_blocks(None, None).await.unwrap();
@@ -172,7 +172,7 @@ async fn test_solutions() {
         .await
         .unwrap();
 
-    let result = storage.list_failed_solutions_pool().await.unwrap();
+    let result = storage.list_failed_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
 }
 

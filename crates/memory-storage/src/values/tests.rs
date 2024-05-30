@@ -112,6 +112,48 @@ fn test_page_intents_by_time() {
 }
 
 #[test]
+fn test_page_solutions_pool() {
+    let solutions_iter: Vec<_> = (0..10)
+        .map(|i| solution_with_decision_variables(i as usize))
+        .map(|s| (essential_hash::hash(&s), s))
+        .collect();
+    let solutions: HashMap<_, _> = solutions_iter.iter().cloned().collect();
+    let expected: Vec<_> = solutions_iter.iter().map(|(_, s)| s.clone()).collect();
+
+    let r = page_solutions(
+        solutions_iter.iter().map(|(h, _)| h),
+        |h| solutions.get(h).cloned(),
+        0,
+        1,
+    );
+    assert_eq!(&r[..], &expected[0..1]);
+
+    let r = page_solutions(
+        solutions_iter.iter().map(|(h, _)| h),
+        |h| solutions.get(h).cloned(),
+        1,
+        1,
+    );
+    assert_eq!(&r[..], &expected[1..=1]);
+
+    let r = page_solutions(
+        solutions_iter.iter().map(|(h, _)| h),
+        |h| solutions.get(h).cloned(),
+        0,
+        10,
+    );
+    assert_eq!(&r[..], &expected[0..10]);
+
+    let r = page_solutions(
+        solutions_iter.iter().map(|(h, _)| h),
+        |h| solutions.get(h).cloned(),
+        1,
+        6,
+    );
+    assert_eq!(&r[..], &expected[6..10]);
+}
+
+#[test]
 fn test_paging_blocks() {
     let solutions: Vec<Vec<_>> = (0..10)
         .map(|i| {

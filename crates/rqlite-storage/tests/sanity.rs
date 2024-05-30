@@ -167,14 +167,14 @@ async fn test_insert_solution_into_pool() {
         .insert_solution_into_pool(solution.clone())
         .await
         .unwrap();
-    let solutions = storage.list_solutions_pool().await.unwrap();
+    let solutions = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(solutions.len(), 1);
     assert_eq!(hash(&solutions[0].data), hash(&Solution::empty()));
     storage
         .move_solutions_to_solved(&[hash(&Solution::empty())])
         .await
         .unwrap();
-    let solutions = storage.list_solutions_pool().await.unwrap();
+    let solutions = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(solutions.len(), 0);
     let batches = storage.list_winning_blocks(None, None).await.unwrap();
     assert_eq!(batches.len(), 1);

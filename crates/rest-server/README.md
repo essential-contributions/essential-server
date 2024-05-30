@@ -72,6 +72,9 @@ Returns: `Hash` as JSON
 curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[]},"signature":[[]]}' http://localhost:59498/submit-solution
 ```
 ### GET `/list-solutions-pool`
+Query parameters: 
+- *Optional* `{ page: u64 }`. This is the page number to list sets from. The default is 0.
+
 Returns: `Vec<Solution>` as JSON
 
 **Example:**
