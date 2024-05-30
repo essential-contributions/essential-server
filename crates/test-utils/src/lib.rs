@@ -45,9 +45,9 @@ pub fn solution_with_intent(intent_to_solve: IntentAddress) -> Solution {
         data: vec![SolutionData {
             intent_to_solve,
             decision_variables: Default::default(),
+            state_mutations: Default::default(),
+            transient_data: Default::default(),
         }],
-        state_mutations: Default::default(),
-        transient_data: Default::default(),
     }
 }
 
@@ -68,8 +68,8 @@ pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
         data: vec![SolutionData {
             intent_to_solve: IntentAddress::empty(),
             decision_variables: vec![decision_variables as Word; decision_variables],
+            state_mutations: Default::default(),
+            transient_data: Default::default(),
         }],
-        state_mutations: Default::default(),
-        transient_data: Default::default(),
     }
 }

@@ -37,15 +37,13 @@ pub(crate) fn apply_mutations<S>(
 where
     S: StateStorage,
 {
-    for state_mutation in &solution.state_mutations {
-        let set = &solution
-            .data
-            .get(state_mutation.pathway as usize)
-            .ok_or(anyhow::anyhow!("Intent in solution data not found"))?
-            .intent_to_solve
-            .set;
-        for mutation in state_mutation.mutations.iter() {
-            storage.apply_state(set, mutation.key.clone(), mutation.value.clone());
+    for data in &solution.data {
+        for mutation in data.state_mutations.iter() {
+            storage.apply_state(
+                &data.intent_to_solve.set,
+                mutation.key.clone(),
+                mutation.value.clone(),
+            );
         }
     }
     Ok(())

@@ -29,12 +29,9 @@ where
 async fn test_run() {
     let (solution, storage) = test_solution(None, 1).await;
 
-    let first_state_mutation = &solution.state_mutations[0];
-    let mutation_key = first_state_mutation.mutations[0].key.clone();
-    let mutation_address = solution.data[first_state_mutation.pathway as usize]
-        .intent_to_solve
-        .set
-        .clone();
+    let first_state_mutation = &solution.data[0].state_mutations[0];
+    let mutation_key = first_state_mutation.key.clone();
+    let mutation_address = solution.data[0].intent_to_solve.set.clone();
 
     submit_solution(&storage, solution.clone()).await.unwrap();
 
@@ -81,7 +78,7 @@ async fn test_counter() {
     let solution3 = counter_solution(intent_address.clone(), 3).await;
     let solution4 = counter_solution(intent_address.clone(), 4).await;
 
-    let mutation_key = solution.state_mutations[0].mutations[0].key.clone();
+    let mutation_key = solution.data[0].state_mutations[0].key.clone();
     let solution_clone = solution.clone();
 
     submit_solution(&storage, solution.clone()).await.unwrap();

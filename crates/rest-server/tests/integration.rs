@@ -301,6 +301,8 @@ async fn test_check_solution() {
             intent: address,
         },
         decision_variables: vec![],
+        state_mutations: vec![],
+        transient_data: vec![],
     });
     let response = client
         .post(url.join("/check-solution").unwrap())
@@ -351,6 +353,8 @@ async fn test_check_solution_with_data() {
             intent: address,
         },
         decision_variables: vec![],
+        state_mutations: vec![],
+        transient_data: vec![],
     });
     let input = CheckSolution {
         solution,
