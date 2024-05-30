@@ -1,6 +1,6 @@
 use essential_types::{
     intent::{Directive, Intent},
-    solution::{Mutations, Solution, SolutionData},
+    solution::{Solution, SolutionData},
     ContentAddress, IntentAddress,
 };
 
@@ -39,8 +39,6 @@ impl Empty for Solution {
     fn empty() -> Self {
         Self {
             data: Default::default(),
-            state_mutations: Default::default(),
-            transient_data: Default::default(),
         }
     }
 }
@@ -50,15 +48,8 @@ impl Empty for SolutionData {
         Self {
             intent_to_solve: IntentAddress::empty(),
             decision_variables: Default::default(),
-        }
-    }
-}
-
-impl Empty for Mutations {
-    fn empty() -> Self {
-        Self {
-            pathway: Default::default(),
-            mutations: Default::default(),
+            transient_data: Default::default(),
+            state_mutations: Default::default(),
         }
     }
 }
