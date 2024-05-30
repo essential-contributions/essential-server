@@ -1,38 +1,33 @@
 use essential_hash::hash;
-use essential_rqlite_storage::RqliteStorage;
-use essential_storage::{QueryState, StateStorage, Storage};
-use essential_types::{
-    intent::Intent, solution::Solution, ContentAddress, IntentAddress, StorageLayout,
-};
+use essential_memory_storage::MemoryStorage;
+use essential_storage::Storage;
+use essential_types::{intent::Intent, solution::Solution, IntentAddress, StorageLayout};
 use std::vec;
 use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
 
-#[tokio::test]
-#[ignore]
-async fn test_create() {
-    let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
-    let storage_layout = StorageLayout;
-    let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    storage
-        .insert_intent_set(storage_layout, intent)
-        .await
-        .unwrap();
-}
+#[cfg(feature = "rqlite")]
+mod rqlite;
 
 #[tokio::test]
-#[ignore]
 async fn test_update_state() {
-    let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
+    #[cfg(feature = "rqlite")]
+    update_state(rqlite::TestRqlite::new().await.rqlite).await;
+    update_state(MemoryStorage::new()).await;
+}
+
+async fn update_state<S: Storage>(storage: S) {
     let storage_layout = StorageLayout;
     let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     storage
         .insert_intent_set(storage_layout, intent)
         .await
         .unwrap();
-    let address = ContentAddress(hash(&vec![Intent::empty()]));
+    let address = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
     let key = vec![0; 4];
     let v = storage.update_state(&address, &key, vec![1]).await.unwrap();
     assert!(v.is_empty());
+    let v = storage.query_state(&address, &key).await.unwrap();
+    assert_eq!(v, vec![1]);
     let v = storage.update_state(&address, &key, vec![2]).await.unwrap();
     assert_eq!(v, vec![1]);
     let v = storage.update_state(&address, &key, vec![]).await.unwrap();
@@ -63,9 +58,13 @@ async fn test_update_state() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_update_state_batch() {
-    let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
+    #[cfg(feature = "rqlite")]
+    update_state_batch(rqlite::TestRqlite::new().await.rqlite).await;
+    update_state_batch(MemoryStorage::new()).await;
+}
+
+async fn update_state_batch<S: Storage>(storage: S) {
     let storage_layout = StorageLayout;
     let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     storage
@@ -77,8 +76,8 @@ async fn test_update_state_batch() {
         .insert_intent_set(storage_layout, intent)
         .await
         .unwrap();
-    let address_0 = ContentAddress(hash(&vec![Intent::empty()]));
-    let address_1 = ContentAddress(hash(&vec![intent_with_salt(3)]));
+    let address_0 = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
+    let address_1 = essential_hash::intent_set_addr::from_intents(&vec![intent_with_salt(3)]);
     let key = vec![0; 4];
     let v = storage
         .update_state(&address_0, &key, vec![1])
@@ -120,9 +119,13 @@ async fn test_update_state_batch() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_insert_intent_set() {
-    let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
+    #[cfg(feature = "rqlite")]
+    insert_intent_set(rqlite::TestRqlite::new().await.rqlite).await;
+    insert_intent_set(MemoryStorage::new()).await;
+}
+
+async fn insert_intent_set<S: Storage>(storage: S) {
     let storage_layout = StorageLayout;
     let intent_0 = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     storage
@@ -136,22 +139,16 @@ async fn test_insert_intent_set() {
         .await
         .unwrap();
     let intent_sets = storage.list_intent_sets(None, None).await.unwrap();
-    assert_eq!(
-        intent_sets,
-        vec![
-            vec![Intent::empty()],
-            vec![intent_with_salt(1), intent_with_salt(2)]
-        ]
-    );
-    let intent_set = storage
-        .get_intent_set(&ContentAddress(hash(&vec![Intent::empty()])))
-        .await
-        .unwrap();
+    let mut s = vec![intent_with_salt(1), intent_with_salt(2)];
+    s.sort_by_key(essential_hash::content_addr);
+    assert_eq!(intent_sets, vec![vec![Intent::empty()], s]);
+    let address = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
+    let intent_set = storage.get_intent_set(&address).await.unwrap();
     assert_eq!(intent_set, Some(intent_0));
 
     let address = IntentAddress {
-        set: ContentAddress(hash(&vec![Intent::empty()])),
-        intent: ContentAddress(hash(&Intent::empty())),
+        set: essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]),
+        intent: essential_hash::content_addr(&Intent::empty()),
     };
     let intent = storage.get_intent(&address).await.unwrap();
 
@@ -159,9 +156,13 @@ async fn test_insert_intent_set() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_insert_solution_into_pool() {
-    let storage = RqliteStorage::new("http://localhost:4001").await.unwrap();
+    #[cfg(feature = "rqlite")]
+    insert_solution_into_pool(rqlite::TestRqlite::new().await.rqlite).await;
+    insert_solution_into_pool(MemoryStorage::new()).await;
+}
+
+async fn insert_solution_into_pool<S: Storage>(storage: S) {
     let solution = Solution::empty();
     storage
         .insert_solution_into_pool(solution.clone())

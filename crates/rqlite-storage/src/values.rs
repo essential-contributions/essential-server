@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, time::Duration};
 
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcomes};
 use essential_types::{
     intent::{self, Intent},
@@ -417,4 +417,29 @@ pub fn map_query_to_query_values(
     };
     let queries = queries.unwrap_or_default();
     Ok(QueryValues { queries })
+}
+
+pub fn assert_row_changed(
+    result: &serde_json::Map<String, serde_json::Value>,
+    sql: &[&[serde_json::Value]],
+) -> anyhow::Result<()> {
+    let Some(results) = result.get(RESULTS_KEY) else {
+        bail!("Query results are invalid");
+    };
+
+    // Results must be an array
+    let serde_json::Value::Array(results) = results else {
+        bail!("Query results are invalid");
+    };
+
+    // Results must be a two object
+    let [_, serde_json::Value::Object(results)] = &results[..] else {
+        bail!("invalid amount of results");
+    };
+
+    ensure!(
+        results.get("rows_affected") == Some(&serde_json::Value::Number(1.into())),
+        "expected 1 row to be changed"
+    );
+    Ok(())
 }

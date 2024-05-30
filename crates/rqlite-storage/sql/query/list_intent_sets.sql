@@ -34,4 +34,4 @@ FROM
     JOIN intents i ON isp.intent_id = i.id
 ORDER BY
     isp.set_id,
-    i.id;
+    isp.id;

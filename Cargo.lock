@@ -2011,6 +2011,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-dbs"
+version = "0.1.0"
+dependencies = [
+ "essential-hash",
+ "essential-memory-storage",
+ "essential-rqlite-storage",
+ "essential-sign",
+ "essential-storage",
+ "essential-types",
+ "tempfile",
+ "test-utils",
+ "tokio",
+]
+
+[[package]]
 name = "test-utils"
 version = "0.1.0"
 dependencies = [

@@ -19,8 +19,6 @@ use std::{
 };
 use thiserror::Error;
 
-#[cfg(test)]
-mod tests;
 mod values;
 
 /// Amount of values returned in a single page.

@@ -1,13 +1,25 @@
-use super::*;
 use essential_hash::hash;
-use std::vec;
+use essential_memory_storage::MemoryStorage;
+use essential_storage::{
+    failed_solution::{CheckOutcome, SolutionFailReason},
+    Storage,
+};
+use essential_types::{IntentAddress, StorageLayout};
 use test_utils::{
     intent_with_salt, sign_intent_set_with_random_keypair, solution_with_decision_variables,
 };
 
+#[cfg(feature = "rqlite")]
+mod rqlite;
+
 #[tokio::test]
 async fn test_insert_intent_set() {
-    let storage = MemoryStorage::new();
+    #[cfg(feature = "rqlite")]
+    insert_intent_set(rqlite::TestRqlite::new().await.rqlite).await;
+    insert_intent_set(MemoryStorage::new()).await;
+}
+
+async fn insert_intent_set<S: Storage>(storage: S) {
     let storage_layout = StorageLayout {};
 
     let mut intent_sets = [
@@ -75,7 +87,12 @@ async fn test_insert_intent_set() {
 
 #[tokio::test]
 async fn test_solutions() {
-    let storage = MemoryStorage::new();
+    #[cfg(feature = "rqlite")]
+    solutions(rqlite::TestRqlite::new().await.rqlite).await;
+    solutions(MemoryStorage::new()).await;
+}
+
+async fn solutions<S: Storage>(storage: S) {
     let solution = solution_with_decision_variables(0);
     let solution2 = solution_with_decision_variables(1);
     let solution3 = solution_with_decision_variables(2);
@@ -167,7 +184,8 @@ async fn test_solutions() {
         .prune_failed_solutions(
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap(),
+                .unwrap()
+                + std::time::Duration::from_secs(10),
         )
         .await
         .unwrap();
@@ -178,8 +196,12 @@ async fn test_solutions() {
 
 #[tokio::test]
 async fn test_update_and_query_state() {
-    let storage = MemoryStorage::new();
+    #[cfg(feature = "rqlite")]
+    update_and_query_state(rqlite::TestRqlite::new().await.rqlite).await;
+    update_and_query_state(MemoryStorage::new()).await;
+}
 
+async fn update_and_query_state<S: Storage>(storage: S) {
     let intent_set = sign_intent_set_with_random_keypair(vec![intent_with_salt(0)]);
     let address = essential_hash::intent_set_addr::from_intents(&intent_set.set);
     let key = vec![0; 4];
