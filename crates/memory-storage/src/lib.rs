@@ -3,7 +3,7 @@ use essential_lock::StdLock;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason, SolutionOutcomes},
-    key_range, QueryState, StateStorage, Storage,
+    key_range, CommitData, QueryState, StateStorage, Storage,
 };
 use essential_types::{
     intent::{self, Intent},
@@ -122,20 +122,7 @@ impl StateStorage for MemoryStorage {
     where
         U: IntoIterator<Item = (ContentAddress, Key, Vec<Word>)> + Send,
     {
-        let v = self.inner.apply(|i| {
-            updates
-                .into_iter()
-                .map(|(address, key, value)| {
-                    let map = i.state.entry(address).or_default();
-                    let v = if value.is_empty() {
-                        map.remove(&key)
-                    } else {
-                        map.insert(key, value)
-                    };
-                    v.unwrap_or_default()
-                })
-                .collect()
-        });
+        let v = self.inner.apply(|i| update_state_batch(i, updates));
         Ok(v)
     }
 }
@@ -201,65 +188,16 @@ impl Storage for MemoryStorage {
     }
 
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
-        if solutions.is_empty() {
-            return Ok(());
-        }
-        let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-        self.inner.apply(|i| {
-            if i.solved.contains_key(&timestamp) {
-                bail!("Two blocks created at the same time");
-            }
-            for hash in solutions {
-                i.solution_block_time_index
-                    .entry(*hash)
-                    .or_default()
-                    .push(timestamp);
-            }
-            let solutions = solutions
-                .iter()
-                .filter(|h| i.solution_pool.remove(*h))
-                .cloned()
-                .collect();
-            let number = i.solved.len() as u64;
-            let batch = Block {
-                number,
-                timestamp,
-                hashes: solutions,
-            };
-            i.solved.insert(timestamp, batch);
-            Ok(())
-        })
+        self.inner.apply(|i| move_solutions_to_solved(i, solutions))
     }
 
     async fn move_solutions_to_failed(
         &self,
         solutions: &[(Hash, SolutionFailReason)],
     ) -> anyhow::Result<()> {
-        let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
         let hashes: HashSet<_> = solutions.iter().map(|(h, _)| h).collect();
-        self.inner.apply(|i| {
-            let solutions = solutions.iter().filter_map(|(h, r)| {
-                if i.solution_pool.remove(h) {
-                    Some((*h, r.clone()))
-                } else {
-                    None
-                }
-            });
-            for v in i.solution_time_index.values_mut() {
-                v.retain(|h| !hashes.contains(h));
-            }
-            i.solution_time_index.retain(|_, v| !v.is_empty());
-
-            for (hash, reason) in solutions {
-                i.failed_solution_pool.entry(hash).or_default().push(reason);
-                i.failed_solution_time_index
-                    .entry(time)
-                    .or_default()
-                    .push(hash);
-            }
-
-            Ok(())
-        })
+        self.inner
+            .apply(|i| move_solutions_to_failed(i, solutions, hashes))
     }
 
     async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
@@ -406,6 +344,104 @@ impl Storage for MemoryStorage {
             Ok(())
         })
     }
+
+    fn commit_block(
+        &self,
+        data: CommitData,
+    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send {
+        let CommitData {
+            failed,
+            solved,
+            state_updates,
+        } = data;
+        let hashes: HashSet<_> = failed.iter().map(|(h, _)| h).collect();
+        let r = self.inner.apply(|i| {
+            move_solutions_to_failed(i, failed, hashes)?;
+            move_solutions_to_solved(i, solved)?;
+            update_state_batch(i, state_updates);
+            Ok(())
+        });
+        async { r }
+    }
+}
+
+fn move_solutions_to_failed(
+    i: &mut Inner,
+    solutions: &[(Hash, SolutionFailReason)],
+    hashes: HashSet<&Hash>,
+) -> Result<(), anyhow::Error> {
+    let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+    let solutions = solutions.iter().filter_map(|(h, r)| {
+        if i.solution_pool.remove(h) {
+            Some((*h, r.clone()))
+        } else {
+            None
+        }
+    });
+
+    for v in i.solution_time_index.values_mut() {
+        v.retain(|h| !hashes.contains(h));
+    }
+    i.solution_time_index.retain(|_, v| !v.is_empty());
+
+    for (hash, reason) in solutions {
+        i.failed_solution_pool.entry(hash).or_default().push(reason);
+        i.failed_solution_time_index
+            .entry(time)
+            .or_default()
+            .push(hash);
+    }
+
+    Ok(())
+}
+
+fn move_solutions_to_solved(i: &mut Inner, solutions: &[Hash]) -> Result<(), anyhow::Error> {
+    if solutions.is_empty() {
+        return Ok(());
+    }
+
+    let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
+
+    if i.solved.contains_key(&timestamp) {
+        bail!("Two blocks created at the same time");
+    }
+    for hash in solutions {
+        i.solution_block_time_index
+            .entry(*hash)
+            .or_default()
+            .push(timestamp);
+    }
+    let solutions = solutions
+        .iter()
+        .filter(|h| i.solution_pool.remove(*h))
+        .cloned()
+        .collect();
+    let number = i.solved.len() as u64;
+    let batch = Block {
+        number,
+        timestamp,
+        hashes: solutions,
+    };
+    i.solved.insert(timestamp, batch);
+    Ok(())
+}
+
+fn update_state_batch<U>(i: &mut Inner, updates: U) -> Vec<Vec<i64>>
+where
+    U: IntoIterator<Item = (ContentAddress, Key, Vec<Word>)>,
+{
+    updates
+        .into_iter()
+        .map(|(address, key, value)| {
+            let map = i.state.entry(address).or_default();
+            let v = if value.is_empty() {
+                map.remove(&key)
+            } else {
+                map.insert(key, value)
+            };
+            v.unwrap_or_default()
+        })
+        .collect()
 }
 
 #[derive(Debug, Error)]

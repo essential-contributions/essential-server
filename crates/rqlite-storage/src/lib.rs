@@ -10,7 +10,7 @@ use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
     failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes},
-    key_range, QueryState, StateStorage, Storage,
+    key_range, CommitData, QueryState, StateStorage, Storage,
 };
 use essential_types::{intent, Block, ContentAddress, Hash, Key, StorageLayout, Word};
 use futures::FutureExt;
@@ -383,33 +383,7 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[essential_types::Hash],
     ) -> anyhow::Result<()> {
-        if solutions.is_empty() {
-            return Ok(());
-        }
-        // Get the time this batch was created at.
-        let created_at = std::time::SystemTime::now();
-        let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
-
-        // Encode the data into base64 blobs.
-        let batch_hash = encode(&hash(&solutions));
-
-        // For each solution, insert the solution into the solved table and delete from the pool.
-        let inserts = solutions.iter().flat_map(|hash| {
-            let hash = encode(hash);
-            [
-                include_sql!(owned "insert/copy_to_solved.sql", hash.clone()),
-                include_sql!(owned "update/delete_from_solutions_pool.sql", hash),
-            ]
-        });
-
-        // First insert the batch then the solutions.
-        let mut sql = vec![include_sql!(
-            owned "insert/batch.sql",
-            batch_hash,
-            unix_time.as_secs(),
-            unix_time.subsec_nanos()
-        )];
-        sql.extend(inserts);
+        let sql = move_solutions_to_solved(solutions)?;
 
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
@@ -421,18 +395,7 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[(Hash, SolutionFailReason)],
     ) -> anyhow::Result<()> {
-        // Return early if there are no solutions to move.
-        if solutions.is_empty() {
-            return Ok(());
-        }
-        let sql: Vec<_> = solutions
-            .iter()
-            .flat_map(|(hash, reason)| {
-                let hash = encode(hash);
-                let reason = encode(reason);
-                [include_sql!(owned "insert/copy_to_failed.sql", reason, hash)]
-            })
-            .collect();
+        let sql = move_solutions_to_failed(solutions);
 
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
@@ -573,6 +536,101 @@ impl Storage for RqliteStorage {
         )];
         self.execute(&sql[..]).await
     }
+
+    fn commit_block(
+        &self,
+        data: CommitData,
+    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send {
+        let CommitData {
+            failed,
+            solved,
+            state_updates,
+        } = data;
+        let mut sql = move_solutions_to_failed(failed);
+        let r = match move_solutions_to_solved(solved) {
+            Ok(s) => {
+                sql.extend(s);
+                sql.extend(update_state_batch(state_updates));
+                Ok(())
+            }
+            Err(e) => Err(e),
+        };
+
+        async move {
+            r?;
+            if sql.is_empty() {
+                return Ok(());
+            }
+            // TODO: Is there a way to avoid this?
+            // Maybe create an owned version of execute.
+            let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| v.as_slice()).collect();
+            self.execute(&sql[..]).await
+        }
+    }
+}
+
+fn move_solutions_to_failed(
+    solutions: &[(Hash, SolutionFailReason)],
+) -> Vec<Vec<serde_json::Value>> {
+    solutions
+        .iter()
+        .flat_map(|(hash, reason)| {
+            let hash = encode(hash);
+            let reason = encode(reason);
+            [include_sql!(owned "insert/copy_to_failed.sql", reason, hash)]
+        })
+        .collect()
+}
+
+fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
+    if solutions.is_empty() {
+        return Ok(Vec::new());
+    }
+    let created_at = std::time::SystemTime::now();
+    let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
+    let batch_hash = encode(&hash(&solutions));
+    let inserts = solutions.iter().flat_map(|hash| {
+        let hash = encode(hash);
+        [
+            include_sql!(owned "insert/copy_to_solved.sql", hash.clone()),
+            include_sql!(owned "update/delete_from_solutions_pool.sql", hash),
+        ]
+    });
+    let mut sql = vec![include_sql!(
+        owned "insert/batch.sql",
+        batch_hash,
+        unix_time.as_secs(),
+        unix_time.subsec_nanos()
+    )];
+    sql.extend(inserts);
+    Ok(sql)
+}
+
+fn update_state_batch<U>(updates: U) -> Vec<Vec<serde_json::Value>>
+where
+    U: IntoIterator<Item = (ContentAddress, essential_types::Key, Vec<Word>)>,
+{
+    updates
+        .into_iter()
+        .flat_map(|(address, key, value)| {
+            let address = encode(&address);
+            let key = encode(&key);
+            let value = encode(&value);
+            if value.is_empty() {
+                // Delete the value and return the existing value if it exists.
+                [
+                    include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
+                    include_sql!(owned "update/delete_state.sql", address, key),
+                ]
+            } else {
+                // Update the value and return the existing value if it exists.
+                [
+                    include_sql!(owned "query/get_state.sql", address.clone(), key.clone()),
+                    include_sql!(owned "update/update_state.sql", key, value, address),
+                ]
+            }
+        })
+        .collect()
 }
 
 /// Error for rqlite read.
