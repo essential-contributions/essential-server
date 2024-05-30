@@ -659,6 +659,7 @@ dependencies = [
  "test-utils",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
