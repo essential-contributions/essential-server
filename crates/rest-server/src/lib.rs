@@ -32,6 +32,17 @@ use tower::Service;
 
 const MAX_CONNECTIONS: usize = 2000;
 
+#[derive(Debug, Clone)]
+/// Server configuration.
+pub struct Config {
+    /// Whether the rest server should build blocks
+    /// or just serve requests.
+    /// Default is `true`.
+    pub build_blocks: bool,
+    /// Essential server configuration.
+    pub server_config: essential_server::Config,
+}
+
 #[derive(Deserialize)]
 /// Type to deserialize a time range query parameters.
 struct TimeRange {
@@ -65,6 +76,7 @@ pub async fn run<S, A>(
     addr: A,
     local_addr: oneshot::Sender<SocketAddr>,
     shutdown_rx: Option<oneshot::Receiver<()>>,
+    config: Config,
 ) -> anyhow::Result<()>
 where
     A: ToSocketAddrs,
@@ -73,7 +85,11 @@ where
     <S as StateRead>::Error: Send,
 {
     // Spawn essential and get the handle.
-    let handle = essential.clone().spawn()?;
+    let handle = if config.build_blocks {
+        Some(essential.clone().spawn(config.server_config)?)
+    } else {
+        None
+    };
 
     // Create all the endpoints.
     let app = Router::new()
@@ -105,7 +121,9 @@ where
     serve(app, listener, shutdown_rx).await;
 
     // After the server is done, shutdown essential.
-    handle.shutdown().await?;
+    if let Some(handle) = handle {
+        handle.shutdown().await?;
+    }
 
     Ok(())
 }
@@ -448,5 +466,14 @@ where
 {
     fn from(err: E) -> Self {
         Self(err.into())
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            build_blocks: true,
+            server_config: Default::default(),
+        }
     }
 }

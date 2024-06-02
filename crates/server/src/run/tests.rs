@@ -10,6 +10,8 @@ use essential_types::{intent::Intent, ContentAddress, IntentAddress, Word};
 use std::time::Duration;
 use test_utils::{empty::Empty, sign_intent_set_with_random_keypair};
 
+use super::RUN_LOOP_FREQUENCY;
+
 async fn run<S>(storage: &S) -> anyhow::Result<()>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
@@ -19,7 +21,7 @@ where
     let (tx, rx) = tokio::sync::oneshot::channel();
     let shutdown = super::Shutdown(rx);
     let s = storage.clone();
-    let jh = tokio::spawn(async move { super::run(&s, shutdown).await });
+    let jh = tokio::spawn(async move { super::run(&s, shutdown, RUN_LOOP_FREQUENCY).await });
     tokio::time::sleep(Duration::from_millis(100)).await;
     tx.send(()).unwrap();
     jh.await?

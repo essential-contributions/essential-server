@@ -38,6 +38,21 @@ where
     config: Arc<CheckIntentConfig>,
 }
 
+#[derive(Debug, Clone)]
+/// Server configuration.
+pub struct Config {
+    /// Interval at which to run the main loop.
+    pub run_loop_interval: Duration,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            run_loop_interval: run::RUN_LOOP_FREQUENCY,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CheckSolutionOutput {
     pub utility: f64,
@@ -62,18 +77,18 @@ where
         Self { storage, config }
     }
 
-    pub fn spawn(self) -> anyhow::Result<Handle>
+    pub fn spawn(self, config: Config) -> anyhow::Result<Handle>
     where
         S: 'static + Send + Sync,
     {
         let (mut handle, shutdown) = Handle::new();
-        let jh = tokio::spawn(async move { self.run(shutdown).await });
+        let jh = tokio::spawn(async move { self.run(shutdown, config.run_loop_interval).await });
         handle.set_jh(jh);
         Ok(handle)
     }
 
-    pub async fn run(&self, shutdown: Shutdown) -> anyhow::Result<()> {
-        run::run(&self.storage, shutdown).await
+    pub async fn run(&self, shutdown: Shutdown, run_loop_interval: Duration) -> anyhow::Result<()> {
+        run::run(&self.storage, shutdown, run_loop_interval).await
     }
 
     pub async fn deploy_intent_set(
