@@ -511,6 +511,37 @@ fn test_batch_paging() {
     );
 }
 
+#[test]
+fn test_empty_batch() {
+    let conn = Connection::open_in_memory().unwrap();
+    create_tables(&conn);
+
+    for i in 0..4 {
+        conn.execute(
+            include_sql!("insert", "solutions"),
+            [&format!("hash{}", i), "solution1"],
+        )
+        .unwrap();
+
+        conn.execute(
+            include_sql!("insert", "solutions_pool"),
+            [&format!("hash{}", i)],
+        )
+        .unwrap();
+    }
+
+    let time = Duration::new(0, 0);
+    move_solutions_to_solved(&conn, 0, &["hash0".to_string(), "hash1".to_string()], time);
+    let time = Duration::new(1, 1);
+    move_solutions_to_solved(&conn, 1, &[], time);
+    let time = Duration::new(2, 2);
+    move_solutions_to_solved(&conn, 2, &["hash2".to_string(), "hash3".to_string()], time);
+    let result = query(&conn, "select id from batch", [], |row| {
+        row.get::<_, usize>(0).unwrap()
+    });
+    assert_eq!(result, vec![1, 2]);
+}
+
 fn move_solutions_to_solved(conn: &Connection, batch: usize, hashes: &[String], time: Duration) {
     conn.execute(
         include_sql!("insert", "batch"),
@@ -527,6 +558,8 @@ fn move_solutions_to_solved(conn: &Connection, batch: usize, hashes: &[String], 
         conn.execute(include_sql!("update", "delete_from_solutions_pool"), [hash])
             .unwrap();
     }
+    conn.execute(include_sql!("update", "delete_empty_batch"), [])
+        .unwrap();
 }
 
 fn move_solutions_to_failed(conn: &Connection, hashes_reasons: &[(&str, &str, u64)]) {
@@ -567,6 +600,5 @@ fn test_ser() {
             }
         ]
     }"#;
-    let v: serde_json::Value = serde_json::from_str(json).unwrap();
-    dbg!(&v);
+    let _v: serde_json::Value = serde_json::from_str(json).unwrap();
 }

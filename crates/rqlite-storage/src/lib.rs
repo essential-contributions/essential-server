@@ -386,6 +386,10 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[essential_types::Hash],
     ) -> anyhow::Result<()> {
+        if solutions.is_empty() {
+            return Ok(());
+        }
+
         let sql = move_solutions_to_solved(solutions)?;
 
         // TODO: Is there a way to avoid this?
@@ -398,6 +402,10 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[(Hash, SolutionFailReason)],
     ) -> anyhow::Result<()> {
+        if solutions.is_empty() {
+            return Ok(());
+        }
+
         let sql = move_solutions_to_failed(solutions)?;
 
         // TODO: Is there a way to avoid this?
@@ -557,15 +565,26 @@ impl Storage for RqliteStorage {
             solved,
             state_updates,
         } = data;
-        let r = move_solutions_to_failed(failed);
+        let r = if !failed.is_empty() {
+            move_solutions_to_failed(failed)
+        } else {
+            Ok(Vec::new())
+        };
 
-        let r = r.and_then(|mut sql| match move_solutions_to_solved(solved) {
-            Ok(s) => {
-                sql.extend(s);
-                sql.extend(update_state_batch(state_updates));
-                Ok(sql)
+        let r = r.and_then(|mut sql| {
+            let r = if !solved.is_empty() {
+                move_solutions_to_solved(solved)
+            } else {
+                Ok(Vec::new())
+            };
+            match r {
+                Ok(s) => {
+                    sql.extend(s);
+                    sql.extend(update_state_batch(state_updates));
+                    Ok(sql)
+                }
+                Err(e) => Err(e),
             }
-            Err(e) => Err(e),
         });
 
         async move {
@@ -613,6 +632,8 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
             include_sql!(owned "update/delete_from_solutions_pool.sql", hash),
         ]
     });
+    // FIXME: This should only create a block if at least one solution
+    // hash is in the solutions pool.
     let mut sql = vec![include_sql!(
         owned "insert/batch.sql",
         batch_hash,
@@ -620,6 +641,7 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
         unix_time.subsec_nanos()
     )];
     sql.extend(inserts);
+    sql.push(include_sql!(owned "update/delete_empty_batch.sql"));
     Ok(sql)
 }
 

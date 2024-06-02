@@ -412,6 +412,10 @@ fn move_solutions_to_solved(i: &mut Inner, solutions: &[Hash]) -> Result<(), any
         return Ok(());
     }
 
+    if solutions.iter().all(|s| !i.solution_pool.contains(s)) {
+        return Ok(());
+    }
+
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
 
     if i.solved.contains_key(&timestamp) {

@@ -11,6 +11,8 @@ essential-rqlite-storage = { workspace = true }
 essential-sign = { workspace = true }
 essential-storage = { workspace = true }
 essential-types = { workspace = true }
+paste = { workspace = true }
+pretty_assertions = { workspace = true }
 tempfile = { workspace = true }
 test-utils = { workspace = true }
 tokio = { workspace = true }
