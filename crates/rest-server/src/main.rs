@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::{Parser, ValueEnum};
 use essential_memory_storage::MemoryStorage;
-use essential_rest_server::BuildMode;
+use essential_rest_server::Config;
 use essential_rqlite_storage::RqliteStorage;
 
 #[derive(Parser)]
@@ -16,9 +16,9 @@ struct Cli {
     #[arg(long, short, default_value_t = Db::Memory, value_enum)]
     db: Db,
 
-    /// Mode to run the server in.
-    #[arg(long, short, default_value_t = BuildMode::BuildBlocks, value_enum)]
-    mode: BuildMode,
+    /// Whether to build the blocks or not.
+    #[arg(long, short, default_value_t = true)]
+    build_blocks: bool,
 
     #[arg(long, short, default_value_t = String::from("https://localhost:4001"))]
     /// Address of the rqlite server, if using rqlite.
@@ -44,13 +44,13 @@ async fn main() {
     let Cli {
         address,
         db,
-        mode,
+        build_blocks,
         rqlite_address,
         tracing,
         loop_freq,
     } = Cli::parse();
     let (local_addr, local_addr_rx) = tokio::sync::oneshot::channel();
-    let config = Default::default();
+    let check_config = Default::default();
     if tracing {
         #[cfg(feature = "tracing")]
         let _ = tracing_subscriber::fmt()
@@ -62,40 +62,27 @@ async fn main() {
             .try_init();
     }
 
-    let mut server_config = essential_server::Config::default();
+    let mut config = Config {
+        build_blocks,
+        ..Default::default()
+    };
     if let Some(run_loop_interval) = loop_freq {
-        server_config.run_loop_interval = Duration::from_secs(run_loop_interval);
+        config.server_config.run_loop_interval = Duration::from_secs(run_loop_interval);
     }
 
     let jh = tokio::task::spawn(async move {
         match db {
             Db::Memory => {
                 let storage = MemoryStorage::new();
-                let essential = essential_server::Essential::new(storage, config);
-                essential_rest_server::run(
-                    essential,
-                    address,
-                    local_addr,
-                    None,
-                    mode,
-                    server_config,
-                )
-                .await
+                let essential = essential_server::Essential::new(storage, check_config);
+                essential_rest_server::run(essential, address, local_addr, None, config).await
             }
             Db::Rqlite => {
                 let storage = RqliteStorage::new(&rqlite_address)
                     .await
                     .expect("Failed to connect to rqlite");
-                let essential = essential_server::Essential::new(storage, config);
-                essential_rest_server::run(
-                    essential,
-                    address,
-                    local_addr,
-                    None,
-                    mode,
-                    server_config,
-                )
-                .await
+                let essential = essential_server::Essential::new(storage, check_config);
+                essential_rest_server::run(essential, address, local_addr, None, config).await
             }
         }
     });

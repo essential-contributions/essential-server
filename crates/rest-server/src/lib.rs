@@ -13,10 +13,7 @@ use axum::{
     Json, Router,
 };
 use base64::Engine as _;
-use clap::ValueEnum;
-use essential_server::{
-    CheckSolutionOutput, Config, Essential, SolutionOutcome, StateRead, Storage,
-};
+use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_types::{
     convert::word_from_bytes,
     intent::{self, Intent},
@@ -29,14 +26,15 @@ use tokio::{
     sync::oneshot,
 };
 
-#[derive(ValueEnum, Clone, Copy, Debug, Default)]
-/// The mode this server should run in.
-pub enum BuildMode {
-    #[default]
-    /// Serves requests and builds blocks.
-    BuildBlocks,
-    /// Serves requests only.
-    ServeOnly,
+#[derive(Debug, Clone)]
+/// Server configuration.
+pub struct Config {
+    /// Whether the rest server should build blocks
+    /// or just serve requests.
+    /// Default is `true`.
+    pub build_blocks: bool,
+    /// Essential server configuration.
+    pub server_config: essential_server::Config,
 }
 
 #[derive(Deserialize)]
@@ -72,7 +70,6 @@ pub async fn run<S, A>(
     addr: A,
     local_addr: oneshot::Sender<SocketAddr>,
     shutdown_rx: Option<oneshot::Receiver<()>>,
-    mode: BuildMode,
     config: Config,
 ) -> anyhow::Result<()>
 where
@@ -82,9 +79,10 @@ where
     <S as StateRead>::Error: Send,
 {
     // Spawn essential and get the handle.
-    let handle = match mode {
-        BuildMode::BuildBlocks => Some(essential.clone().spawn(config)?),
-        BuildMode::ServeOnly => None,
+    let handle = if config.build_blocks {
+        Some(essential.clone().spawn(config.server_config)?)
+    } else {
+        None
     };
 
     // Create all the endpoints.
@@ -390,5 +388,14 @@ where
 {
     fn from(err: E) -> Self {
         Self(err.into())
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            build_blocks: true,
+            server_config: Default::default(),
+        }
     }
 }
