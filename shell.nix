@@ -16,6 +16,7 @@ mkShell {
   buildInputs = [
     cargo-toml-lint
     clippy
+    rqlite
     rust-analyzer
     rustfmt
   ];
