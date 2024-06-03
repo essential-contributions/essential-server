@@ -5,7 +5,7 @@ use essential_storage::{
     failed_solution::{CheckOutcome, SolutionFailReason},
     Storage,
 };
-use essential_types::{IntentAddress, StorageLayout};
+use essential_types::IntentAddress;
 use test_utils::{
     intent_with_salt, sign_intent_set_with_random_keypair, solution_with_decision_variables,
 };
@@ -17,8 +17,6 @@ mod rqlite;
 create_test!(insert_intent_set);
 
 async fn insert_intent_set<S: Storage>(storage: S) {
-    let storage_layout = StorageLayout {};
-
     let mut intent_sets = [
         sign_intent_set_with_random_keypair(vec![
             intent_with_salt(0),
@@ -38,12 +36,12 @@ async fn insert_intent_set<S: Storage>(storage: S) {
     }
 
     storage
-        .insert_intent_set(storage_layout.clone(), intent_sets[0].clone())
+        .insert_intent_set(intent_sets[0].clone())
         .await
         .unwrap();
 
     storage
-        .insert_intent_set(storage_layout.clone(), intent_sets[0].clone())
+        .insert_intent_set(intent_sets[0].clone())
         .await
         .unwrap();
 
@@ -51,7 +49,7 @@ async fn insert_intent_set<S: Storage>(storage: S) {
     assert_eq!(result, vec![intent_sets[0].set.clone()]);
 
     storage
-        .insert_intent_set(storage_layout, intent_sets[1].clone())
+        .insert_intent_set(intent_sets[1].clone())
         .await
         .unwrap();
 
@@ -71,15 +69,6 @@ async fn insert_intent_set<S: Storage>(storage: S) {
             assert_eq!(&result, intent);
         }
     }
-
-    let result = storage
-        .get_storage_layout(&essential_hash::intent_set_addr::from_intents(
-            &intent_sets[0].set,
-        ))
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(result, StorageLayout {});
 }
 
 create_test!(solutions);
@@ -204,10 +193,7 @@ async fn update_and_query_state<S: Storage>(storage: S) {
     let query_result = storage.query_state(&address, &key).await.unwrap();
     assert!(query_result.is_empty());
 
-    storage
-        .insert_intent_set(StorageLayout {}, intent_set.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(intent_set.clone()).await.unwrap();
 
     // Test updating the state
     let old = storage

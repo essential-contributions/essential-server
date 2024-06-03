@@ -8,7 +8,7 @@ use std::{future::Future, ops::Range, time::Duration};
 use essential_types::{
     intent::{self, Intent},
     solution::Solution,
-    Block, ContentAddress, Hash, IntentAddress, Key, StorageLayout, Word,
+    Block, ContentAddress, Hash, IntentAddress, Key, Word,
 };
 use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes};
 
@@ -33,7 +33,6 @@ pub trait Storage: StateStorage {
     /// Insert a set of intents with their storage layout.
     fn insert_intent_set(
         &self,
-        storage_layout: StorageLayout,
         intent: intent::SignedSet,
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
@@ -96,12 +95,6 @@ pub trait Storage: StateStorage {
         time_range: Option<Range<Duration>>,
         page: Option<usize>,
     ) -> impl Future<Output = anyhow::Result<Vec<Block>>> + Send;
-
-    /// Get the storage layout of a content address.
-    fn get_storage_layout(
-        &self,
-        address: &ContentAddress,
-    ) -> impl Future<Output = anyhow::Result<Option<StorageLayout>>> + Send;
 
     /// Get failed solution and its failing reason.
     fn get_solution(

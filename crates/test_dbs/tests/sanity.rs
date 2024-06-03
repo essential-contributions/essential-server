@@ -2,7 +2,7 @@ use common::create_test;
 use essential_hash::hash;
 use essential_memory_storage::MemoryStorage;
 use essential_storage::Storage;
-use essential_types::{intent::Intent, solution::Solution, IntentAddress, StorageLayout};
+use essential_types::{intent::Intent, solution::Solution, IntentAddress};
 use std::vec;
 use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
 
@@ -13,12 +13,8 @@ mod rqlite;
 create_test!(update_state);
 
 async fn update_state<S: Storage>(storage: S) {
-    let storage_layout = StorageLayout;
     let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    storage
-        .insert_intent_set(storage_layout, intent)
-        .await
-        .unwrap();
+    storage.insert_intent_set(intent).await.unwrap();
     let address = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
     let key = vec![0; 4];
     let v = storage.update_state(&address, &key, vec![1]).await.unwrap();
@@ -57,17 +53,10 @@ async fn update_state<S: Storage>(storage: S) {
 create_test!(update_state_batch);
 
 async fn update_state_batch<S: Storage>(storage: S) {
-    let storage_layout = StorageLayout;
     let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    storage
-        .insert_intent_set(storage_layout.clone(), intent)
-        .await
-        .unwrap();
+    storage.insert_intent_set(intent).await.unwrap();
     let intent = sign_intent_set_with_random_keypair(vec![intent_with_salt(3)]);
-    storage
-        .insert_intent_set(storage_layout, intent)
-        .await
-        .unwrap();
+    storage.insert_intent_set(intent).await.unwrap();
     let address_0 = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
     let address_1 = essential_hash::intent_set_addr::from_intents(&vec![intent_with_salt(3)]);
     let key = vec![0; 4];
@@ -113,18 +102,11 @@ async fn update_state_batch<S: Storage>(storage: S) {
 create_test!(insert_intent_set);
 
 async fn insert_intent_set<S: Storage>(storage: S) {
-    let storage_layout = StorageLayout;
     let intent_0 = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    storage
-        .insert_intent_set(storage_layout.clone(), intent_0.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(intent_0.clone()).await.unwrap();
     let intent_1 =
         sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
-    storage
-        .insert_intent_set(storage_layout, intent_1)
-        .await
-        .unwrap();
+    storage.insert_intent_set(intent_1).await.unwrap();
     let intent_sets = storage.list_intent_sets(None, None).await.unwrap();
     let mut s = vec![intent_with_salt(1), intent_with_salt(2)];
     s.sort_by_key(essential_hash::content_addr);

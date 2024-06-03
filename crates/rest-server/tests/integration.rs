@@ -9,7 +9,7 @@ use essential_types::{
     convert::bytes_from_word,
     intent::{self, Intent},
     solution::{Solution, SolutionData},
-    Block, ContentAddress, IntentAddress, StorageLayout, Word,
+    Block, ContentAddress, IntentAddress, Word,
 };
 use reqwest::{Client, ClientBuilder};
 use server::run;
@@ -139,9 +139,7 @@ async fn test_submit_solution() {
     let set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.set);
 
     let mem = MemoryStorage::new();
-    mem.insert_intent_set(StorageLayout {}, intent_set)
-        .await
-        .unwrap();
+    mem.insert_intent_set(intent_set).await.unwrap();
 
     let TestServer {
         client,
@@ -189,9 +187,7 @@ async fn test_query_state() {
     let key = vec![0; 4];
 
     let mem = MemoryStorage::new();
-    mem.insert_intent_set(StorageLayout {}, intent_set)
-        .await
-        .unwrap();
+    mem.insert_intent_set(intent_set).await.unwrap();
     mem.update_state(&address, &key, vec![42]).await.unwrap();
 
     let TestServer {
@@ -280,9 +276,7 @@ async fn test_solution_outcome() {
 async fn test_check_solution() {
     let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
     let mem = MemoryStorage::new();
-    mem.insert_intent_set(StorageLayout {}, intent_set.clone())
-        .await
-        .unwrap();
+    mem.insert_intent_set(intent_set.clone()).await.unwrap();
 
     let TestServer {
         client,

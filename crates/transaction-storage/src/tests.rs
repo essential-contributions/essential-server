@@ -1,6 +1,6 @@
 use essential_memory_storage::MemoryStorage;
 use essential_storage::{QueryState, Storage};
-use essential_types::{intent::Intent, StorageLayout};
+use essential_types::intent::Intent;
 use test_utils::{empty::Empty, sign_intent_set_with_random_keypair};
 
 use super::*;
@@ -13,10 +13,7 @@ async fn test_can_query() {
     let signed = sign_intent_set_with_random_keypair(vec![intent]);
     let key = vec![0; 4];
     let value = vec![1];
-    storage
-        .insert_intent_set(StorageLayout {}, signed)
-        .await
-        .unwrap();
+    storage.insert_intent_set(signed).await.unwrap();
     storage.update_state(&address, &key, value).await.unwrap();
 
     let mut storage = storage.transaction();
