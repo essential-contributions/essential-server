@@ -189,6 +189,7 @@ impl RqliteStorage {
 
         let value: serde_json::Map<String, serde_json::Value> = r.json().await?;
         handle_errors(&value, sql)?;
+        values::assert_row_changed(&value, sql)?;
         values::map_execute_to_values(value)
     }
 
@@ -314,11 +315,13 @@ impl Storage for RqliteStorage {
     async fn insert_intent_set(
         &self,
         storage_layout: StorageLayout,
-        intents: intent::SignedSet,
+        mut intents: intent::SignedSet,
     ) -> anyhow::Result<()> {
         // Get the time this intent set was created at.
         let created_at = std::time::SystemTime::now();
         let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
+
+        intents.set.sort_by_key(essential_hash::content_addr);
 
         // Encode the data into base64 blobs.
         let set_addr = essential_hash::intent_set_addr::from_intents(&intents.set);
@@ -383,6 +386,10 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[essential_types::Hash],
     ) -> anyhow::Result<()> {
+        if solutions.is_empty() {
+            return Ok(());
+        }
+
         let sql = move_solutions_to_solved(solutions)?;
 
         // TODO: Is there a way to avoid this?
@@ -395,7 +402,11 @@ impl Storage for RqliteStorage {
         &self,
         solutions: &[(Hash, SolutionFailReason)],
     ) -> anyhow::Result<()> {
-        let sql = move_solutions_to_failed(solutions);
+        if solutions.is_empty() {
+            return Ok(());
+        }
+
+        let sql = move_solutions_to_failed(solutions)?;
 
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
@@ -407,8 +418,9 @@ impl Storage for RqliteStorage {
         &self,
         address: &essential_types::IntentAddress,
     ) -> anyhow::Result<Option<essential_types::intent::Intent>> {
+        let set = encode(&address.set);
         let intent_hash = encode(&address.intent);
-        let sql = &[include_sql!("query/get_intent.sql", intent_hash)];
+        let sql = &[include_sql!("query/get_intent.sql", set, intent_hash)];
         let queries = self.query_values(sql).await?;
 
         // Expecting single query, single row, single column
@@ -493,7 +505,7 @@ impl Storage for RqliteStorage {
         let page = page.unwrap_or(0);
         let queries = match time_range {
             Some(range) => {
-                let sql = &[include_sql!(named "query/list_winning_batches.sql",
+                let sql = &[include_sql!(named "query/list_winning_batches_by_time.sql",
                     "page_size" => PAGE_SIZE,
                     "page_number" => page,
                     "start_seconds" => range.start.as_secs(),
@@ -554,18 +566,30 @@ impl Storage for RqliteStorage {
             solved,
             state_updates,
         } = data;
-        let mut sql = move_solutions_to_failed(failed);
-        let r = match move_solutions_to_solved(solved) {
-            Ok(s) => {
-                sql.extend(s);
-                sql.extend(update_state_batch(state_updates));
-                Ok(())
-            }
-            Err(e) => Err(e),
+        let r = if !failed.is_empty() {
+            move_solutions_to_failed(failed)
+        } else {
+            Ok(Vec::new())
         };
 
+        let r = r.and_then(|mut sql| {
+            let r = if !solved.is_empty() {
+                move_solutions_to_solved(solved)
+            } else {
+                Ok(Vec::new())
+            };
+            match r {
+                Ok(s) => {
+                    sql.extend(s);
+                    sql.extend(update_state_batch(state_updates));
+                    Ok(sql)
+                }
+                Err(e) => Err(e),
+            }
+        });
+
         async move {
-            r?;
+            let sql = r?;
             if sql.is_empty() {
                 return Ok(());
             }
@@ -579,15 +603,25 @@ impl Storage for RqliteStorage {
 
 fn move_solutions_to_failed(
     solutions: &[(Hash, SolutionFailReason)],
-) -> Vec<Vec<serde_json::Value>> {
-    solutions
+) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
+    let created_at = std::time::SystemTime::now();
+    let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
+    Ok(solutions
         .iter()
         .flat_map(|(hash, reason)| {
             let hash = encode(hash);
             let reason = encode(reason);
-            [include_sql!(owned "insert/copy_to_failed.sql", reason, hash)]
+            [
+                include_sql!(owned "insert/copy_to_failed.sql",
+                    reason,
+                    unix_time.as_secs(),
+                    unix_time.subsec_nanos(),
+                    hash.clone()
+                ),
+                include_sql!(owned "update/delete_from_solutions_pool.sql", hash),
+            ]
         })
-        .collect()
+        .collect())
 }
 
 fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
@@ -596,7 +630,6 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
     }
     let created_at = std::time::SystemTime::now();
     let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
-    let batch_hash = encode(&hash(&solutions));
     let inserts = solutions.iter().flat_map(|hash| {
         let hash = encode(hash);
         [
@@ -606,11 +639,11 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
     });
     let mut sql = vec![include_sql!(
         owned "insert/batch.sql",
-        batch_hash,
         unix_time.as_secs(),
         unix_time.subsec_nanos()
     )];
     sql.extend(inserts);
+    sql.push(include_sql!(owned "update/delete_empty_batch.sql"));
     Ok(sql)
 }
 

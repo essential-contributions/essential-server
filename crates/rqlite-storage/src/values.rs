@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, time::Duration};
 
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcomes};
 use essential_types::{
     intent::{self, Intent},
@@ -79,20 +79,20 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::Sig
         bail!("expected a single column");
     };
 
-    // Intents should only have a single row
-    let [Columns { columns: intents }] = &intents[..] else {
-        bail!("expected a single row");
-    };
-
     // Decode the signature
     let signature: Signature = decode(signature)?;
 
     // Decode the intents
     let intents: Vec<Intent> = intents
         .iter()
-        .map(|intent| match intent {
-            serde_json::Value::String(intent) => decode(intent),
-            _ => Err(anyhow::anyhow!("unexpected column type")),
+        .map(|Columns { columns }| {
+            let [intent] = &columns[..] else {
+                bail!("expected a single column");
+            };
+            match intent {
+                serde_json::Value::String(intent) => decode(intent),
+                _ => Err(anyhow::anyhow!("unexpected column type")),
+            }
         })
         .collect::<Result<_, _>>()?;
 
@@ -105,9 +105,12 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::Sig
 pub fn get_solution(
     QueryValues { queries }: QueryValues,
 ) -> Result<Option<SolutionOutcomes>, anyhow::Error> {
+    let empty = Vec::new();
+
     let (solution, outcomes) = match &queries[..] {
         [Some(Rows { rows: solution }), Some(Rows { rows: outcomes })] => (solution, outcomes),
-        [None, None] => return Ok(None),
+        [Some(Rows { rows: solution }), None] => (solution, &empty),
+        [None, _] => return Ok(None),
         _ => bail!("expected two queries {:?}", queries),
     };
 
@@ -122,11 +125,12 @@ pub fn get_solution(
     let outcomes = outcomes
         .iter()
         .map(|Columns { columns }| match &columns[..] {
-            [Value::Number(block_number), Value::Null] => block_number
+            [Value::Number(block_number), Value::Null, _, _] => block_number
                 .as_u64()
+                .and_then(|n| n.checked_sub(1))
                 .map(CheckOutcome::Success)
                 .ok_or_else(|| anyhow::anyhow!("failed to parse block_number")),
-            [Value::Null, Value::String(reason)] => decode(reason).map(CheckOutcome::Fail),
+            [Value::Null, Value::String(reason), _, _] => decode(reason).map(CheckOutcome::Fail),
             _ => bail!("unexpected columns: {:?}", columns),
         })
         .collect::<anyhow::Result<_>>()?;
@@ -417,4 +421,29 @@ pub fn map_query_to_query_values(
     };
     let queries = queries.unwrap_or_default();
     Ok(QueryValues { queries })
+}
+
+pub fn assert_row_changed(
+    result: &serde_json::Map<String, serde_json::Value>,
+    sql: &[&[serde_json::Value]],
+) -> anyhow::Result<()> {
+    let Some(results) = result.get(RESULTS_KEY) else {
+        bail!("Query results are invalid");
+    };
+
+    // Results must be an array
+    let serde_json::Value::Array(results) = results else {
+        bail!("Query results are invalid");
+    };
+
+    // Results must be a two object
+    let [_, serde_json::Value::Object(results)] = &results[..] else {
+        bail!("invalid amount of results");
+    };
+
+    ensure!(
+        results.get("rows_affected") == Some(&serde_json::Value::Number(1.into())),
+        "expected 1 row to be changed"
+    );
+    Ok(())
 }

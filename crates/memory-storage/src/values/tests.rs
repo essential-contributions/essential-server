@@ -1,4 +1,5 @@
 use super::*;
+use essential_storage::failed_solution::SolutionFailReason;
 use essential_types::Batch;
 use std::vec;
 use test_utils::{
@@ -258,4 +259,31 @@ fn test_paging_blocks() {
     )
     .unwrap();
     assert_eq!(r, vec![]);
+}
+
+#[test]
+fn test_page_solutions() {
+    let solutions: Vec<_> = (0..102).map(test_utils::solution_with_all_inputs).collect();
+    let solution_hashes: Vec<_> = solutions
+        .iter()
+        .map(|s| (essential_hash::hash(s), SolutionFailReason::NotComposable))
+        .collect();
+    let solutions_map: HashMap<essential_types::Hash, Solution> = solution_hashes
+        .iter()
+        .map(|(h, _)| *h)
+        .zip(solutions)
+        .collect();
+    let failed = page_solutions(
+        solution_hashes.into_iter(),
+        |(h, r)| {
+            let solution = solutions_map.get(&h).cloned()?;
+            Some(essential_storage::failed_solution::FailedSolution {
+                solution,
+                reason: r,
+            })
+        },
+        0,
+        100,
+    );
+    assert_eq!(failed.len(), 100);
 }

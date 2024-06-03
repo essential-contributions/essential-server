@@ -4,7 +4,7 @@ use empty::Empty;
 use essential_sign::sign;
 use essential_types::{
     intent::{self, Directive, Intent},
-    solution::{Solution, SolutionData},
+    solution::{Mutation, Solution, SolutionData},
     IntentAddress, Signature, Signed, Word,
 };
 use secp256k1::{rand::rngs::OsRng, PublicKey, Secp256k1, SecretKey};
@@ -63,6 +63,28 @@ pub fn intent_with_salt(salt: Word) -> Intent {
     }
 }
 
+pub fn intent_with_salt_and_state(salt: Word, key: Word) -> Intent {
+    Intent {
+        state_read: vec![essential_state_read_vm::asm::to_bytes(vec![
+            essential_state_read_vm::asm::Stack::Push(1).into(),
+            essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+            essential_state_read_vm::asm::Stack::Push(key).into(),
+            essential_state_read_vm::asm::Stack::Push(1).into(),
+            essential_state_read_vm::asm::Stack::Push(1).into(),
+            essential_state_read_vm::asm::Stack::Push(0).into(),
+            essential_state_read_vm::asm::StateRead::KeyRange,
+            essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        ])
+        .collect()],
+        constraints: vec![essential_constraint_vm::asm::to_bytes(vec![
+            essential_constraint_vm::asm::Stack::Push(salt).into(),
+            essential_constraint_vm::asm::Stack::Pop.into(),
+        ])
+        .collect()],
+        directive: Directive::Satisfy,
+    }
+}
+
 pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
     Solution {
         data: vec![SolutionData {
@@ -70,6 +92,30 @@ pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
             decision_variables: vec![decision_variables as Word; decision_variables],
             state_mutations: Default::default(),
             transient_data: Default::default(),
+        }],
+    }
+}
+
+pub fn solution_with_all_inputs(i: usize) -> Solution {
+    let input = vec![i as Word; i];
+    Solution {
+        data: vec![SolutionData {
+            intent_to_solve: IntentAddress::empty(),
+            decision_variables: input.clone(),
+            state_mutations: vec![
+                Mutation {
+                    key: input.clone(),
+                    value: input.clone()
+                };
+                i
+            ],
+            transient_data: vec![
+                Mutation {
+                    key: input.clone(),
+                    value: input.clone()
+                };
+                i
+            ],
         }],
     }
 }

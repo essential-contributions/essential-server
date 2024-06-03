@@ -140,12 +140,14 @@ fn test_signature_multiple_intent() {
                 }],
             }),
             Some(Rows {
-                rows: vec![Columns {
-                    columns: vec![
-                        Value::String(encode(&set[0])),
-                        Value::String(encode(&set[1])),
-                    ],
-                }],
+                rows: vec![
+                    Columns {
+                        columns: vec![Value::String(encode(&set[0]))],
+                    },
+                    Columns {
+                        columns: vec![Value::String(encode(&set[1]))],
+                    },
+                ],
             }),
         ],
     };

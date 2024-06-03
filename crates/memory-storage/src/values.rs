@@ -22,8 +22,9 @@ pub fn page_intents<'a>(
         .skip(start)
         .filter_map(|v| {
             let set = intents.get(v)?;
-            Some(set.intents().cloned().collect())
+            Some(set.intents().cloned().collect::<Vec<_>>())
         })
+        .filter(|v| !v.is_empty())
         .take(page_size)
         .collect()
 }
@@ -42,9 +43,10 @@ pub fn page_intents_by_time(
         .flat_map(|(_, v)| {
             v.iter().filter_map(|v| {
                 let set = intents.get(v)?;
-                Some(set.intents().cloned().collect())
+                Some(set.intents().cloned().collect::<Vec<_>>())
             })
         })
+        .filter(|v| !v.is_empty())
         .take(page_size)
         .collect()
 }

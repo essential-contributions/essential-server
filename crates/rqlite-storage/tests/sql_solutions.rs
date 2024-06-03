@@ -88,11 +88,8 @@ fn test_insert_solutions() {
     );
 
     // Move solutions to solved
-    conn.execute(
-        include_sql!("insert", "batch"),
-        params!["batch_hash1", 0, 0],
-    )
-    .unwrap();
+    conn.execute(include_sql!("insert", "batch"), params![0, 0])
+        .unwrap();
     conn.execute(include_sql!("insert", "copy_to_solved"), ["hash1"])
         .unwrap();
     conn.execute(include_sql!("insert", "copy_to_solved"), ["hash2"])
@@ -370,7 +367,6 @@ fn test_batch_paging() {
 
         move_solutions_to_solved(
             &conn,
-            n,
             &hashes,
             Duration::new((100 * n) as u64, (100 * n) as u32),
         );
@@ -511,14 +507,41 @@ fn test_batch_paging() {
     );
 }
 
-fn move_solutions_to_solved(conn: &Connection, batch: usize, hashes: &[String], time: Duration) {
+#[test]
+fn test_empty_batch() {
+    let conn = Connection::open_in_memory().unwrap();
+    create_tables(&conn);
+
+    for i in 0..4 {
+        conn.execute(
+            include_sql!("insert", "solutions"),
+            [&format!("hash{}", i), "solution1"],
+        )
+        .unwrap();
+
+        conn.execute(
+            include_sql!("insert", "solutions_pool"),
+            [&format!("hash{}", i)],
+        )
+        .unwrap();
+    }
+
+    let time = Duration::new(0, 0);
+    move_solutions_to_solved(&conn, &["hash0".to_string(), "hash1".to_string()], time);
+    let time = Duration::new(1, 1);
+    move_solutions_to_solved(&conn, &[], time);
+    let time = Duration::new(2, 2);
+    move_solutions_to_solved(&conn, &["hash2".to_string(), "hash3".to_string()], time);
+    let result = query(&conn, "select id from batch", [], |row| {
+        row.get::<_, usize>(0).unwrap()
+    });
+    assert_eq!(result, vec![1, 2]);
+}
+
+fn move_solutions_to_solved(conn: &Connection, hashes: &[String], time: Duration) {
     conn.execute(
         include_sql!("insert", "batch"),
-        params![
-            format!("batch_hash{}", batch),
-            time.as_secs(),
-            time.subsec_nanos()
-        ],
+        params![time.as_secs(), time.subsec_nanos()],
     )
     .unwrap();
     for hash in hashes {
@@ -527,13 +550,15 @@ fn move_solutions_to_solved(conn: &Connection, batch: usize, hashes: &[String], 
         conn.execute(include_sql!("update", "delete_from_solutions_pool"), [hash])
             .unwrap();
     }
+    conn.execute(include_sql!("update", "delete_empty_batch"), [])
+        .unwrap();
 }
 
 fn move_solutions_to_failed(conn: &Connection, hashes_reasons: &[(&str, &str, u64)]) {
     for (hash, reason, secs) in hashes_reasons {
         conn.execute(
             include_sql!("insert", "copy_to_failed"),
-            params![reason, secs, hash],
+            params![reason, secs, 0, hash],
         )
         .unwrap();
         conn.execute(include_sql!("update", "delete_from_solutions_pool"), [hash])
@@ -567,6 +592,5 @@ fn test_ser() {
             }
         ]
     }"#;
-    let v: serde_json::Value = serde_json::from_str(json).unwrap();
-    dbg!(&v);
+    let _v: serde_json::Value = serde_json::from_str(json).unwrap();
 }
