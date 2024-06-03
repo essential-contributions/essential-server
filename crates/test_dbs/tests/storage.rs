@@ -1,6 +1,6 @@
 use common::create_test;
 use essential_memory_storage::MemoryStorage;
-use essential_storage::Storage;
+use essential_storage::{failed_solution::SolutionFailReason, Storage};
 use essential_types::{ContentAddress, IntentAddress, StorageLayout};
 use pretty_assertions::assert_eq;
 use test_utils::{
@@ -428,4 +428,25 @@ async fn list_solutions_pool<S: Storage>(storage: S) {
     // List empty third page
     let result = storage.list_solutions_pool(Some(2)).await.unwrap();
     assert!(result.is_empty());
+}
+
+create_test!(list_failed_solutions_pool);
+
+async fn list_failed_solutions_pool<S: Storage>(storage: S) {
+    let solutions: Vec<_> = (0..102).map(solution_with_all_inputs).collect();
+
+    let mut hashes = vec![];
+
+    for solution in &solutions {
+        hashes.push((
+            essential_hash::hash(solution),
+            SolutionFailReason::NotComposable,
+        ));
+        storage
+            .insert_solution_into_pool(solution.clone())
+            .await
+            .unwrap();
+    }
+
+    storage.move_solutions_to_failed(&hashes).await.unwrap();
 }

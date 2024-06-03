@@ -24,6 +24,7 @@ pub struct TestRqlite {
 impl TestRqlite {
     pub async fn new() -> Self {
         let temp_dir = TempDir::new().unwrap();
+        dbg!(temp_dir.path().display());
 
         let mut child = Command::new("rqlited")
             .arg("-node-id")
