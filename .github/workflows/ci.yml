@@ -57,7 +57,7 @@ jobs:
           - command: fmt --all -- --check
           - command: test --locked --all
           - command: test --no-default-features --locked --all
-          - command: test --all-features --locked --all
+          - command: test --all-features --locked --all -- --nocapture
     env:
         CARGO_NET_GIT_FETCH_WITH_CLI: 'true'
     steps:
