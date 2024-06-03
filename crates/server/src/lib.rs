@@ -15,7 +15,7 @@ use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{
     intent::{self, Intent},
     solution::Solution,
-    Block, ContentAddress, Hash, IntentAddress, Key, StorageLayout, Word,
+    Block, ContentAddress, Hash, IntentAddress, Key, Word,
 };
 use run::{Handle, Shutdown};
 use solution::read::read_intents_from_storage;
@@ -202,13 +202,6 @@ where
         key: &Key,
     ) -> anyhow::Result<Vec<Word>> {
         self.storage.query_state(address, key).await
-    }
-
-    pub async fn get_storage_layout(
-        &self,
-        address: &ContentAddress,
-    ) -> anyhow::Result<Option<StorageLayout>> {
-        self.storage.get_storage_layout(address).await
     }
 }
 

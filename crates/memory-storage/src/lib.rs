@@ -8,7 +8,7 @@ use essential_storage::{
 use essential_types::{
     intent::{self, Intent},
     solution::Solution,
-    ContentAddress, Hash, IntentAddress, Key, Signature, StorageLayout, Word,
+    ContentAddress, Hash, IntentAddress, Key, Signature, Word,
 };
 use futures::future::FutureExt;
 use std::{
@@ -59,7 +59,6 @@ struct Block {
 
 #[derive(Debug)]
 struct IntentSet {
-    storage_layout: StorageLayout,
     data: HashMap<ContentAddress, Intent>,
     signature: Signature,
 }
@@ -137,11 +136,7 @@ impl QueryState for MemoryStorage {
 }
 
 impl Storage for MemoryStorage {
-    async fn insert_intent_set(
-        &self,
-        storage_layout: StorageLayout,
-        signed: intent::SignedSet,
-    ) -> anyhow::Result<()> {
+    async fn insert_intent_set(&self, signed: intent::SignedSet) -> anyhow::Result<()> {
         let intent::SignedSet { set, signature } = signed;
 
         let data: HashMap<_, _> = set
@@ -151,11 +146,7 @@ impl Storage for MemoryStorage {
 
         let set_addr = essential_hash::intent_set_addr::from_intent_addrs(data.keys().cloned());
 
-        let set = IntentSet {
-            storage_layout,
-            data,
-            signature,
-        };
+        let set = IntentSet { data, signature };
         let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
         self.inner.apply(|i| {
             let contains = i.intents.insert(set_addr.clone(), set);
@@ -304,17 +295,6 @@ impl Storage for MemoryStorage {
         self.inner.apply(|i| {
             values::page_winning_blocks(&i.solved, &i.solutions, time_range, page, PAGE_SIZE)
         })
-    }
-
-    async fn get_storage_layout(
-        &self,
-        address: &ContentAddress,
-    ) -> anyhow::Result<Option<StorageLayout>> {
-        let v = self.inner.apply(|i| {
-            let set = i.intents.get(address)?;
-            Some(set.storage_layout.clone())
-        });
-        Ok(v)
     }
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {

@@ -16,7 +16,6 @@ fn intent_set(intents: Vec<Intent>) -> IntentSet {
             .into_iter()
             .map(|intent| (ContentAddress(essential_hash::hash(&intent)), intent))
             .collect(),
-        storage_layout: essential_types::StorageLayout,
         signature,
     }
 }

@@ -12,7 +12,7 @@ use essential_storage::{
     failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes},
     key_range, CommitData, QueryState, StateStorage, Storage,
 };
-use essential_types::{intent, Block, ContentAddress, Hash, Key, StorageLayout, Word};
+use essential_types::{intent, Block, ContentAddress, Hash, Key, Word};
 use futures::FutureExt;
 use std::{pin::Pin, sync::Arc, time::Duration};
 use thiserror::Error;
@@ -126,7 +126,6 @@ impl RqliteStorage {
             include_sql!("create/intents.sql"),
             include_sql!("create/intent_sets.sql"),
             include_sql!("create/intent_set_pairing.sql"),
-            include_sql!("create/storage_layout.sql"),
             include_sql!("create/solutions.sql"),
             include_sql!("create/solutions_pool.sql"),
             include_sql!("create/solved.sql"),
@@ -312,11 +311,7 @@ impl QueryState for RqliteStorage {
 }
 
 impl Storage for RqliteStorage {
-    async fn insert_intent_set(
-        &self,
-        storage_layout: StorageLayout,
-        mut intents: intent::SignedSet,
-    ) -> anyhow::Result<()> {
+    async fn insert_intent_set(&self, mut intents: intent::SignedSet) -> anyhow::Result<()> {
         // Get the time this intent set was created at.
         let created_at = std::time::SystemTime::now();
         let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
@@ -327,7 +322,6 @@ impl Storage for RqliteStorage {
         let set_addr = essential_hash::intent_set_addr::from_intents(&intents.set);
         let address = encode(&set_addr);
         let signature = encode(&intents.signature);
-        let storage_layout = encode(&storage_layout);
 
         // For each intent, insert the intent and the intent set pairing.
         let intents = intents.set.iter().flat_map(|intent| {
@@ -350,16 +344,13 @@ impl Storage for RqliteStorage {
         });
 
         // Insert the intent set and storage layout then the intents and pairings.
-        let mut inserts = vec![
-            include_sql!(owned
-                "insert/intent_set.sql",
-                address.clone(),
-                signature,
-                unix_time.as_secs(),
-                unix_time.subsec_nanos()
-            ),
-            include_sql!(owned "insert/storage_layout.sql", storage_layout, address.clone()),
-        ];
+        let mut inserts = vec![include_sql!(owned
+            "insert/intent_set.sql",
+            address.clone(),
+            signature,
+            unix_time.as_secs(),
+            unix_time.subsec_nanos()
+        )];
         inserts.extend(intents);
 
         // TODO: Is there a way to avoid this?
@@ -523,20 +514,6 @@ impl Storage for RqliteStorage {
             }
         };
         values::list_winning_blocks(queries)
-    }
-
-    async fn get_storage_layout(
-        &self,
-        address: &essential_types::ContentAddress,
-    ) -> anyhow::Result<Option<StorageLayout>> {
-        let address = encode(address);
-        let sql = &[include_sql!("query/get_storage_layout.sql", address)];
-        let queries = self.query_values(sql).await?;
-        match single_value(&queries) {
-            Some(serde_json::Value::String(v)) => Ok(Some(decode(v)?)),
-            None => Ok(None),
-            _ => bail!("Storage layout stored incorrectly"),
-        }
     }
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {

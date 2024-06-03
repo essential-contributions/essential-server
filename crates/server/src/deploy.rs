@@ -1,6 +1,6 @@
 use essential_check as check;
 use essential_storage::Storage;
-use essential_types::{intent, ContentAddress, StorageLayout};
+use essential_types::{intent, ContentAddress};
 
 #[cfg(test)]
 mod tests;
@@ -14,7 +14,7 @@ where
     check::intent::check_signed_set(&intent_set)?;
     let intent_set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.set);
 
-    match storage.insert_intent_set(StorageLayout, intent_set).await {
+    match storage.insert_intent_set(intent_set).await {
         Ok(()) => Ok(intent_set_addr),
         Err(err) => anyhow::bail!("Failed to deploy intent set: {}", err),
     }

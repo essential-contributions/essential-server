@@ -4,7 +4,7 @@ use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason},
     CommitData, Storage,
 };
-use essential_types::{ContentAddress, IntentAddress, StorageLayout, Word};
+use essential_types::{ContentAddress, IntentAddress, Word};
 use pretty_assertions::assert_eq;
 use test_utils::{
     empty::Empty, intent_with_salt, intent_with_salt_and_state,
@@ -26,15 +26,9 @@ async fn insert_intent_set<S: Storage>(storage: S) {
     ]);
     set.set.sort_by_key(essential_hash::content_addr);
 
-    storage
-        .insert_intent_set(StorageLayout {}, set.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(set.clone()).await.unwrap();
 
-    storage
-        .insert_intent_set(StorageLayout {}, set.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(set.clone()).await.unwrap();
 
     let result = storage.list_intent_sets(None, None).await.unwrap();
     assert_eq!(result, vec![set.set.clone()]);
@@ -55,10 +49,7 @@ async fn insert_intent_set<S: Storage>(storage: S) {
     let mut expected: Vec<_> = sets.iter().map(|s| s.set.clone()).collect();
 
     for set in &sets {
-        storage
-            .insert_intent_set(StorageLayout {}, set.clone())
-            .await
-            .unwrap();
+        storage.insert_intent_set(set.clone()).await.unwrap();
     }
 
     let result = storage.list_intent_sets(None, None).await.unwrap();
@@ -66,10 +57,7 @@ async fn insert_intent_set<S: Storage>(storage: S) {
 
     // Insert empty set
     storage
-        .insert_intent_set(
-            StorageLayout {},
-            sign_intent_set_with_random_keypair(vec![]),
-        )
+        .insert_intent_set(sign_intent_set_with_random_keypair(vec![]))
         .await
         .unwrap();
 
@@ -89,10 +77,7 @@ async fn insert_intent_set<S: Storage>(storage: S) {
     expected.extend(storage_sets.iter().map(|s| s.set.clone()));
 
     for set in &storage_sets {
-        storage
-            .insert_intent_set(StorageLayout {}, set.clone())
-            .await
-            .unwrap();
+        storage.insert_intent_set(set.clone()).await.unwrap();
     }
 
     let result = storage.list_intent_sets(None, None).await.unwrap();
@@ -231,19 +216,13 @@ async fn get_intent<S: Storage>(storage: S) {
     ]);
     set.set.sort_by_key(essential_hash::content_addr);
 
-    storage
-        .insert_intent_set(StorageLayout {}, set.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(set.clone()).await.unwrap();
 
     let mut set2 =
         sign_intent_set_with_random_keypair(vec![intent_with_salt(0), intent_with_salt(1)]);
     set2.set.sort_by_key(essential_hash::content_addr);
 
-    storage
-        .insert_intent_set(StorageLayout {}, set2.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(set2.clone()).await.unwrap();
 
     let set_address = essential_hash::intent_set_addr::from_intents(&set.set);
     let set_address2 = essential_hash::intent_set_addr::from_intents(&set2.set);
@@ -307,10 +286,7 @@ async fn get_intent_set<S: Storage>(storage: S) {
         ]);
         set.set.sort_by_key(essential_hash::content_addr);
 
-        storage
-            .insert_intent_set(StorageLayout {}, set.clone())
-            .await
-            .unwrap();
+        storage.insert_intent_set(set.clone()).await.unwrap();
         sets.push(set);
     }
 
@@ -346,10 +322,7 @@ async fn list_intent_sets<S: Storage>(storage: S) {
         ]);
         set.set.sort_by_key(essential_hash::content_addr);
 
-        storage
-            .insert_intent_set(StorageLayout {}, set.clone())
-            .await
-            .unwrap();
+        storage.insert_intent_set(set.clone()).await.unwrap();
         sets.push(set.set);
     }
 
@@ -782,10 +755,7 @@ async fn commit_block<S: Storage>(storage: S) {
     ]);
     set.set.sort_by_key(essential_hash::content_addr);
 
-    storage
-        .insert_intent_set(StorageLayout {}, set.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(set.clone()).await.unwrap();
 
     let address = essential_hash::intent_set_addr::from_intents(&set.set);
 
@@ -836,10 +806,7 @@ async fn update_state<S: Storage>(storage: S) {
     ]);
     set.set.sort_by_key(essential_hash::content_addr);
 
-    storage
-        .insert_intent_set(StorageLayout {}, set.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(set.clone()).await.unwrap();
 
     let address = essential_hash::intent_set_addr::from_intents(&set.set);
 
@@ -877,10 +844,7 @@ async fn update_state_batch<S: Storage>(storage: S) {
     ]);
     set.set.sort_by_key(essential_hash::content_addr);
 
-    storage
-        .insert_intent_set(StorageLayout {}, set.clone())
-        .await
-        .unwrap();
+    storage.insert_intent_set(set.clone()).await.unwrap();
 
     let address = essential_hash::intent_set_addr::from_intents(&set.set);
 
