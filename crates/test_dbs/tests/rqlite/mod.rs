@@ -12,7 +12,8 @@ const URL: &str = "127.0.0.1:0";
 // Rqlite complains if we use the same url for both http and raft
 const RAFT_URL: &str = "localhost:0";
 const PORT_LINE: &str = "service listening on";
-const LEADER: &str = "is now Leader";
+// const LEADER: &str = "is now Leader";
+const LEADER: &str = "entering leader state";
 
 pub struct TestRqlite {
     pub temp_dir: TempDir,
@@ -73,6 +74,8 @@ impl TestRqlite {
 
         assert_ne!(port, 0);
         let url = format!("{}{}", DB, port);
+
+        dbg!(&url);
 
         let rqlite = RqliteStorage::new(&url).await.unwrap();
 
