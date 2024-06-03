@@ -24,6 +24,14 @@ pub struct TestRqlite {
 impl TestRqlite {
     pub async fn new() -> Self {
         let temp_dir = TempDir::new().unwrap();
+        let _ = std::fs::create_dir_all(temp_dir.path());
+        let temp_dir = if temp_dir.path().exists() {
+            temp_dir
+        } else {
+            let path = concat!(env!("CARGO_MANIFEST_DIR"), "/.test_dbs");
+            let _ = std::fs::create_dir_all(path);
+            TempDir::new_in(path).unwrap()
+        };
         dbg!(temp_dir.path().display());
 
         let mut child = Command::new("rqlited")
@@ -72,6 +80,8 @@ impl TestRqlite {
 
         assert_ne!(port, 0);
         let url = format!("{}{}", DB, port);
+
+        dbg!(&url);
 
         let rqlite = RqliteStorage::new(&url).await.unwrap();
 
