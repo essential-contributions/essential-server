@@ -39,7 +39,12 @@ fn test_valid_solution() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::Number(1.into()), Value::Null],
+                    columns: vec![
+                        Value::Number(1.into()),
+                        Value::Null,
+                        Value::Null,
+                        Value::Null,
+                    ],
                 }],
             }),
         ],
@@ -48,7 +53,7 @@ fn test_valid_solution() {
     let r = get_solution(queries).unwrap().unwrap();
     let expected = SolutionOutcomes {
         solution: solution.clone(),
-        outcome: vec![CheckOutcome::Success(1)],
+        outcome: vec![CheckOutcome::Success(0)],
     };
     assert_eq!(r, expected);
 
@@ -61,7 +66,12 @@ fn test_valid_solution() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::Null, Value::String(encode(&reason))],
+                    columns: vec![
+                        Value::Null,
+                        Value::String(encode(&reason)),
+                        Value::Null,
+                        Value::Null,
+                    ],
                 }],
             }),
         ],

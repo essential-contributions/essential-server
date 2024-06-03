@@ -41,7 +41,7 @@ struct Inner {
     intent_time_index: BTreeMap<Duration, Vec<ContentAddress>>,
     solution_pool: HashSet<Hash>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
-    failed_solution_pool: HashMap<Hash, Vec<SolutionFailReason>>,
+    failed_solution_pool: HashMap<Hash, Vec<(SolutionFailReason, Duration)>>,
     failed_solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     solutions: HashMap<Hash, Solution>,
     /// Solved batches ordered by the time they were solved.
@@ -286,7 +286,7 @@ impl Storage for MemoryStorage {
                     let solution = i.solutions.get(&h).cloned()?;
                     Some(FailedSolution {
                         solution,
-                        reason: r,
+                        reason: r.0,
                     })
                 },
                 page.unwrap_or(0),
@@ -320,13 +320,13 @@ impl Storage for MemoryStorage {
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {
         let r = self.inner.apply(|i| {
             i.solutions.get(&solution_hash).cloned().map(|s| {
-                let outcome = i
+                let mut outcomes: Vec<_> = i
                     .failed_solution_pool
                     .get(&solution_hash)
                     .into_iter()
                     .flatten()
                     .cloned()
-                    .map(CheckOutcome::Fail)
+                    .map(|(r, t)| (t, CheckOutcome::Fail(r)))
                     .chain(
                         i.solution_block_time_index
                             .get(&solution_hash)
@@ -334,10 +334,12 @@ impl Storage for MemoryStorage {
                             .flatten()
                             .filter_map(|time| {
                                 let b = i.solved.get(time)?;
-                                Some(CheckOutcome::Success(b.number))
+                                Some((*time, CheckOutcome::Success(b.number)))
                             }),
                     )
                     .collect();
+                outcomes.sort_by_key(|(t, _)| *t);
+                let outcome = outcomes.into_iter().map(|(_, o)| o).collect();
                 SolutionOutcomes {
                     solution: s.clone(),
                     outcome,
@@ -402,7 +404,10 @@ fn move_solutions_to_failed(
     i.solution_time_index.retain(|_, v| !v.is_empty());
 
     for (hash, reason) in solutions {
-        i.failed_solution_pool.entry(hash).or_default().push(reason);
+        i.failed_solution_pool
+            .entry(hash)
+            .or_default()
+            .push((reason, time));
         i.failed_solution_time_index
             .entry(time)
             .or_default()

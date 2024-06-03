@@ -505,7 +505,7 @@ impl Storage for RqliteStorage {
         let page = page.unwrap_or(0);
         let queries = match time_range {
             Some(range) => {
-                let sql = &[include_sql!(named "query/list_winning_batches.sql",
+                let sql = &[include_sql!(named "query/list_winning_batches_by_time.sql",
                     "page_size" => PAGE_SIZE,
                     "page_number" => page,
                     "start_seconds" => range.start.as_secs(),
@@ -612,7 +612,12 @@ fn move_solutions_to_failed(
             let hash = encode(hash);
             let reason = encode(reason);
             [
-                include_sql!(owned "insert/copy_to_failed.sql", reason, unix_time.as_secs(), hash.clone()),
+                include_sql!(owned "insert/copy_to_failed.sql",
+                    reason,
+                    unix_time.as_secs(),
+                    unix_time.subsec_nanos(),
+                    hash.clone()
+                ),
                 include_sql!(owned "update/delete_from_solutions_pool.sql", hash),
             ]
         })
@@ -625,7 +630,6 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
     }
     let created_at = std::time::SystemTime::now();
     let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
-    let batch_hash = encode(&hash(&solutions));
     let inserts = solutions.iter().flat_map(|hash| {
         let hash = encode(hash);
         [
@@ -637,7 +641,6 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
     // hash is in the solutions pool.
     let mut sql = vec![include_sql!(
         owned "insert/batch.sql",
-        batch_hash,
         unix_time.as_secs(),
         unix_time.subsec_nanos()
     )];

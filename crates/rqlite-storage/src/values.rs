@@ -105,9 +105,12 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::Sig
 pub fn get_solution(
     QueryValues { queries }: QueryValues,
 ) -> Result<Option<SolutionOutcomes>, anyhow::Error> {
+    let empty = Vec::new();
+
     let (solution, outcomes) = match &queries[..] {
         [Some(Rows { rows: solution }), Some(Rows { rows: outcomes })] => (solution, outcomes),
-        [None, None] => return Ok(None),
+        [Some(Rows { rows: solution }), None] => (solution, &empty),
+        [None, _] => return Ok(None),
         _ => bail!("expected two queries {:?}", queries),
     };
 
@@ -122,11 +125,12 @@ pub fn get_solution(
     let outcomes = outcomes
         .iter()
         .map(|Columns { columns }| match &columns[..] {
-            [Value::Number(block_number), Value::Null] => block_number
+            [Value::Number(block_number), Value::Null, _, _] => block_number
                 .as_u64()
+                .and_then(|n| n.checked_sub(1))
                 .map(CheckOutcome::Success)
                 .ok_or_else(|| anyhow::anyhow!("failed to parse block_number")),
-            [Value::Null, Value::String(reason)] => decode(reason).map(CheckOutcome::Fail),
+            [Value::Null, Value::String(reason), _, _] => decode(reason).map(CheckOutcome::Fail),
             _ => bail!("unexpected columns: {:?}", columns),
         })
         .collect::<anyhow::Result<_>>()?;
