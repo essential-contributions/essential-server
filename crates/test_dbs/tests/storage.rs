@@ -1,6 +1,9 @@
 use common::create_test;
 use essential_memory_storage::MemoryStorage;
-use essential_storage::{failed_solution::SolutionFailReason, Storage};
+use essential_storage::{
+    failed_solution::{FailedSolution, SolutionFailReason},
+    Storage,
+};
 use essential_types::{ContentAddress, IntentAddress, StorageLayout};
 use pretty_assertions::assert_eq;
 use test_utils::{
@@ -433,6 +436,10 @@ async fn list_solutions_pool<S: Storage>(storage: S) {
 create_test!(list_failed_solutions_pool);
 
 async fn list_failed_solutions_pool<S: Storage>(storage: S) {
+    // List empty
+    let result = storage.list_failed_solutions_pool(None).await.unwrap();
+    assert!(result.is_empty());
+
     let solutions: Vec<_> = (0..102).map(solution_with_all_inputs).collect();
 
     let mut hashes = vec![];
@@ -449,4 +456,29 @@ async fn list_failed_solutions_pool<S: Storage>(storage: S) {
     }
 
     storage.move_solutions_to_failed(&hashes).await.unwrap();
+
+    let solutions: Vec<_> = solutions
+        .into_iter()
+        .map(|s| FailedSolution {
+            solution: s,
+            reason: SolutionFailReason::NotComposable,
+        })
+        .collect();
+
+    // List up to page size
+    let result = storage.list_failed_solutions_pool(None).await.unwrap();
+    assert_eq!(result.len(), 100);
+    assert_eq!(&result[..], &solutions[0..100]);
+
+    // List first page
+    let result = storage.list_failed_solutions_pool(Some(0)).await.unwrap();
+    assert_eq!(&result[..], &solutions[0..100]);
+
+    // List second page
+    let result = storage.list_failed_solutions_pool(Some(1)).await.unwrap();
+    assert_eq!(&result[..], &solutions[100..102]);
+
+    // List empty third page
+    let result = storage.list_failed_solutions_pool(Some(2)).await.unwrap();
+    assert!(result.is_empty());
 }

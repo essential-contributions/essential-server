@@ -42,7 +42,7 @@ struct Inner {
     solution_pool: HashSet<Hash>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, Vec<SolutionFailReason>>,
-    failed_solution_time_index: HashMap<Duration, Vec<Hash>>,
+    failed_solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     solutions: HashMap<Hash, Solution>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
@@ -271,10 +271,15 @@ impl Storage for MemoryStorage {
         page: Option<usize>,
     ) -> anyhow::Result<Vec<FailedSolution>> {
         Ok(self.inner.apply(|i| {
-            let iter = i
-                .failed_solution_pool
-                .iter()
-                .flat_map(|(h, r)| r.iter().map(|r| (*h, r.clone())));
+            let iter = i.failed_solution_time_index.values().flat_map(|hashes| {
+                hashes.iter().flat_map(|h| {
+                    i.failed_solution_pool
+                        .get(h)
+                        .into_iter()
+                        .flatten()
+                        .map(|r| (*h, r.clone()))
+                })
+            });
             values::page_solutions(
                 iter,
                 |(h, r)| {

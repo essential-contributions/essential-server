@@ -32,6 +32,8 @@ impl TestRqlite {
             .arg(URL)
             .arg("-raft-addr")
             .arg(RAFT_URL)
+            .arg("-raft-log-level")
+            .arg("TRACE")
             .arg("-fk")
             .arg(&format!("{}", temp_dir.path().display()))
             .kill_on_drop(true)
@@ -71,8 +73,6 @@ impl TestRqlite {
 
         assert_ne!(port, 0);
         let url = format!("{}{}", DB, port);
-
-        dbg!(&url);
 
         let rqlite = RqliteStorage::new(&url).await.unwrap();
 
