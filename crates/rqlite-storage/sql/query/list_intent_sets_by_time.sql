@@ -27,4 +27,7 @@ WHERE
             )
         LIMIT
             :page_size OFFSET :page_size * :page_number
-    );
+    )
+ORDER BY
+    intent_set_pairing.set_id,
+    intent_set_pairing.id;

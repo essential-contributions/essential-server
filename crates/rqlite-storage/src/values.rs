@@ -79,20 +79,20 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::Sig
         bail!("expected a single column");
     };
 
-    // Intents should only have a single row
-    let [Columns { columns: intents }] = &intents[..] else {
-        bail!("expected a single row");
-    };
-
     // Decode the signature
     let signature: Signature = decode(signature)?;
 
     // Decode the intents
     let intents: Vec<Intent> = intents
         .iter()
-        .map(|intent| match intent {
-            serde_json::Value::String(intent) => decode(intent),
-            _ => Err(anyhow::anyhow!("unexpected column type")),
+        .map(|Columns { columns }| {
+            let [intent] = &columns[..] else {
+                bail!("expected a single column");
+            };
+            match intent {
+                serde_json::Value::String(intent) => decode(intent),
+                _ => Err(anyhow::anyhow!("unexpected column type")),
+            }
         })
         .collect::<Result<_, _>>()?;
 

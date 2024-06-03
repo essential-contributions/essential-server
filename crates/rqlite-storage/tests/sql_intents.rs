@@ -81,7 +81,7 @@ fn test_intent_gets() {
     let result = query(
         &conn,
         include_sql!("query", "get_intent"),
-        ["intent_hash1"],
+        ["hash1", "intent_hash1"],
         |row| row.get::<_, String>(0).unwrap(),
     );
     assert_eq!(result, vec!["intent1".to_string()]);
@@ -89,10 +89,26 @@ fn test_intent_gets() {
     let result = query(
         &conn,
         include_sql!("query", "get_intent"),
-        ["intent_hash2"],
+        ["hash2", "intent_hash1"],
+        |row| row.get::<_, String>(0).unwrap(),
+    );
+    assert_eq!(result, vec!["intent1".to_string()]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_intent"),
+        ["hash2", "intent_hash2"],
         |row| row.get::<_, String>(0).unwrap(),
     );
     assert_eq!(result, vec!["intent2".to_string()]);
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_intent"),
+        ["hash1", "intent_hash2"],
+        |row| row.get::<_, String>(0).unwrap(),
+    );
+    assert!(result.is_empty());
 
     let result = query(
         &conn,

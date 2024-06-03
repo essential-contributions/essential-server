@@ -418,8 +418,9 @@ impl Storage for RqliteStorage {
         &self,
         address: &essential_types::IntentAddress,
     ) -> anyhow::Result<Option<essential_types::intent::Intent>> {
+        let set = encode(&address.set);
         let intent_hash = encode(&address.intent);
-        let sql = &[include_sql!("query/get_intent.sql", intent_hash)];
+        let sql = &[include_sql!("query/get_intent.sql", set, intent_hash)];
         let queries = self.query_values(sql).await?;
 
         // Expecting single query, single row, single column
