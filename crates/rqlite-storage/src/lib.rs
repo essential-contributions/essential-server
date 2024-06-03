@@ -637,8 +637,6 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
             include_sql!(owned "update/delete_from_solutions_pool.sql", hash),
         ]
     });
-    // FIXME: This should only create a block if at least one solution
-    // hash is in the solutions pool.
     let mut sql = vec![include_sql!(
         owned "insert/batch.sql",
         unix_time.as_secs(),
