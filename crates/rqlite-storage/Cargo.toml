@@ -20,9 +20,14 @@ tokio = { workspace = true }
 tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
-rusqlite = { version = "0.31.0", features = ["bundled"] }
+criterion = { workspace = true }
+rusqlite = { version = "0.31.0", features = ["bundled", "backup"] }
 test-utils = { workspace = true }
 
 [features]
 default = []
 tracing = ["dep:tracing"]
+
+[[bench]]
+name = "queries"
+harness = false

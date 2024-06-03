@@ -9,6 +9,7 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 base64 = "0.22.0"
 clap = { version = "4.5.4", features = ["derive"] }
+criterion = "0.5"
 essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
 essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
