@@ -4,6 +4,7 @@
 , essential-server
 , essential-rest-server
 , mkShell
+, rqlite
 , rust-analyzer
 , rustfmt
 }:

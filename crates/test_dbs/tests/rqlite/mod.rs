@@ -48,6 +48,7 @@ impl TestRqlite {
         let mut port = 0;
         loop {
             if let Some(line) = lines.next_line().await.unwrap() {
+                eprintln!("{}", line);
                 if line.contains("[http]") && line.contains(PORT_LINE) {
                     port = line
                         .split(PORT_LINE)
