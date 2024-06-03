@@ -1,3 +1,4 @@
+use common::create_test;
 use essential_hash::hash;
 use essential_memory_storage::MemoryStorage;
 use essential_storage::{
@@ -9,15 +10,11 @@ use test_utils::{
     intent_with_salt, sign_intent_set_with_random_keypair, solution_with_decision_variables,
 };
 
+mod common;
 #[cfg(feature = "rqlite")]
 mod rqlite;
 
-#[tokio::test]
-async fn test_insert_intent_set() {
-    #[cfg(feature = "rqlite")]
-    insert_intent_set(rqlite::TestRqlite::new().await.rqlite).await;
-    insert_intent_set(MemoryStorage::new()).await;
-}
+create_test!(insert_intent_set);
 
 async fn insert_intent_set<S: Storage>(storage: S) {
     let storage_layout = StorageLayout {};
@@ -85,12 +82,7 @@ async fn insert_intent_set<S: Storage>(storage: S) {
     assert_eq!(result, StorageLayout {});
 }
 
-#[tokio::test]
-async fn test_solutions() {
-    #[cfg(feature = "rqlite")]
-    solutions(rqlite::TestRqlite::new().await.rqlite).await;
-    solutions(MemoryStorage::new()).await;
-}
+create_test!(solutions);
 
 async fn solutions<S: Storage>(storage: S) {
     let solution = solution_with_decision_variables(0);
@@ -194,12 +186,7 @@ async fn solutions<S: Storage>(storage: S) {
     assert!(result.is_empty());
 }
 
-#[tokio::test]
-async fn test_update_and_query_state() {
-    #[cfg(feature = "rqlite")]
-    update_and_query_state(rqlite::TestRqlite::new().await.rqlite).await;
-    update_and_query_state(MemoryStorage::new()).await;
-}
+create_test!(update_and_query_state);
 
 async fn update_and_query_state<S: Storage>(storage: S) {
     let intent_set = sign_intent_set_with_random_keypair(vec![intent_with_salt(0)]);

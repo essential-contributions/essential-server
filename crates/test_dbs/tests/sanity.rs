@@ -1,3 +1,4 @@
+use common::create_test;
 use essential_hash::hash;
 use essential_memory_storage::MemoryStorage;
 use essential_storage::Storage;
@@ -5,15 +6,11 @@ use essential_types::{intent::Intent, solution::Solution, IntentAddress, Storage
 use std::vec;
 use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
 
+mod common;
 #[cfg(feature = "rqlite")]
 mod rqlite;
 
-#[tokio::test]
-async fn test_update_state() {
-    #[cfg(feature = "rqlite")]
-    update_state(rqlite::TestRqlite::new().await.rqlite).await;
-    update_state(MemoryStorage::new()).await;
-}
+create_test!(update_state);
 
 async fn update_state<S: Storage>(storage: S) {
     let storage_layout = StorageLayout;
@@ -57,12 +54,7 @@ async fn update_state<S: Storage>(storage: S) {
     assert_eq!(v, vec![3; 2]);
 }
 
-#[tokio::test]
-async fn test_update_state_batch() {
-    #[cfg(feature = "rqlite")]
-    update_state_batch(rqlite::TestRqlite::new().await.rqlite).await;
-    update_state_batch(MemoryStorage::new()).await;
-}
+create_test!(update_state_batch);
 
 async fn update_state_batch<S: Storage>(storage: S) {
     let storage_layout = StorageLayout;
@@ -118,12 +110,7 @@ async fn update_state_batch<S: Storage>(storage: S) {
     assert_eq!(v, vec![8]);
 }
 
-#[tokio::test]
-async fn test_insert_intent_set() {
-    #[cfg(feature = "rqlite")]
-    insert_intent_set(rqlite::TestRqlite::new().await.rqlite).await;
-    insert_intent_set(MemoryStorage::new()).await;
-}
+create_test!(insert_intent_set);
 
 async fn insert_intent_set<S: Storage>(storage: S) {
     let storage_layout = StorageLayout;
@@ -155,12 +142,7 @@ async fn insert_intent_set<S: Storage>(storage: S) {
     assert_eq!(intent, Some(Intent::empty()));
 }
 
-#[tokio::test]
-async fn test_insert_solution_into_pool() {
-    #[cfg(feature = "rqlite")]
-    insert_solution_into_pool(rqlite::TestRqlite::new().await.rqlite).await;
-    insert_solution_into_pool(MemoryStorage::new()).await;
-}
+create_test!(insert_solution_into_pool);
 
 async fn insert_solution_into_pool<S: Storage>(storage: S) {
     let solution = Solution::empty();
