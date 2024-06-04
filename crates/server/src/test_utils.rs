@@ -85,7 +85,7 @@ pub async fn test_solution(
     let (intent_address, storage) =
         deploy_intent_to_storage(storage.unwrap_or_default(), test_intent(salt)).await;
     let mut solution = Solution::empty();
-    let solution_decision_variables = vec![42];
+    let solution_decision_variables = vec![vec![42]];
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
         decision_variables: solution_decision_variables,
@@ -156,7 +156,7 @@ pub fn counter_intent(salt: Word) -> Intent {
 
 pub async fn counter_solution(intent_address: IntentAddress, final_value: Word) -> Solution {
     let mut solution = Solution::empty();
-    let solution_decision_variables = vec![final_value];
+    let solution_decision_variables = vec![vec![final_value]];
     solution.data = vec![SolutionData {
         intent_to_solve: intent_address.clone(),
         decision_variables: solution_decision_variables,

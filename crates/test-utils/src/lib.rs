@@ -89,7 +89,7 @@ pub fn solution_with_decision_variables(decision_variables: usize) -> Solution {
     Solution {
         data: vec![SolutionData {
             intent_to_solve: IntentAddress::empty(),
-            decision_variables: vec![decision_variables as Word; decision_variables],
+            decision_variables: vec![vec![decision_variables as Word; decision_variables]],
             state_mutations: Default::default(),
             transient_data: Default::default(),
         }],
@@ -101,7 +101,7 @@ pub fn solution_with_all_inputs(i: usize) -> Solution {
     Solution {
         data: vec![SolutionData {
             intent_to_solve: IntentAddress::empty(),
-            decision_variables: input.clone(),
+            decision_variables: vec![input.clone()],
             state_mutations: vec![
                 Mutation {
                     key: input.clone(),
@@ -125,7 +125,7 @@ pub fn solution_with_all_inputs_fixed_size(i: usize, size: usize) -> Solution {
     Solution {
         data: vec![SolutionData {
             intent_to_solve: IntentAddress::empty(),
-            decision_variables: input.clone(),
+            decision_variables: vec![input.clone()],
             state_mutations: vec![
                 Mutation {
                     key: input.clone(),
