@@ -132,6 +132,9 @@ impl RqliteStorage {
             include_sql!("create/intent_state.sql"),
             include_sql!("create/batch.sql"),
             include_sql!("create/failed_solutions.sql"),
+            include_sql!("index/solved_batch_id.sql"),
+            include_sql!("index/solved_content_hash.sql"),
+            include_sql!("index/failed_solutions_content_hash.sql"),
         ];
         self.execute(&creates[..]).await
     }

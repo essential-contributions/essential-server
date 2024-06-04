@@ -119,3 +119,27 @@ pub fn solution_with_all_inputs(i: usize) -> Solution {
         }],
     }
 }
+
+pub fn solution_with_all_inputs_fixed_size(i: usize, size: usize) -> Solution {
+    let input = vec![i as Word; size];
+    Solution {
+        data: vec![SolutionData {
+            intent_to_solve: IntentAddress::empty(),
+            decision_variables: input.clone(),
+            state_mutations: vec![
+                Mutation {
+                    key: input.clone(),
+                    value: input.clone()
+                };
+                i
+            ],
+            transient_data: vec![
+                Mutation {
+                    key: input.clone(),
+                    value: input.clone()
+                };
+                i
+            ],
+        }],
+    }
+}

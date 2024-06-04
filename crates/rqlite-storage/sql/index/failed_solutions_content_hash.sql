@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS failed_solutions_content_hash ON failed_solutions (content_hash);

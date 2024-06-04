@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS solved_content_hash ON solved (content_hash);
