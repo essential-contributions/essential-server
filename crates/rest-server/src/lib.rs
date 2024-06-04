@@ -145,7 +145,7 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
                     Ok(v) => v,
                     Err(err) => {
                         #[cfg(feature = "tracing")]
-                        tracing::trace!("Failed to accept connection {}", err);
+                        tracing::info!("Failed to accept connection {}", err);
                         continue;
                     }
                 }
@@ -153,7 +153,7 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
         };
 
         #[cfg(feature = "tracing")]
-        tracing::trace!("Accepted new connection from: {}", remote_addr);
+        tracing::info!("Accepted new connection from: {}", remote_addr);
 
         // We don't need to call `poll_ready` because `Router` is always ready.
         let tower_service = app.clone();

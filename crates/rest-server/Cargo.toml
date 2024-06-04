@@ -24,10 +24,15 @@ tracing-subscriber = { workspace = true, optional = true, features = [
 ] }
 
 [dev-dependencies]
+essential-constraint-vm = { workspace = true }
 essential-hash = { workspace = true }
+essential-sign = { workspace = true }
+essential-state-read-vm = { workspace = true }
 essential-storage = { workspace = true }
+rayon = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde_json = { workspace = true }
+tempfile = { workspace = true }
 test-utils = { workspace = true }
 
 [features]

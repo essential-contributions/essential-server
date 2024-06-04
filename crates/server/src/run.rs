@@ -9,6 +9,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::oneshot;
 
 pub(crate) const RUN_LOOP_FREQUENCY: std::time::Duration = std::time::Duration::from_secs(10);
+const MAX_BLOCK_SIZE: usize = 1_000;
 
 #[cfg(test)]
 pub mod tests;
@@ -107,9 +108,28 @@ async fn build_block<S>(storage: &S) -> anyhow::Result<(Solutions, TransactionSt
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
 {
-    // Get all solutions from the pool.
+    // Get max solutions from the pool.
     // This returns the solutions in FIFO order.
-    let solutions = storage.list_solutions_pool(Some(0)).await?;
+
+    // This is the page size we use in both our dbs. Unfortunately, we can't
+    // export the const as we are using a generic here.
+    let page_size = 100;
+    let mut last = 0;
+    let mut solutions = Vec::new();
+    let mut page = 0;
+
+    // Pull in the first round of solutions.
+    let new_solutions = storage.list_solutions_pool(Some(page)).await?;
+    solutions.extend(new_solutions);
+    page += 1;
+
+    // While we are pulling full pages and are under the max block size, keep pulling.
+    while solutions.len() - last == page_size && solutions.len() <= MAX_BLOCK_SIZE {
+        let new_solutions = storage.list_solutions_pool(Some(page)).await?;
+        last = solutions.len();
+        solutions.extend(new_solutions);
+        page += 1;
+    }
 
     // Create a state db transaction.
     let mut transaction = storage.clone().transaction();
