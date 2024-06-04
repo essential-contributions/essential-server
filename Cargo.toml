@@ -40,6 +40,7 @@ tracing-subscriber = "0.3"
 essential-memory-storage = { path = "crates/memory-storage" }
 essential-rqlite-storage = { path = "crates/rqlite-storage" }
 essential-server = { path = "crates/server" }
+essential-server-types = { path = "crates/types" }
 essential-storage = { path = "crates/storage" }
 essential-transaction-storage = { path = "crates/transaction-storage" }
 test-utils = { path = "crates/test-utils" }

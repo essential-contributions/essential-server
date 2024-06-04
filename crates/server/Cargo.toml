@@ -10,6 +10,7 @@ essential-constraint-vm = { workspace = true }
 essential-hash = { workspace = true }
 essential-sign = { workspace = true }
 essential-state-read-vm = { workspace = true }
+essential-server-types = { workspace = true }
 essential-storage = { workspace = true }
 essential-transaction-storage = { workspace = true }
 essential-types = { workspace = true }

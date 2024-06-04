@@ -8,6 +8,7 @@ use essential_check::{
     self as check,
     solution::{CheckIntentConfig, Utility},
 };
+pub use essential_server_types::{CheckSolutionOutput, SolutionOutcome};
 pub use essential_state_read_vm::{Gas, StateRead};
 use essential_storage::failed_solution::CheckOutcome;
 pub use essential_storage::Storage;
@@ -51,18 +52,6 @@ impl Default for Config {
             run_loop_interval: run::RUN_LOOP_FREQUENCY,
         }
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct CheckSolutionOutput {
-    pub utility: f64,
-    pub gas: u64,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub enum SolutionOutcome {
-    Success(u64),
-    Fail(String),
 }
 
 const PRUNE_FAILED_STORAGE_OLDER_THAN: Duration = Duration::from_secs(604800); // one week
