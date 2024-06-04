@@ -1,0 +1,1 @@
+CREATE INDEX IF NOT EXISTS solved_batch_id ON solved (batch_id);

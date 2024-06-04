@@ -1,11 +1,14 @@
 use base64::Engine;
 use core::time;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use essential_types::{intent::SignedSet, ContentAddress, Word};
+use essential_storage::failed_solution::SolutionFailReason;
+use essential_types::{intent::SignedSet, solution::Solution, ContentAddress, Hash, Word};
 use std::fs::read_dir;
-use test_utils::{intent_with_salt, sign_intent_set_with_random_keypair};
+use test_utils::{
+    intent_with_salt, sign_intent_set_with_random_keypair, solution_with_all_inputs_fixed_size,
+};
 
-use rusqlite::{params, Connection};
+use rusqlite::{named_params, params, Connection};
 
 macro_rules! include_sql {
     ($dir:expr, $sql:expr) => {
@@ -53,6 +56,7 @@ pub fn bench(c: &mut Criterion) {
             update_state(&conn, &addresses[i], &key, &value);
         })
     });
+
     let key = [0 as Word; 4];
     let value = [0 as Word; 32];
     c.bench_function("query_state", |b| {
@@ -60,6 +64,14 @@ pub fn bench(c: &mut Criterion) {
             query_state(&conn, &addresses[0], &key, &value);
         })
     });
+
+    c.bench_function("delete_state", |b| {
+        b.iter(|| {
+            let i = i.next().unwrap();
+            delete_state(&conn, &addresses[i], &key);
+        })
+    });
+
     let mut set =
         sign_intent_set_with_random_keypair(vec![intent_with_salt(0), intent_with_salt(1)]);
     set.set.sort_by_key(essential_hash::content_addr);
@@ -97,6 +109,30 @@ pub fn bench(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("list_intent_sets_by_time", |b| {
+        b.iter(|| {
+            let r = query(
+                &conn,
+                include_sql!("query", "list_intent_sets_by_time"),
+                named_params! {
+                    ":page_size": 100,
+                    ":page_number": 0,
+                    ":start_seconds": 0,
+                    ":start_nanos": 0,
+                    ":end_seconds": 10000,
+                    ":end_nanos": 0,
+                },
+                |row| {
+                    (
+                        row.get::<_, u64>(0).unwrap(),
+                        row.get::<_, String>(1).unwrap(),
+                    )
+                },
+            );
+            black_box(r);
+        })
+    });
+
     c.bench_function("get_intent_set", |b| {
         b.iter(|| {
             let r = query(
@@ -122,16 +158,214 @@ pub fn bench(c: &mut Criterion) {
             black_box(r);
         })
     });
-    // let path = concat!(env!("CARGO_MANIFEST_DIR"), "/my_db.sqlite");
-    // // Connection::open(path).unwrap();
-    // conn.backup(rusqlite::DatabaseName::Main, path, None).unwrap();
+
+    let num_solutions = 10_000;
+
+    let solutions = (0..num_solutions).map(|i| solution_with_all_inputs_fixed_size(i, 10));
+    let mut s_hashes = vec![];
+    for solution in solutions {
+        let hash = insert_solution(&conn, &solution);
+        s_hashes.push(hash);
+    }
+    let solution = solution_with_all_inputs_fixed_size(0, 1000);
+    c.bench_function("insert_solution", |b| {
+        b.iter(|| {
+            insert_solution(&conn, &solution);
+        })
+    });
+
+    let reason =
+        SolutionFailReason::ConstraintsFailed("This failed because of some reason".to_string());
+    let hash = essential_hash::hash(&solution);
+    c.bench_function("copy_to_failed", |b| {
+        b.iter(|| {
+            insert_solution(&conn, &solution);
+            conn.execute(
+                include_sql!("insert", "copy_to_failed"),
+                params![encode(&reason), 0, 0, encode(&hash),],
+            )
+            .unwrap();
+            conn.execute(
+                include_sql!("update", "delete_from_solutions_pool"),
+                [encode(&hash)],
+            )
+            .unwrap();
+        })
+    });
+
+    c.bench_function("copy_to_solved", |b| {
+        b.iter(|| {
+            insert_solution(&conn, &solution);
+            conn.execute(include_sql!("insert", "batch"), [0, 0])
+                .unwrap();
+            conn.execute(include_sql!("insert", "copy_to_solved"), [encode(&hash)])
+                .unwrap();
+            conn.execute(
+                include_sql!("update", "delete_from_solutions_pool"),
+                [encode(&hash)],
+            )
+            .unwrap();
+            conn.execute(include_sql!("update", "delete_empty_batch"), [])
+                .unwrap();
+        })
+    });
+
+    let i = (0..num_solutions).cycle();
+    for i in i.take(1_000) {
+        conn.execute(include_sql!("insert", "batch"), [0, 0])
+            .unwrap();
+        conn.execute(
+            include_sql!("insert", "copy_to_solved"),
+            [encode(&s_hashes[i])],
+        )
+        .unwrap();
+    }
+    let i = (0..num_solutions).cycle();
+    for i in i.take(1_000) {
+        conn.execute(
+            include_sql!("insert", "copy_to_failed"),
+            params![encode(&reason), 0, 0, encode(&s_hashes[i]),],
+        )
+        .unwrap();
+    }
+
+    let mut i = (0..num_solutions).cycle();
+    c.bench_function("get_solution_outcomes", |b| {
+        b.iter(|| {
+            let i = i.next().unwrap();
+            let r = query(
+                &conn,
+                include_sql!("query", "get_solution_outcomes"),
+                [encode(&s_hashes[i]), encode(&s_hashes[i])],
+                |row| {
+                    (
+                        row.get::<_, Option<u64>>(0).unwrap(),
+                        row.get::<_, Option<String>>(1).unwrap(),
+                        row.get::<_, u64>(2).unwrap(),
+                        row.get::<_, u64>(3).unwrap(),
+                    )
+                },
+            );
+            black_box(r);
+        })
+    });
+
+    c.bench_function("get_solution_query", |b| {
+        b.iter(|| {
+            let i = i.next().unwrap();
+            let r = query(
+                &conn,
+                include_sql!("query", "get_solution"),
+                [encode(&s_hashes[i])],
+                |row| (row.get::<_, String>(0).unwrap(),),
+            );
+            black_box(r);
+        })
+    });
+
+    // This is slow but it really depends on the page size and number.
+    c.bench_function("list_failed_solutions", |b| {
+        b.iter(|| {
+            let r = query(
+                &conn,
+                include_sql!("query", "list_failed_solutions"),
+                named_params! {
+                    ":page_size": 100,
+                    ":page_number": 2,
+                },
+                |row| {
+                    (
+                        row.get::<_, String>(0).unwrap(),
+                        row.get::<_, String>(1).unwrap(),
+                    )
+                },
+            );
+            black_box(r);
+        })
+    });
+
+    c.bench_function("list_solutions_pool", |b| {
+        b.iter(|| {
+            let r = query(
+                &conn,
+                include_sql!("query", "list_solutions_pool"),
+                named_params! {
+                    ":page_size": 100,
+                    ":page_number": 2,
+                },
+                |row| (row.get::<_, String>(0).unwrap(),),
+            );
+            black_box(r);
+        })
+    });
+
+    c.bench_function("list_winning_batches_query", |b| {
+        b.iter(|| {
+            let r = query(
+                &conn,
+                include_sql!("query", "list_winning_batches"),
+                named_params! {
+                    ":page_size": 100,
+                    ":page_number": 2,
+                },
+                |row| {
+                    (
+                        row.get::<_, u64>(0).unwrap(),
+                        row.get::<_, String>(1).unwrap(),
+                        row.get::<_, u64>(2).unwrap(),
+                        row.get::<_, u64>(3).unwrap(),
+                    )
+                },
+            );
+            black_box(r);
+        })
+    });
+
+    c.bench_function("list_winning_batches_by_time", |b| {
+        b.iter(|| {
+            let r = query(
+                &conn,
+                include_sql!("query", "list_winning_batches_by_time"),
+                named_params! {
+                    ":page_size": 100,
+                    ":page_number": 2,
+                    ":start_seconds": 0,
+                    ":start_nanos": 0,
+                    ":end_seconds": 10000,
+                    ":end_nanos": 0,
+                },
+                |row| {
+                    (
+                        row.get::<_, u64>(0).unwrap(),
+                        row.get::<_, String>(1).unwrap(),
+                        row.get::<_, u64>(2).unwrap(),
+                        row.get::<_, u64>(3).unwrap(),
+                    )
+                },
+            );
+            black_box(r);
+        })
+    });
+
+    c.bench_function("prune_failed", |b| {
+        b.iter(|| {
+            conn.execute(include_sql!("update", "prune_failed"), [100000])
+                .unwrap();
+        })
+    });
 }
 
 criterion_group!(benches, bench);
 criterion_main!(benches);
 
-pub fn create_tables(conn: &Connection) {
+fn create_tables(conn: &Connection) {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/sql/create/");
+    create(path, conn);
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/sql/index/");
+    create(path, conn);
+}
+
+fn create(path: &str, conn: &Connection) {
     for entry in read_dir(path).unwrap() {
         let entry = entry.unwrap();
         if entry.file_type().unwrap().is_file() && entry.path().extension().unwrap() == "sql" {
@@ -184,10 +418,31 @@ fn insert_intent(conn: &Connection, set: SignedSet) -> ContentAddress {
     set_address
 }
 
+fn insert_solution(conn: &Connection, solution: &Solution) -> Hash {
+    let hash = essential_hash::hash(solution);
+    let h = encode(&hash);
+    conn.execute(
+        include_sql!("insert", "solutions"),
+        params![h.clone(), encode(solution)],
+    )
+    .unwrap();
+    conn.execute(include_sql!("insert", "solutions_pool"), params![h.clone()])
+        .unwrap();
+    hash
+}
+
 fn update_state(conn: &Connection, address: &ContentAddress, key: &[Word], value: &[Word]) {
     conn.execute(
         include_sql!("update", "update_state"),
         params![encode(&key), encode(&value), encode(&address)],
+    )
+    .unwrap();
+}
+
+fn delete_state(conn: &Connection, address: &ContentAddress, key: &[Word]) {
+    conn.execute(
+        include_sql!("update", "delete_state"),
+        params![encode(&address), encode(&key)],
     )
     .unwrap();
 }
