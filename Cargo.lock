@@ -759,6 +759,7 @@ dependencies = [
  "essential-constraint-vm",
  "essential-hash",
  "essential-memory-storage",
+ "essential-server-types",
  "essential-sign",
  "essential-state-read-vm",
  "essential-storage",
@@ -771,6 +772,13 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "essential-server-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
