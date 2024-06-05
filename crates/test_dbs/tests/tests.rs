@@ -1,13 +1,18 @@
 use common::create_test;
 use essential_hash::hash;
 use essential_memory_storage::MemoryStorage;
+use essential_server::{
+    test_utils::{counter_intent, counter_solution, run},
+    SolutionOutcome, StateRead,
+};
 use essential_storage::{
     failed_solution::{CheckOutcome, SolutionFailReason},
     Storage,
 };
-use essential_types::IntentAddress;
+use essential_types::{intent::Intent, ContentAddress, IntentAddress};
 use test_utils::{
-    intent_with_salt, sign_intent_set_with_random_keypair, solution_with_decision_variables,
+    empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair,
+    solution_with_decision_variables, solution_with_intent,
 };
 
 mod common;
@@ -217,4 +222,132 @@ async fn update_and_query_state<S: Storage>(storage: S) {
     // Test querying empty state
     let query_result = storage.query_state(&address, &vec![1; 4]).await.unwrap();
     assert!(query_result.is_empty());
+}
+
+create_test!(test_solution_outcome);
+
+async fn test_solution_outcome<S: Storage>(storage: S)
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let _ = tracing_subscriber::fmt::try_init();
+
+    let essential = essential_server::Essential::new(storage.clone(), Default::default());
+    let handle = Some(essential.clone().spawn(Default::default()).unwrap());
+
+    let intent = Intent::empty();
+    let intent_hash = ContentAddress(essential_hash::hash(&intent));
+    let intent = sign_intent_set_with_random_keypair(vec![intent]);
+    let intent_set = essential.deploy_intent_set(intent).await.unwrap();
+    let intent_address = IntentAddress {
+        set: intent_set,
+        intent: intent_hash,
+    };
+    let solution = solution_with_intent(intent_address);
+    let solution_hash = essential_hash::hash(&solution);
+
+    essential.submit_solution(solution.clone()).await.unwrap();
+    run(&storage).await.unwrap();
+
+    let blocks = essential.list_winning_blocks(None, None).await.unwrap();
+    let outcome = essential.solution_outcome(&solution_hash).await.unwrap();
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].batch.solutions.len(), 1);
+    assert!(&blocks[0].batch.solutions.contains(&solution));
+    assert_eq!(outcome.len(), 1);
+    assert_eq!(outcome[0], SolutionOutcome::Success(0));
+
+    essential.submit_solution(solution.clone()).await.unwrap();
+    run(&storage).await.unwrap();
+
+    let blocks = essential.list_winning_blocks(None, None).await.unwrap();
+    let outcome = essential.solution_outcome(&solution_hash).await.unwrap();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[1].batch.solutions.len(), 1);
+    assert!(&blocks[1].batch.solutions.contains(&solution));
+    assert_eq!(outcome.len(), 2);
+    assert_eq!(outcome[1], SolutionOutcome::Success(1));
+
+    if let Some(handle) = handle {
+        handle.shutdown().await.unwrap();
+    }
+}
+
+create_test!(test_counter);
+
+async fn test_counter<S: Storage>(storage: S)
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let _ = tracing_subscriber::fmt::try_init();
+
+    let essential = essential_server::Essential::new(storage.clone(), Default::default());
+    let handle = Some(essential.clone().spawn(Default::default()).unwrap());
+
+    let intent = counter_intent(1);
+    let intent_hash = ContentAddress(essential_hash::hash(&intent));
+    let intent = sign_intent_set_with_random_keypair(vec![intent]);
+    let intent_set = essential.deploy_intent_set(intent).await.unwrap();
+    let intent_address = IntentAddress {
+        set: intent_set,
+        intent: intent_hash,
+    };
+    let solution = counter_solution(intent_address.clone(), 1).await;
+    let solution2 = counter_solution(intent_address.clone(), 2).await;
+    let solution3 = counter_solution(intent_address.clone(), 3).await;
+    let solution4 = counter_solution(intent_address.clone(), 4).await;
+
+    let mutation_key = solution.data[0].state_mutations[0].key.clone();
+
+    essential.submit_solution(solution.clone()).await.unwrap();
+    essential.submit_solution(solution.clone()).await.unwrap();
+    essential.submit_solution(solution2.clone()).await.unwrap();
+    essential.submit_solution(solution4.clone()).await.unwrap();
+
+    let pre_state = storage
+        .query_state(&intent_address.set, &mutation_key)
+        .await
+        .unwrap();
+    assert!(pre_state.is_empty());
+
+    run(&storage).await.unwrap();
+
+    let post_state = storage
+        .query_state(&intent_address.set, &mutation_key)
+        .await
+        .unwrap();
+    assert_eq!(post_state, vec![2]);
+
+    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].batch.solutions.len(), 2);
+    let solutions = &blocks[0].batch.solutions;
+    assert!(solutions.contains(&solution));
+    assert!(solutions.contains(&solution2));
+
+    essential.submit_solution(solution3.clone()).await.unwrap();
+    essential.submit_solution(solution4.clone()).await.unwrap();
+
+    run(&storage).await.unwrap();
+
+    let post_state = storage
+        .query_state(&intent_address.set, &mutation_key)
+        .await
+        .unwrap();
+    assert_eq!(post_state, vec![4]);
+
+    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[1].batch.solutions.len(), 2);
+    let solutions = &blocks[1].batch.solutions;
+    assert!(solutions.contains(&solution3));
+    assert!(solutions.contains(&solution4));
+
+    if let Some(handle) = handle {
+        handle.shutdown().await.unwrap();
+    }
 }

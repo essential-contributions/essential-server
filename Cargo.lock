@@ -2211,6 +2211,7 @@ dependencies = [
  "essential-hash",
  "essential-memory-storage",
  "essential-rqlite-storage",
+ "essential-server",
  "essential-sign",
  "essential-storage",
  "essential-types",
@@ -2219,6 +2220,7 @@ dependencies = [
  "tempfile",
  "test-utils",
  "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]

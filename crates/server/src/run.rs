@@ -18,7 +18,7 @@ pub struct Handle {
     jh: Option<tokio::task::JoinHandle<anyhow::Result<()>>>,
 }
 
-pub struct Shutdown(oneshot::Receiver<()>);
+pub struct Shutdown(pub oneshot::Receiver<()>);
 
 struct Solutions {
     valid_solutions: Vec<(Arc<Solution>, f64)>,

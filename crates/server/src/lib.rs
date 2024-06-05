@@ -22,10 +22,10 @@ use solution::read::read_intents_from_storage;
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
 mod deploy;
-mod run;
+pub(crate) mod run;
 mod solution;
-#[cfg(test)]
-mod test_utils;
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_utils;
 
 #[derive(Clone)]
 pub struct Essential<S>

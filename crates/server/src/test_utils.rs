@@ -1,11 +1,32 @@
 use crate::deploy::deploy;
 use essential_memory_storage::MemoryStorage;
+use essential_state_read_vm::StateRead;
+use essential_storage::Storage;
 use essential_types::{
     intent::Intent,
     solution::{Mutation, Solution, SolutionData},
     ContentAddress, IntentAddress, Word,
 };
+use std::time::Duration;
 use test_utils::{empty::Empty, sign_intent_set_with_random_keypair, solution_with_intent};
+
+pub async fn run<S>(storage: &S) -> anyhow::Result<()>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let shutdown = super::Shutdown(rx);
+    let s = storage.clone();
+    let jh =
+        tokio::spawn(
+            async move { crate::run::run(&s, shutdown, crate::run::RUN_LOOP_FREQUENCY).await },
+        );
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    tx.send(()).unwrap();
+    jh.await?
+}
 
 // Empty valid solution.
 // Sign an empty valid intent and deploy it to newly created memory storage,

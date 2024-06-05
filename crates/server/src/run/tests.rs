@@ -1,32 +1,15 @@
 use crate::{
     deploy::deploy,
     solution::submit_solution,
-    test_utils::{counter_intent, counter_solution, deploy_intent, sanity_solution, test_solution},
+    test_utils::{
+        counter_intent, counter_solution, deploy_intent, run, sanity_solution, test_solution,
+    },
 };
 use essential_memory_storage::MemoryStorage;
 use essential_server_types::SolutionOutcome;
-use essential_state_read_vm::StateRead;
 use essential_storage::{QueryState, Storage};
 use essential_types::{intent::Intent, ContentAddress, IntentAddress, Word};
-use std::time::Duration;
 use test_utils::{empty::Empty, sign_intent_set_with_random_keypair};
-
-use super::RUN_LOOP_FREQUENCY;
-
-async fn run<S>(storage: &S) -> anyhow::Result<()>
-where
-    S: Storage + StateRead + Clone + Send + Sync + 'static,
-    <S as StateRead>::Future: Send,
-    <S as StateRead>::Error: Send,
-{
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    let shutdown = super::Shutdown(rx);
-    let s = storage.clone();
-    let jh = tokio::spawn(async move { super::run(&s, shutdown, RUN_LOOP_FREQUENCY).await });
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    tx.send(()).unwrap();
-    jh.await?
-}
 
 #[tokio::test]
 async fn test_run() {
