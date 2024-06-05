@@ -1,7 +1,8 @@
 use essential_check as check;
-use essential_storage::{StateStorage, Storage};
+use essential_server_types::SolutionOutcome;
+use essential_storage::{failed_solution::CheckOutcome, StateStorage, Storage};
 use essential_transaction_storage::TransactionStorage;
-use essential_types::{intent::Intent, solution::Solution, ContentAddress, IntentAddress};
+use essential_types::{intent::Intent, solution::Solution, ContentAddress, Hash, IntentAddress};
 use std::{collections::HashMap, sync::Arc};
 
 pub(crate) mod read;
@@ -88,4 +89,30 @@ pub fn contains_all_intents(
         "All intents must be in the set"
     );
     Ok(())
+}
+
+/// Get all FIFO ordered outcomes of solution.
+/// Outcome is the number of included block for successful solutions
+/// and failure reason for failed solutions.
+pub async fn solution_outcome<S>(
+    storage: &S,
+    solution_hash: &Hash,
+) -> anyhow::Result<Vec<SolutionOutcome>>
+where
+    S: Storage,
+{
+    Ok(storage
+        .get_solution(*solution_hash)
+        .await?
+        .map(|outcome| {
+            outcome
+                .outcome
+                .into_iter()
+                .map(|outcome| match outcome {
+                    CheckOutcome::Success(block_number) => SolutionOutcome::Success(block_number),
+                    CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
+                })
+                .collect()
+        })
+        .unwrap_or_default())
 }

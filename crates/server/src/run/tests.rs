@@ -1,9 +1,10 @@
 use crate::{
     deploy::deploy,
     solution::submit_solution,
-    test_utils::{counter_intent, counter_solution, deploy_intent, test_solution},
+    test_utils::{counter_intent, counter_solution, deploy_intent, sanity_solution, test_solution},
 };
 use essential_memory_storage::MemoryStorage;
+use essential_server_types::SolutionOutcome;
 use essential_state_read_vm::StateRead;
 use essential_storage::{QueryState, Storage};
 use essential_types::{intent::Intent, ContentAddress, IntentAddress, Word};
@@ -68,6 +69,38 @@ async fn test_run() {
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[1].batch.solutions.len(), 1);
     assert!(blocks[1].batch.solutions.iter().any(|s| s == &solution3));
+}
+
+#[tokio::test]
+async fn test_solution_outcome() {
+    let (solution, storage) = sanity_solution().await;
+    let solution_hash = essential_hash::hash(&solution);
+
+    submit_solution(&storage, solution.clone()).await.unwrap();
+    run(&storage).await.unwrap();
+
+    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    let outcome = crate::solution::solution_outcome(&storage, &solution_hash)
+        .await
+        .unwrap();
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].batch.solutions.len(), 1);
+    assert!(&blocks[0].batch.solutions.contains(&solution));
+    assert_eq!(outcome.len(), 1);
+    assert_eq!(outcome[0], SolutionOutcome::Success(0));
+
+    submit_solution(&storage, solution.clone()).await.unwrap();
+    run(&storage).await.unwrap();
+
+    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    let outcome = crate::solution::solution_outcome(&storage, &solution_hash)
+        .await
+        .unwrap();
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[1].batch.solutions.len(), 1);
+    assert!(&blocks[1].batch.solutions.contains(&solution));
+    assert_eq!(outcome.len(), 2);
+    assert_eq!(outcome[1], SolutionOutcome::Success(1));
 }
 
 #[tokio::test]

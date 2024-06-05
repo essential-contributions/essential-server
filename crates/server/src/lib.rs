@@ -10,7 +10,6 @@ use essential_check::{
 };
 pub use essential_server_types::{CheckSolutionOutput, SolutionOutcome};
 pub use essential_state_read_vm::{Gas, StateRead};
-use essential_storage::failed_solution::CheckOutcome;
 pub use essential_storage::Storage;
 use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{
@@ -135,23 +134,7 @@ where
         &self,
         solution_hash: &Hash,
     ) -> anyhow::Result<Vec<SolutionOutcome>> {
-        Ok(self
-            .storage
-            .get_solution(*solution_hash)
-            .await?
-            .map(|outcome| {
-                outcome
-                    .outcome
-                    .into_iter()
-                    .map(|outcome| match outcome {
-                        CheckOutcome::Success(block_number) => {
-                            SolutionOutcome::Success(block_number)
-                        }
-                        CheckOutcome::Fail(fail) => SolutionOutcome::Fail(fail.to_string()),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default())
+        solution::solution_outcome(&self.storage, solution_hash).await
     }
 
     pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {

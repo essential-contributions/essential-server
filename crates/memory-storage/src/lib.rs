@@ -248,7 +248,7 @@ impl Storage for MemoryStorage {
                 .values()
                 .flatten()
                 .filter(|h| i.solution_pool.contains(*h));
-            // TODO: Is there a better way to filter non-unique elements from the iter above, while preserving FIFO order?
+            // TODO: Is there a better way to filter non-unique elements from the iter above, while preserving order?
             let mut unique_solutions = vec![];
             for i in iter {
                 if !unique_solutions.contains(&i) {
