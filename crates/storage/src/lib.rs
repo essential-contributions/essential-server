@@ -96,7 +96,8 @@ pub trait Storage: StateStorage {
         page: Option<usize>,
     ) -> impl Future<Output = anyhow::Result<Vec<Block>>> + Send;
 
-    /// Get failed solution and its failing reason.
+    /// Get outcomes of solution.
+    /// If solution was successful, outcome is the block number. Otherwise it is the failure reason.
     fn get_solution(
         &self,
         solution_hash: Hash,

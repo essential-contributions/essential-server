@@ -248,9 +248,16 @@ impl Storage for MemoryStorage {
                 .values()
                 .flatten()
                 .filter(|h| i.solution_pool.contains(*h));
+            // TODO: Is there a better way to filter non-unique elements from the iter above, while preserving FIFO order?
+            let mut unique_solutions = vec![];
+            for i in iter {
+                if !unique_solutions.contains(&i) {
+                    unique_solutions.push(i);
+                }
+            }
             values::page_solutions(
-                iter,
-                |h| i.solutions.get(h).cloned(),
+                unique_solutions.iter(),
+                |h| i.solutions.get(*h).cloned(),
                 page.unwrap_or(0),
                 PAGE_SIZE,
             )

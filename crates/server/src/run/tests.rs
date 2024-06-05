@@ -81,12 +81,9 @@ async fn test_counter() {
     let solution4 = counter_solution(intent_address.clone(), 4).await;
 
     let mutation_key = solution.data[0].state_mutations[0].key.clone();
-    let solution_clone = solution.clone();
 
     submit_solution(&storage, solution.clone()).await.unwrap();
-    submit_solution(&storage, solution_clone.clone())
-        .await
-        .unwrap();
+    submit_solution(&storage, solution.clone()).await.unwrap();
     submit_solution(&storage, solution2.clone()).await.unwrap();
     submit_solution(&storage, solution4.clone()).await.unwrap();
 

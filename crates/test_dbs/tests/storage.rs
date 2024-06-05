@@ -406,6 +406,44 @@ async fn list_solutions_pool<S: Storage>(storage: S) {
     assert!(result.is_empty());
 }
 
+create_test!(list_solutions_pool_identical_solution);
+
+async fn list_solutions_pool_identical_solution<S: Storage>(storage: S) {
+    let solution = solution_with_all_inputs(0);
+
+    storage
+        .insert_solution_into_pool(solution.clone())
+        .await
+        .unwrap();
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert_eq!(result.len(), 1);
+
+    storage
+        .move_solutions_to_solved(&[essential_hash::hash(&solution)])
+        .await
+        .unwrap();
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert_eq!(result.len(), 0);
+
+    storage
+        .insert_solution_into_pool(solution.clone())
+        .await
+        .unwrap();
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert_eq!(result.len(), 1);
+
+    storage
+        .move_solutions_to_solved(&[essential_hash::hash(&solution)])
+        .await
+        .unwrap();
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert_eq!(result.len(), 0);
+}
+
 create_test!(list_failed_solutions_pool);
 
 async fn list_failed_solutions_pool<S: Storage>(storage: S) {
