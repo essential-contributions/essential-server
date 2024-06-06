@@ -768,6 +768,7 @@ dependencies = [
  "futures",
  "rayon",
  "serde",
+ "test-dbs",
  "test-utils",
  "tokio",
  "tracing",

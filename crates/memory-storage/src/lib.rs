@@ -35,7 +35,7 @@ impl Default for MemoryStorage {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Inner {
     intents: HashMap<ContentAddress, IntentSet>,
     intent_time_index: BTreeMap<Duration, Vec<ContentAddress>>,
@@ -177,7 +177,9 @@ impl Storage for MemoryStorage {
     }
 
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
-        self.inner.apply(|i| move_solutions_to_solved(i, solutions))
+        let hashes: HashSet<_> = solutions.iter().collect();
+        self.inner
+            .apply(|i| move_solutions_to_solved(i, solutions, hashes))
     }
 
     async fn move_solutions_to_failed(
@@ -354,9 +356,10 @@ impl Storage for MemoryStorage {
             state_updates,
         } = data;
         let hashes: HashSet<_> = failed.iter().map(|(h, _)| h).collect();
+        let solved_hashes: HashSet<_> = solved.iter().collect();
         let r = self.inner.apply(|i| {
             move_solutions_to_failed(i, failed, hashes)?;
-            move_solutions_to_solved(i, solved)?;
+            move_solutions_to_solved(i, solved, solved_hashes)?;
             update_state_batch(i, state_updates);
             Ok(())
         });
@@ -397,7 +400,11 @@ fn move_solutions_to_failed(
     Ok(())
 }
 
-fn move_solutions_to_solved(i: &mut Inner, solutions: &[Hash]) -> Result<(), anyhow::Error> {
+fn move_solutions_to_solved(
+    i: &mut Inner,
+    solutions: &[Hash],
+    hashes: HashSet<&Hash>,
+) -> Result<(), anyhow::Error> {
     if solutions.is_empty() {
         return Ok(());
     }
@@ -411,6 +418,12 @@ fn move_solutions_to_solved(i: &mut Inner, solutions: &[Hash]) -> Result<(), any
     if i.solved.contains_key(&timestamp) {
         bail!("Two blocks created at the same time");
     }
+
+    for v in i.solution_time_index.values_mut() {
+        v.retain(|h| !hashes.contains(h));
+    }
+    i.solution_time_index.retain(|_, v| !v.is_empty());
+
     for hash in solutions {
         i.solution_block_time_index
             .entry(*hash)

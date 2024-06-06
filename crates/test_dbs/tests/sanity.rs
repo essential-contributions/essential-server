@@ -1,14 +1,9 @@
-use common::create_test;
 use essential_hash::hash;
-use essential_memory_storage::MemoryStorage;
 use essential_storage::Storage;
 use essential_types::{intent::Intent, solution::Solution, IntentAddress};
 use std::vec;
+use test_dbs::create_test;
 use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
-
-mod common;
-#[cfg(feature = "rqlite")]
-mod rqlite;
 
 create_test!(update_state);
 

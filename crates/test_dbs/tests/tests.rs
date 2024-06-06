@@ -1,18 +1,13 @@
-use common::create_test;
 use essential_hash::hash;
-use essential_memory_storage::MemoryStorage;
 use essential_storage::{
     failed_solution::{CheckOutcome, SolutionFailReason},
     Storage,
 };
 use essential_types::IntentAddress;
+use test_dbs::create_test;
 use test_utils::{
     intent_with_salt, sign_intent_set_with_random_keypair, solution_with_decision_variables,
 };
-
-mod common;
-#[cfg(feature = "rqlite")]
-mod rqlite;
 
 create_test!(insert_intent_set);
 
@@ -217,4 +212,94 @@ async fn update_and_query_state<S: Storage>(storage: S) {
     // Test querying empty state
     let query_result = storage.query_state(&address, &vec![1; 4]).await.unwrap();
     assert!(query_result.is_empty());
+}
+
+create_test!(double_get_solution_bug);
+
+async fn double_get_solution_bug<S: Storage>(storage: S) {
+    let solution = solution_with_decision_variables(0);
+    let hash = hash(&solution);
+
+    storage
+        .insert_solution_into_pool(solution.clone())
+        .await
+        .unwrap();
+
+    storage
+        .insert_solution_into_pool(solution.clone())
+        .await
+        .unwrap();
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert_eq!(result.len(), 1);
+
+    storage.move_solutions_to_solved(&[hash]).await.unwrap();
+
+    let result = storage.get_solution(hash).await.unwrap().unwrap();
+    assert_eq!(result.outcome, vec![CheckOutcome::Success(0)]);
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert!(result.is_empty());
+
+    storage
+        .insert_solution_into_pool(solution.clone())
+        .await
+        .unwrap();
+
+    storage
+        .insert_solution_into_pool(solution.clone())
+        .await
+        .unwrap();
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert_eq!(result.len(), 1);
+
+    let result = storage.get_solution(hash).await.unwrap().unwrap();
+    assert_eq!(result.outcome, vec![CheckOutcome::Success(0)]);
+
+    storage.move_solutions_to_solved(&[hash]).await.unwrap();
+
+    let result = storage.get_solution(hash).await.unwrap().unwrap();
+    assert_eq!(
+        result.outcome,
+        vec![CheckOutcome::Success(0), CheckOutcome::Success(1)]
+    );
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert!(result.is_empty());
+}
+
+create_test!(list_solutions_pool_order);
+
+async fn list_solutions_pool_order<S: Storage>(storage: S) {
+    let solutions = (0..10)
+        .map(solution_with_decision_variables)
+        .collect::<Vec<_>>();
+
+    let hashes = solutions.iter().map(hash).collect::<Vec<_>>();
+
+    for solution in &solutions {
+        storage
+            .insert_solution_into_pool(solution.clone())
+            .await
+            .unwrap();
+    }
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+    assert_eq!(result, solutions);
+
+    storage.move_solutions_to_solved(&hashes).await.unwrap();
+
+    for solution in solutions.iter().rev() {
+        storage
+            .insert_solution_into_pool(solution.clone())
+            .await
+            .unwrap();
+    }
+
+    let result = storage.list_solutions_pool(None).await.unwrap();
+
+    let mut expected = solutions.clone();
+    expected.reverse();
+    assert_eq!(result, expected);
 }

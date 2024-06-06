@@ -43,4 +43,5 @@ essential-server = { path = "crates/server" }
 essential-server-types = { path = "crates/types" }
 essential-storage = { path = "crates/storage" }
 essential-transaction-storage = { path = "crates/transaction-storage" }
+test-dbs = { path = "crates/test_dbs" }
 test-utils = { path = "crates/test-utils" }
