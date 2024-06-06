@@ -1,19 +1,14 @@
-use common::create_test;
-use essential_memory_storage::MemoryStorage;
 use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason},
     CommitData, Storage,
 };
 use essential_types::{ContentAddress, IntentAddress, Word};
 use pretty_assertions::assert_eq;
+use test_dbs::create_test;
 use test_utils::{
     empty::Empty, intent_with_salt, intent_with_salt_and_state,
     sign_intent_set_with_random_keypair, solution_with_all_inputs,
 };
-
-mod common;
-#[cfg(feature = "rqlite")]
-mod rqlite;
 
 create_test!(insert_intent_set);
 
