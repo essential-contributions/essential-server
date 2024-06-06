@@ -11,6 +11,7 @@ clap = { workspace = true }
 essential-memory-storage = { workspace = true }
 essential-rqlite-storage = { workspace = true }
 essential-server = { workspace = true }
+essential-server-types = { workspace = true }
 essential-types = { workspace = true }
 futures = { workspace = true }
 hyper = { workspace = true, features = ["http2"] }

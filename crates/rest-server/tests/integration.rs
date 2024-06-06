@@ -4,6 +4,7 @@ use base64::Engine as _;
 use essential_memory_storage::MemoryStorage;
 use essential_rest_server as server;
 use essential_server::{CheckSolutionOutput, SolutionOutcome};
+use essential_server_types::CheckSolution;
 use essential_storage::{StateStorage, Storage};
 use essential_types::{
     convert::bytes_from_word,
@@ -324,11 +325,6 @@ async fn test_check_solution() {
 
 #[tokio::test]
 async fn test_check_solution_with_data() {
-    #[derive(serde::Serialize)]
-    struct CheckSolution {
-        solution: Solution,
-        intents: Vec<Intent>,
-    }
     let TestServer {
         client,
         url,
