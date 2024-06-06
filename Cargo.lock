@@ -712,6 +712,7 @@ dependencies = [
  "essential-memory-storage",
  "essential-rqlite-storage",
  "essential-server",
+ "essential-server-types",
  "essential-storage",
  "essential-types",
  "futures",
@@ -778,6 +779,7 @@ dependencies = [
 name = "essential-server-types"
 version = "0.1.0"
 dependencies = [
+ "essential-types",
  "serde",
 ]
 

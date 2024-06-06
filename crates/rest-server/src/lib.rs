@@ -3,8 +3,6 @@
 //!
 //! A simple REST server for the Essential platform.
 
-use std::{net::SocketAddr, time::Duration};
-
 use anyhow::anyhow;
 use axum::{
     extract::{Path, Query, State},
@@ -14,6 +12,7 @@ use axum::{
 };
 use base64::Engine as _;
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
+use essential_server_types::CheckSolution;
 use essential_types::{
     convert::word_from_bytes,
     intent::{self, Intent},
@@ -23,6 +22,7 @@ use essential_types::{
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use serde::Deserialize;
+use std::{net::SocketAddr, time::Duration};
 use tokio::{
     net::{TcpListener, ToSocketAddrs},
     sync::oneshot,
@@ -57,12 +57,6 @@ struct TimeRange {
 struct Page {
     /// The page number to start from.
     page: u64,
-}
-
-#[derive(Deserialize)]
-struct CheckSolution {
-    solution: Solution,
-    intents: Vec<Intent>,
 }
 
 /// Run the server.

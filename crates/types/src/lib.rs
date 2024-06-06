@@ -1,3 +1,5 @@
+use essential_types::{intent::Intent, solution::Solution};
+
 /// Utility and gas used as a result of checking a solution's state transitions.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CheckSolutionOutput {
@@ -13,4 +15,11 @@ pub struct CheckSolutionOutput {
 pub enum SolutionOutcome {
     Success(u64),
     Fail(String),
+}
+
+/// Solution with intents read from storage that will be used for checking.
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct CheckSolution {
+    pub solution: Solution,
+    pub intents: Vec<Intent>,
 }
