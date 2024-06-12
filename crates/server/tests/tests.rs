@@ -1,9 +1,28 @@
 use std::time::Duration;
 
-use essential_server::{SolutionOutcome, StateRead, Storage};
-use essential_types::{intent::Intent, IntentAddress};
+use essential_server::{Essential, Handle, SolutionOutcome, StateRead, Storage};
+use essential_types::{
+    intent::{Intent, SignedSet},
+    IntentAddress,
+};
 use test_dbs::create_test;
-use test_utils::{empty::Empty, sign_intent_set_with_random_keypair, solution_with_intent};
+use test_utils::{
+    counter_intent, empty::Empty, sign_intent_set_with_random_keypair, solution_with_intent,
+};
+
+fn spawn_server<S>(s: S) -> (Essential<S>, Handle)
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let server = essential_server::Essential::new(s, Default::default());
+    let config = essential_server::Config {
+        run_loop_interval: Duration::from_millis(100),
+    };
+    let handle = server.clone().spawn(config).unwrap();
+    (server, handle)
+}
 
 create_test!(solution_outcome);
 
@@ -13,6 +32,8 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
+    let (server, handle) = spawn_server(s);
+
     let intent_set = vec![Intent::empty()];
     let intent_address = essential_hash::content_addr(&intent_set[0]);
     let intent_set_addr = essential_hash::intent_set_addr::from_intents(&intent_set);
@@ -20,12 +41,6 @@ where
         set: intent_set_addr,
         intent: intent_address,
     };
-
-    let server = essential_server::Essential::new(s, Default::default());
-    let config = essential_server::Config {
-        run_loop_interval: Duration::from_millis(100),
-    };
-    let handle = server.clone().spawn(config).unwrap();
 
     let solution = solution_with_intent(intent_address);
     let solution_hash = essential_hash::hash(&solution);
@@ -71,4 +86,30 @@ where
     assert_eq!(outcome[1], SolutionOutcome::Success(1));
 
     handle.shutdown().await.unwrap();
+}
+
+create_test!(counter_app);
+
+async fn counter_app<S>(s: S)
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let (server, handle) = spawn_server(s);
+
+    let set = vec![counter_intent(0)];
+}
+
+fn create_set(set: Vec<Intent>) -> (Vec<IntentAddress>, SignedSet) {
+    let intent_set_addr = essential_hash::intent_set_addr::from_intents(&set);
+    let addresses = set
+        .iter()
+        .map(|intent| IntentAddress {
+            set: intent_set_addr.clone(),
+            intent: essential_hash::content_addr(intent),
+        })
+        .collect();
+    let set = sign_intent_set_with_random_keypair(set);
+    (addresses, set)
 }
