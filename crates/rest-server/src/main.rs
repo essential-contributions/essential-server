@@ -16,9 +16,9 @@ struct Cli {
     #[arg(long, short, default_value_t = Db::Memory, value_enum)]
     db: Db,
 
-    /// Whether to build the blocks or not.
-    #[arg(long, short, default_value_t = true)]
-    build_blocks: bool,
+    /// Disable block building and only handle queries.
+    #[arg(long)]
+    disable_block_building: bool,
 
     #[arg(long, short, default_value_t = String::from("https://localhost:4001"))]
     /// Address of the rqlite server, if using rqlite.
@@ -44,7 +44,7 @@ async fn main() {
     let Cli {
         address,
         db,
-        build_blocks,
+        disable_block_building,
         rqlite_address,
         tracing,
         loop_freq,
@@ -63,7 +63,7 @@ async fn main() {
     }
 
     let mut config = Config {
-        build_blocks,
+        build_blocks: !disable_block_building,
         ..Default::default()
     };
     if let Some(run_loop_interval) = loop_freq {
