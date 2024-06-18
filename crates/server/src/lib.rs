@@ -18,7 +18,8 @@ use essential_types::{
     solution::Solution,
     Block, ContentAddress, Hash, IntentAddress, Key, Word,
 };
-use run::{Handle, Shutdown};
+pub use run::Handle;
+use run::Shutdown;
 use solution::read::read_intents_from_storage;
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
@@ -26,7 +27,7 @@ mod deploy;
 mod run;
 mod solution;
 #[cfg(test)]
-mod test_utils;
+pub mod test_utils;
 
 #[derive(Clone)]
 pub struct Essential<S>
