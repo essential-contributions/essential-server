@@ -24,9 +24,9 @@ struct Cli {
     /// Address of the rqlite server, if using rqlite.
     rqlite_address: String,
 
-    #[arg(long, short, default_value_t = true)]
+    #[arg(long)]
     /// Enable tracing.
-    tracing: bool,
+    disable_tracing: bool,
 
     #[arg(long, short)]
     /// Frequency at which to run the main loop in seconds.
@@ -46,12 +46,12 @@ async fn main() {
         db,
         disable_block_building,
         rqlite_address,
-        tracing,
+        disable_tracing,
         loop_freq,
     } = Cli::parse();
     let (local_addr, local_addr_rx) = tokio::sync::oneshot::channel();
     let check_config = Default::default();
-    if tracing {
+    if !disable_tracing {
         #[cfg(feature = "tracing")]
         let _ = tracing_subscriber::fmt()
             .with_env_filter(
