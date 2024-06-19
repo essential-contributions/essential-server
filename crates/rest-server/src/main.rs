@@ -1,9 +1,8 @@
-use std::time::Duration;
-
 use clap::{Parser, ValueEnum};
 use essential_memory_storage::MemoryStorage;
 use essential_rest_server::Config;
 use essential_rqlite_storage::RqliteStorage;
+use std::time::Duration;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
