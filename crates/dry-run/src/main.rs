@@ -2,10 +2,7 @@ use clap::{Parser, Subcommand};
 use essential_memory_storage::MemoryStorage;
 use essential_types::{intent::Intent, solution::Solution};
 use std::path::{Path, PathBuf};
-use tokio::{
-    io::{AsyncReadExt, BufReader},
-    task::JoinHandle,
-};
+use tokio::io::{AsyncReadExt, BufReader};
 
 #[derive(Parser)]
 #[command(version, about)]
@@ -67,24 +64,17 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         } => {
             let mut wallet = get_wallet(path)?;
 
-            let jh: JoinHandle<anyhow::Result<()>> = tokio::task::spawn(async move {
-                let storage = MemoryStorage::new();
-                let essential = essential_server::Essential::new(storage, Default::default());
-                let intents =
-                    sign_and_deploy_intents(&intents, &mut wallet, &account, &essential).await?;
-                let solution: Solution = serde_json::from_str(&solution)?;
+            let storage = MemoryStorage::new();
+            let essential = essential_server::Essential::new(storage, Default::default());
+            let intents =
+                sign_and_deploy_intents(&intents, &mut wallet, &account, &essential).await?;
+            let solution: Solution = serde_json::from_str(&solution)?;
 
-                let output = essential
-                    .check_solution_with_data(solution, intents)
-                    .await?;
+            let output = essential
+                .check_solution_with_data(solution, intents)
+                .await?;
 
-                println!("{}", serde_json::to_string(&output)?);
-                Ok(())
-            });
-
-            jh.await
-                .expect("Server dry run failed")
-                .expect("Server dry run error");
+            println!("{}", serde_json::to_string(&output)?);
         }
     }
     Ok(())
