@@ -32,6 +32,7 @@ enum Command {
         #[arg(short, long)]
         path: Option<PathBuf>,
         /// The name of the account to deploy the app with.
+        #[arg(long)]
         account: String,
         /// Path to compiled intents.
         #[arg(long)]
@@ -113,7 +114,7 @@ async fn sign_and_deploy_intents(
             .ok_or_else(|| anyhow::anyhow!("invalid file name"))?;
         let path = intents_path.join(name);
 
-        let intent_set = read_intent_set_from_file(&path).await?;
+        let intent_set = read_intents(&path).await?;
         let signed_set = wallet.sign_intent_set(intent_set.clone(), account)?;
         essential.deploy_intent_set(signed_set).await?;
 
@@ -122,7 +123,7 @@ async fn sign_and_deploy_intents(
     Ok(intents)
 }
 
-async fn read_intent_set_from_file(path: &Path) -> anyhow::Result<Vec<Intent>> {
+async fn read_intents(path: &Path) -> anyhow::Result<Vec<Intent>> {
     let file = tokio::fs::File::open(path).await?;
     let mut bytes = Vec::new();
     let mut reader = BufReader::new(file);
