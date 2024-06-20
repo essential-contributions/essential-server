@@ -9,7 +9,5 @@ clap = { workspace = true }
 essential-memory-storage = { workspace = true }
 essential-server = { workspace = true }
 essential-types = { workspace = true }
-essential-wallet = { workspace = true }
-rpassword = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
