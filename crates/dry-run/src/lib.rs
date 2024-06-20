@@ -12,7 +12,7 @@ use std::path::Path;
 use tokio::io::{AsyncReadExt, BufReader};
 
 /// Dry run a solution check with given intents.
-pub async fn dry_run_solution(
+pub async fn dry_run(
     intents: Vec<Intent>,
     solution: Solution,
 ) -> anyhow::Result<CheckSolutionOutput> {
@@ -24,7 +24,23 @@ pub async fn dry_run_solution(
     Ok(output)
 }
 
-/// Read intent sets in a directory.
+/// Dry run a solution check with given intents.
+/// Reads intents from a directory and deserializes the solution from a string, then checks the solution.
+pub async fn dry_run_from_path(
+    intents: &Path,
+    solution: String,
+) -> anyhow::Result<CheckSolutionOutput> {
+    let intents = read_intent_sets(intents)
+        .await?
+        .into_iter()
+        .flatten()
+        .collect();
+    let solution: Solution = serde_json::from_str(&solution)?;
+    let output = dry_run(intents, solution).await?;
+    Ok(output)
+}
+
+/// Read and deserialize intent sets in a directory.
 pub async fn read_intent_sets(path: &Path) -> anyhow::Result<Vec<Vec<Intent>>> {
     let mut intents: Vec<Vec<Intent>> = vec![];
     for intent in path.read_dir()? {
@@ -39,7 +55,7 @@ pub async fn read_intent_sets(path: &Path) -> anyhow::Result<Vec<Vec<Intent>>> {
     Ok(intents)
 }
 
-/// Read intents from a file.
+/// Read and deserialize intents from a file.
 pub async fn read_intents(path: &Path) -> anyhow::Result<Vec<Intent>> {
     let file = tokio::fs::File::open(path).await?;
     let mut bytes = Vec::new();

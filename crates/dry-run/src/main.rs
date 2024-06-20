@@ -1,8 +1,7 @@
 //! CLI tool for dry running a solution check on Essential server.
 
 use clap::Parser;
-use essential_dry_run::{dry_run_solution, read_intent_sets};
-use essential_types::solution::Solution;
+use essential_dry_run::dry_run_from_path;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -25,13 +24,7 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> anyhow::Result<()> {
-    let intents = read_intent_sets(&cli.intents)
-        .await?
-        .into_iter()
-        .flatten()
-        .collect();
-    let solution: Solution = serde_json::from_str(&cli.solution)?;
-    let output = dry_run_solution(intents, solution).await?;
+    let output = dry_run_from_path(&cli.intents, cli.solution).await?;
     println!("{}", serde_json::to_string(&output)?);
     Ok(())
 }
