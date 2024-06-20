@@ -1,4 +1,4 @@
-//! Dry run of checking a solution on Essential server.
+//! Dry run of checking a solution on a local Essential server.
 //!
 //! This crate can be used as a library and a binary CLI tool.
 
