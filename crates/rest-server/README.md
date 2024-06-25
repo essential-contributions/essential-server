@@ -22,13 +22,13 @@ cargo run -p essential-rest-server --release -- --help
 ## API
 > Note that this API is very likely to change as it's currently a WIP.
 ### POST `/deploy-intent-set`
-Body: `Signed<Vec<Intent>>` as JSON \
+Body: `SignedIntents` as JSON \
 Returns: `ContentAddress` as JSON
 
 **Example:**
 ```bash
-curl -X POST -H "Content-Type: application/json" \
-    -d '{"data":[{"slots":{"decision_variables":0,"state":[]},"state_read":[],"constraints":[],"directive":"Satisfy"}],"signature":[[]]}' \
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" \
+    -d '{"set":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"signature":"an5zkoNO0pWx0q0sT11uExke4cx4IFtQ_JYJk8AwR11fKpLK_iuZ2IjUKM-EsWhoA6xqEoKk_D5cxOn8ZL29YQE"}' \
     http://localhost:59498/deploy-intent-set
 ```
 ### GET `/get-intent-set/:address`
@@ -39,7 +39,7 @@ Returns: `Option<Signed<Vec<Intent>>>` as JSON
 
 **Example:**
 ```bash
-curl -X GET -H "Content-Type: application/json" http://localhost:59498/get-intent-set/NsFZ12tS4D5JY2NgfFlAIn9i9OBI3zRLBQFZvJe7o9c=
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-intent-set/ZklInZeRtz6q8cQWsAPhymoBu3Me9cqWuwkL85AEwxI
 ```
 ### GET `/get-intent/:set/:address`
 Parameters: 
@@ -50,7 +50,7 @@ Returns: `Option<Intent>` as JSON
 
 **Example:**
 ```bash
-curl -X GET -H "Content-Type: application/json" http://localhost:59498/get-intent/NsFZ12tS4D5JY2NgfFlAIn9i9OBI3zRLBQFZvJe7o9c=/iFVQiq3hbsVz0h5qSF39CnYkCFwaFLXs3WSF3gxoOaQ=
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-intent/ZklInZeRtz6q8cQWsAPhymoBu3Me9cqWuwkL85AEwxI/cJ6AyISHokEeHuTfufIqhhSS0gxHZRUMDHlKvXD4FHw
 ```
 ### GET `/list-intent-sets`
 Query parameters: 
@@ -61,7 +61,7 @@ Returns: `Vec<Vec<Intent>>` as JSON
 
 **Example:**
 ```bash
-curl -X GET -H "Content-Type: application/json" "http://localhost:59498/list-intent-sets?start=0&end=1&page=0"
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-intent-sets?start=0&end=1&page=0"
 ```
 ### POST `/submit-solution`
 Body: `Solution` as JSON \
@@ -69,7 +69,7 @@ Returns: `Hash` as JSON
 
 **Example:**
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[]},"signature":[[]]}' http://localhost:59498/submit-solution
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"intent_to_solve":{"set":"ZklInZeRtz6q8cQWsAPhymoBu3Me9cqWuwkL85AEwxI","intent":"cJ6AyISHokEeHuTfufIqhhSS0gxHZRUMDHlKvXD4FHw"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/submit-solution
 ```
 ### GET `/list-solutions-pool`
 Query parameters: 
@@ -79,7 +79,7 @@ Returns: `Vec<Solution>` as JSON
 
 **Example:**
 ```bash
-curl -X GET -H "Content-Type: application/json" "http://localhost:59498/list-solutions-pool" 
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-solutions-pool" 
 ```
 ### GET `/query-state/:address/:key`
 Parameters: 
@@ -90,7 +90,7 @@ Returns: `Option<Word>` as JSON
 
 **Example:**
 ```bash
-curl -X GET -H "Content-Type: application/json" http://localhost:59498/query-state/NsFZ12tS4D5JY2NgfFlAIn9i9OBI3zRLBQFZvJe7o9c=/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/query-state/ZklInZeRtz6q8cQWsAPhymoBu3Me9cqWuwkL85AEwxI/AA
 ```
 ### GET `/list-winning-blocks`
 Query parameters: 
@@ -101,7 +101,7 @@ Returns: `Vec<Block>` as JSON
 
 **Example:**
 ```bash
-curl -X GET -H "Content-Type: application/json" "http://localhost:59498/list-winning-blocks?start=0&end=1&page=0"
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-winning-blocks?start=0&end=1&page=0"
 ```
 ### GET `/solution-outcome/:hash`
 Parameters: 
@@ -117,7 +117,7 @@ pub enum SolutionOutcome {
 
 **Example:**
 ```bash
-curl -X GET -H "Content-Type: application/json" "http://localhost:59498/solution-outcome/NsFZ12tS4D5JY2NgfFlAIn9i9OBI3zRLBQFZvJe7o9c="
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/solution-outcome/Qh8e2eGRMnV-LbEn_TXljgjv49d-4vlv6mC3XTYlHqI"
 ```
 ### Post `/check-solution`
 Check a solution against deployed intents without changing state.\
@@ -133,7 +133,7 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"data":{"data":[],"state_mutations":[]},"signature":[[]]}' http://localhost:59498/check-solution
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"intent_to_solve":{"set":"ZklInZeRtz6q8cQWsAPhymoBu3Me9cqWuwkL85AEwxI","intent":"cJ6AyISHokEeHuTfufIqhhSS0gxHZRUMDHlKvXD4FHw"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/check-solution
 ```
 ### Post `/check-solution-with-data`
 Check a solution with all intents without changing state.\
@@ -155,5 +155,33 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"solution": {"data":{"data":[],"state_mutations":[]},"signature":[[]]}, intents: [{"slots":{"decision_variables":0,"state":[]},"state_read":[],"constraints":[],"directive":"Satisfy"}]}' http://localhost:59498/check-solution-with-data
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"solution":{"data":[{"intent_to_solve":{"set":"ZklInZeRtz6q8cQWsAPhymoBu3Me9cqWuwkL85AEwxI","intent":"cJ6AyISHokEeHuTfufIqhhSS0gxHZRUMDHlKvXD4FHw"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"intents":[{"state_read":[],"constraints":[],"directive":"Satisfy"}]}' http://localhost:59498/check-solution-with-data
+```
+
+### Post `/query-state-reads`
+Run a query on state using state read programs,\
+This allows you to use the state read parts of you pint program to query state.\
+This is also useful for getting the pre state for a solution when debugging.\
+Body: `QueryStateReads` as JSON \
+```rust
+pub struct QueryStateReads {
+    pub state_read: Vec<StateReadBytecode>,
+    pub index: SolutionDataIndex,
+    pub solution: Solution,
+    pub request_type: StateReadRequestType,
+}
+```
+Returns: `QueryStateReadsOutput` as JSON
+```rust
+pub enum QueryStateReadsOutput {
+    Reads(BTreeMap<ContentAddress, Vec<(Key, Value)>>),
+    Slots(Slots),
+    All(BTreeMap<ContentAddress, Vec<(Key, Value)>>, Slots),
+    Failure(String),
+}
+```
+These types are defined in the `essential-server-types` crate in this repo.\
+**Example:**
+```bash
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"state_read":[],"index":0,"solution":{"data":[{"intent_to_solve":{"set":"ZklInZeRtz6q8cQWsAPhymoBu3Me9cqWuwkL85AEwxI","intent":"cJ6AyISHokEeHuTfufIqhhSS0gxHZRUMDHlKvXD4FHw"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"request_type":{"All":"All"}}' http://localhost:59498/query-state-reads
 ```

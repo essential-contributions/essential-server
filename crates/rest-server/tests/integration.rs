@@ -2,59 +2,23 @@ use std::{time::Duration, vec};
 
 use base64::Engine as _;
 use essential_memory_storage::MemoryStorage;
-use essential_rest_server as server;
 use essential_server::{CheckSolutionOutput, SolutionOutcome};
-use essential_server_types::CheckSolution;
+use essential_server_types::{
+    CheckSolution, QueryStateReads, QueryStateReadsOutput, Slots, StateReadRequestType,
+};
 use essential_storage::{StateStorage, Storage};
 use essential_types::{
-    convert::bytes_from_word,
+    convert::{bytes_from_word, word_4_from_u8_32},
     intent::{self, Intent},
     solution::{Solution, SolutionData},
     Block, ContentAddress, IntentAddress, Word,
 };
-use reqwest::{Client, ClientBuilder};
-use server::run;
 use test_utils::{
     empty::Empty, sign_intent_set_with_random_keypair, solution_with_decision_variables,
 };
+use utils::{setup, setup_with_mem, TestServer};
 
-static SERVER: &str = "localhost:0";
-static CLIENT: &str = "http://localhost";
-
-struct TestServer {
-    client: Client,
-    url: reqwest::Url,
-    shutdown: tokio::sync::oneshot::Sender<()>,
-    jh: tokio::task::JoinHandle<anyhow::Result<()>>,
-}
-
-async fn setup() -> TestServer {
-    setup_with_mem(MemoryStorage::new()).await
-}
-
-async fn setup_with_mem(mem: MemoryStorage) -> TestServer {
-    let config = Default::default();
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
-    let jh = tokio::task::spawn(async {
-        let essential = essential_server::Essential::new(mem, config);
-        run(essential, SERVER, tx, Some(shutdown_rx), Default::default()).await
-    });
-    let client = ClientBuilder::new()
-        .http2_prior_knowledge()
-        .build()
-        .unwrap();
-    let mut url = reqwest::Url::parse(CLIENT).unwrap();
-    let port = rx.await.unwrap().port();
-    url.set_port(Some(port)).unwrap();
-
-    TestServer {
-        client,
-        url,
-        shutdown,
-        jh,
-    }
-}
+mod utils;
 
 #[tokio::test]
 async fn test_deploy_intent_set() {
@@ -213,6 +177,67 @@ async fn test_query_state() {
     let value = response.json::<Vec<Word>>().await.unwrap();
 
     assert_eq!(value, vec![42]);
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn test_query_state_reads() {
+    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
+    let address = essential_hash::intent_set_addr::from_intents(&intent_set.set);
+    let addr_words = word_4_from_u8_32(address.0);
+
+    let read_key: Vec<u8> = essential_state_read_vm::asm::to_bytes(vec![
+        essential_state_read_vm::asm::Stack::Push(1).into(),
+        essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+        essential_state_read_vm::asm::Stack::Push(addr_words[0]).into(),
+        essential_state_read_vm::asm::Stack::Push(addr_words[1]).into(),
+        essential_state_read_vm::asm::Stack::Push(addr_words[2]).into(),
+        essential_state_read_vm::asm::Stack::Push(addr_words[3]).into(),
+        essential_state_read_vm::asm::Stack::Push(0).into(),
+        essential_state_read_vm::asm::Stack::Push(1).into(), // key length
+        essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
+        essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
+        essential_state_read_vm::asm::StateRead::KeyRangeExtern,
+        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+    ])
+    .collect();
+
+    let query = QueryStateReads::inline_empty(vec![read_key], StateReadRequestType::default());
+
+    let mem = MemoryStorage::new();
+    mem.insert_intent_set(intent_set).await.unwrap();
+    mem.update_state(&address, &vec![0], vec![42])
+        .await
+        .unwrap();
+
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup_with_mem(mem).await;
+
+    let response = client
+        .post(url.join("/query-state-reads").unwrap())
+        .json(&query)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200, "response: {}", response.text().await.unwrap());
+    let outcome = response.json::<QueryStateReadsOutput>().await.unwrap();
+
+    let expect = QueryStateReadsOutput::All(
+        [(address.clone(), [(vec![0], vec![42])].into_iter().collect())]
+            .into_iter()
+            .collect(),
+        Slots {
+            pre: vec![vec![42]],
+            post: vec![vec![42]],
+        },
+    );
+    assert_eq!(outcome, expect);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();

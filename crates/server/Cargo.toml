@@ -8,6 +8,7 @@ anyhow = { workspace = true }
 essential-check = { workspace = true }
 essential-constraint-vm = { workspace = true }
 essential-hash = { workspace = true }
+essential-lock = { workspace = true }
 essential-server-types = { workspace = true }
 essential-sign = { workspace = true }
 essential-state-read-vm = { workspace = true }

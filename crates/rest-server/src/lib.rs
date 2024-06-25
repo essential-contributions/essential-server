@@ -12,7 +12,7 @@ use axum::{
 };
 use base64::Engine as _;
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
-use essential_server_types::CheckSolution;
+use essential_server_types::{CheckSolution, QueryStateReads, QueryStateReadsOutput};
 use essential_types::{
     convert::word_from_bytes,
     intent::{self, Intent},
@@ -99,6 +99,7 @@ where
         .route("/solution-outcome/:hash", get(solution_outcome))
         .route("/check-solution", post(check_solution))
         .route("/check-solution-with-data", post(check_solution_with_data))
+        .route("/query-state-reads", post(query_state_reads))
         .with_state(essential.clone());
 
     // Bind to the address.
@@ -413,6 +414,22 @@ where
         .check_solution_with_data(payload.solution, payload.intents)
         .await?;
     Ok(Json(outcome))
+}
+
+/// The query state reads post endpoint.
+///
+/// Takes a json state read query and returns the outcome
+async fn query_state_reads<S>(
+    State(essential): State<Essential<S>>,
+    Json(payload): Json<QueryStateReads>,
+) -> Result<Json<QueryStateReadsOutput>, Error>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let out = essential.query_state_reads(payload).await?;
+    Ok(Json(out))
 }
 
 /// Shutdown the server manually or on ctrl-c.
