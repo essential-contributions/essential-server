@@ -724,6 +724,7 @@ dependencies = [
  "essential-rqlite-storage",
  "essential-server",
  "essential-server-types",
+ "essential-state-read-vm",
  "essential-storage",
  "essential-types",
  "futures",
@@ -770,6 +771,7 @@ dependencies = [
  "essential-check",
  "essential-constraint-vm",
  "essential-hash",
+ "essential-lock",
  "essential-memory-storage",
  "essential-server-types",
  "essential-sign",
@@ -793,6 +795,7 @@ version = "0.1.0"
 dependencies = [
  "essential-types",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

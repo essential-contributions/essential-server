@@ -164,7 +164,8 @@ where
     Ok(words)
 }
 
-fn next_key(mut key: Key) -> Option<Key> {
+/// Calculate the next key.
+pub fn next_key(mut key: Key) -> Option<Key> {
     for w in key.iter_mut().rev() {
         match *w {
             Word::MAX => *w = Word::MIN,

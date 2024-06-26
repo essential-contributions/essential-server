@@ -26,6 +26,7 @@ tracing-subscriber = { workspace = true, optional = true, features = [
 
 [dev-dependencies]
 essential-hash = { workspace = true }
+essential-state-read-vm = { workspace = true }
 essential-storage = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
 serde_json = { workspace = true }

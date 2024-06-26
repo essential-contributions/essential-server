@@ -21,6 +21,19 @@ pub async fn deploy_intent(intent: Intent) -> (IntentAddress, MemoryStorage) {
     deploy_intent_to_storage(MemoryStorage::default(), intent).await
 }
 
+pub async fn deploy_contracts(
+    contracts: Vec<Vec<Intent>>,
+) -> (Vec<Vec<IntentAddress>>, MemoryStorage) {
+    let mut s = MemoryStorage::default();
+    let mut addresses = Vec::new();
+    for contract in contracts {
+        let (addr, s2) = deploy_contract_to_storage(s, contract).await;
+        s = s2;
+        addresses.push(addr);
+    }
+    (addresses, s)
+}
+
 // Sign and deploy given intent to newly created memory storage.
 pub async fn deploy_intent_to_storage(
     storage: MemoryStorage,
@@ -34,8 +47,25 @@ pub async fn deploy_intent_to_storage(
             set: result,
             intent: intent_hash,
         },
-        storage.clone(),
+        storage,
     )
+}
+
+pub async fn deploy_contract_to_storage(
+    storage: MemoryStorage,
+    contract: Vec<Intent>,
+) -> (Vec<IntentAddress>, MemoryStorage) {
+    let contract_hash = essential_hash::intent_set_addr::from_intents(&contract);
+    let addresses = contract
+        .iter()
+        .map(|intent| IntentAddress {
+            set: contract_hash.clone(),
+            intent: essential_hash::content_addr(intent),
+        })
+        .collect();
+    let contract = sign_intent_set_with_random_keypair(contract);
+    deploy(&storage, contract).await.unwrap();
+    (addresses, storage)
 }
 
 pub fn test_intent(salt: Word) -> Intent {

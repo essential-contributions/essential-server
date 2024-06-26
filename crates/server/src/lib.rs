@@ -23,6 +23,7 @@ use solution::read::read_intents_from_storage;
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
 mod deploy;
+mod query_state_reads;
 mod run;
 mod solution;
 #[cfg(test)]
@@ -191,6 +192,14 @@ where
         key: &Key,
     ) -> anyhow::Result<Vec<Word>> {
         self.storage.query_state(address, key).await
+    }
+
+    pub async fn query_state_reads(
+        &self,
+        query: essential_server_types::QueryStateReads,
+    ) -> anyhow::Result<essential_server_types::QueryStateReadsOutput> {
+        let storage = self.storage.clone().transaction();
+        query_state_reads::query_state_reads(storage, query).await
     }
 }
 

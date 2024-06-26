@@ -7,6 +7,7 @@
 , rqlite
 , rust-analyzer
 , rustfmt
+, curl
 }:
 mkShell {
   inputsFrom = [
@@ -14,6 +15,7 @@ mkShell {
     essential-rest-server
   ];
   buildInputs = [
+    curl
     cargo-toml-lint
     clippy
     rqlite
