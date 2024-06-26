@@ -15,6 +15,8 @@ const ZEROED_INTENT: IntentAddress = IntentAddress {
     intent: ContentAddress([0; 32]),
 };
 
+pub mod ser;
+
 /// Utility and gas used as a result of checking a solution's state transitions.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CheckSolutionOutput {
@@ -92,12 +94,23 @@ pub enum SlotsRequest {
 /// The output of a state read query.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum QueryStateReadsOutput {
+    #[serde(
+        serialize_with = "ser::serialize_map",
+        deserialize_with = "ser::deserialize_map"
+    )]
     /// The keys and values that were read.
     Reads(BTreeMap<ContentAddress, BTreeMap<Key, Value>>),
     /// The slots that were read into.
     Slots(Slots),
     /// The keys and values that were read and the slots that were read into.
-    All(BTreeMap<ContentAddress, BTreeMap<Key, Value>>, Slots),
+    All(
+        #[serde(
+            serialize_with = "ser::serialize_map",
+            deserialize_with = "ser::deserialize_map"
+        )]
+        BTreeMap<ContentAddress, BTreeMap<Key, Value>>,
+        Slots,
+    ),
     /// The state reads failed.
     Failure(String),
 }

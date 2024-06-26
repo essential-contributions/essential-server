@@ -160,7 +160,7 @@ curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"s
 
 ### Post `/query-state-reads`
 Run a query on state using state read programs,\
-This allows you to use the state read parts of you pint program to query state.\
+This allows you to use the state read parts of your pint program to query state.\
 This is also useful for getting the pre state for a solution when debugging.\
 Body: `QueryStateReads` as JSON \
 ```rust

@@ -225,7 +225,12 @@ async fn test_query_state_reads() {
         .send()
         .await
         .unwrap();
-    assert_eq!(response.status(), 200, "response: {}", response.text().await.unwrap());
+    assert_eq!(
+        response.status(),
+        200,
+        "response: {}",
+        response.text().await.unwrap()
+    );
     let outcome = response.json::<QueryStateReadsOutput>().await.unwrap();
 
     let expect = QueryStateReadsOutput::All(
