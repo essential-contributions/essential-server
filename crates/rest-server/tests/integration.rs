@@ -1,6 +1,5 @@
 use std::{time::Duration, vec};
 
-use base64::Engine as _;
 use essential_memory_storage::MemoryStorage;
 use essential_server::{CheckSolutionOutput, SolutionOutcome};
 use essential_server_types::{
@@ -165,7 +164,7 @@ async fn test_query_state() {
     let a = url
         .join(&format!(
             "/query-state/{address}/{}",
-            essential_types::serde::hash::BASE64.encode(
+            hex::encode_upper(
                 key.into_iter()
                     .flat_map(bytes_from_word)
                     .collect::<Vec<u8>>()

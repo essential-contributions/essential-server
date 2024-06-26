@@ -6,7 +6,6 @@ version = "0.1.0"
 [dependencies]
 anyhow = { workspace = true }
 axum = { workspace = true, features = ["http2"] }
-base64 = { workspace = true }
 clap = { workspace = true }
 essential-memory-storage = { workspace = true }
 essential-rqlite-storage = { workspace = true }
@@ -14,6 +13,7 @@ essential-server = { workspace = true }
 essential-server-types = { workspace = true }
 essential-types = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 hyper = { workspace = true, features = ["http2"] }
 hyper-util = { workspace = true, features = ["http2"] }
 serde = { workspace = true }
