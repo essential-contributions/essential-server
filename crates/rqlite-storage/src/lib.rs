@@ -5,7 +5,6 @@
 //! This uses a remote rqlite server to store data.
 
 use anyhow::{bail, ensure};
-use base64::Engine;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
 use essential_storage::{
@@ -50,15 +49,15 @@ struct Db {
     http: reqwest::Client,
 }
 
-/// Encodes a type into blob data which is then base64 encoded.
+/// Encodes a type into blob data which is then hex encoded.
 fn encode<T: serde::Serialize>(value: &T) -> String {
     let value = postcard::to_allocvec(value).expect("How can this fail?");
-    base64::engine::general_purpose::STANDARD.encode(value)
+    hex::encode_upper(value)
 }
 
-/// Decodes a base64 encoded blob into a type.
+/// Decodes a hex encoded blob into a type.
 fn decode<T: serde::de::DeserializeOwned>(value: &str) -> anyhow::Result<T> {
-    let value = base64::engine::general_purpose::STANDARD.decode(value)?;
+    let value = hex::decode(value)?;
     Ok(postcard::from_bytes(&value)?)
 }
 
@@ -321,7 +320,7 @@ impl Storage for RqliteStorage {
 
         intents.set.sort_by_key(essential_hash::content_addr);
 
-        // Encode the data into base64 blobs.
+        // Encode the data into hex blobs.
         let set_addr = essential_hash::intent_set_addr::from_intents(&intents.set);
         let address = encode(&set_addr);
         let signature = encode(&intents.signature);

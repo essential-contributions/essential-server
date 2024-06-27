@@ -10,7 +10,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use base64::Engine as _;
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_server_types::{CheckSolution, QueryStateReads, QueryStateReadsOutput};
 use essential_types::{
@@ -232,7 +231,7 @@ where
 
 /// The get intent set get endpoint.
 ///
-/// Takes a content address (encoded as URL-safe base64 without padding) as a path parameter.
+/// Takes a content address (encoded as hex) as a path parameter.
 async fn get_intent_set<S>(
     State(essential): State<Essential<S>>,
     Path(address): Path<String>,
@@ -252,7 +251,7 @@ where
 /// The get intent get endpoint.
 ///
 /// Takes a set content address and an intent content address as path parameters.
-/// Both are encoded as URL-safe base64 without padding.
+/// Both are encoded as hex.
 async fn get_intent<S>(
     State(essential): State<Essential<S>>,
     Path((set, address)): Path<(String, String)>,
@@ -335,7 +334,7 @@ where
 /// The query state get endpoint.
 ///
 /// Takes a content address and a byte array key as path parameters.
-/// Both are encoded as URL-safe base64 without padding.
+/// Both are encoded as hex.
 async fn query_state<S>(
     State(essential): State<Essential<S>>,
     Path((address, key)): Path<(String, String)>,
@@ -348,9 +347,7 @@ where
     let address: ContentAddress = address
         .parse()
         .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
-    let key: Vec<u8> = essential_types::serde::hash::BASE64
-        .decode(key)
-        .map_err(|e| anyhow!("failed to decode key: {e}"))?;
+    let key: Vec<u8> = hex::decode(key).map_err(|e| anyhow!("failed to decode key: {e}"))?;
 
     // Convert the key to words.
     let key = key
@@ -364,8 +361,7 @@ where
 
 /// The solution outcome get endpoint.
 ///
-/// Takes a solution content address as a path parameter encoded as URL-safe
-/// base64 without padding.
+/// Takes a solution content address as a path parameter encoded hex.
 async fn solution_outcome<S>(
     State(essential): State<Essential<S>>,
     Path(address): Path<String>,
