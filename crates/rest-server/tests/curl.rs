@@ -4,7 +4,7 @@ use essential_server_types::{CheckSolution, QueryStateReads};
 use essential_types::{predicate::Predicate, PredicateAddress};
 use test_utils::{empty::Empty, sign_contract_with_random_keypair, solution_with_predicate};
 use tokio::process::Command;
-use utils::{contractup, TestServer};
+use utils::{setup, TestServer};
 
 mod utils;
 
@@ -16,7 +16,7 @@ async fn test_readme_curl() {
 
     let TestServer {
         url, shutdown, jh, ..
-    } = contractup().await;
+    } = setup().await;
 
     let port = url.port().unwrap();
 
@@ -108,7 +108,7 @@ fn create_readme_inputs() {
     p("check solution with data");
     ser(CheckSolution {
         solution: solution.clone(),
-        contract: signed.contract.clone(),
+        contracts: vec![signed.contract.clone()],
     });
 
     p("query-state-reads");

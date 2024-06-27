@@ -15,7 +15,7 @@ where
 {
     let contract = vec![Predicate::empty()];
     let predicate_address = essential_hash::content_addr(&contract[0]);
-    let contract_addr = essential_hash::contract_addr::from_contract(&contract);
+    let contract_addr = essential_hash::contract_addr::from_contract(&contract.clone().into());
     let predicate_address = PredicateAddress {
         contract: contract_addr,
         predicate: predicate_address,

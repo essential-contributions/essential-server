@@ -1,7 +1,7 @@
 use core::time;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use essential_storage::failed_solution::SolutionFailReason;
-use essential_types::{solution::Solution, ContentAddress, Hash, SignedContract, Word};
+use essential_types::{contract::SignedContract, solution::Solution, ContentAddress, Hash, Word};
 use std::fs::read_dir;
 use test_utils::{
     predicate_with_salt, sign_contract_with_random_keypair, solution_with_all_inputs_fixed_size,
@@ -395,7 +395,7 @@ fn insert_predicate(conn: &Connection, contract: SignedContract) -> ContentAddre
     let time = time::Duration::from_secs(1);
     let address = encode(&contract_address);
     conn.execute(
-        include_sql!("insert", "contract"),
+        include_sql!("insert", "contracts"),
         params![
             address.clone(),
             encode(&contract.signature),
@@ -405,10 +405,10 @@ fn insert_predicate(conn: &Connection, contract: SignedContract) -> ContentAddre
     )
     .unwrap();
 
-    for predicate in &contract.contract {
+    for predicate in &contract.contract.predicates {
         let hash = encode(&essential_hash::content_addr(&predicate));
         conn.execute(
-            include_sql!("insert", "contract"),
+            include_sql!("insert", "predicates"),
             [encode(predicate), hash.clone()],
         )
         .unwrap();

@@ -1,5 +1,5 @@
 DELETE FROM
-    predicate_state
+    contract_state
 WHERE
     contract_id = (
         SELECT

@@ -1,4 +1,4 @@
 INSERT
-    OR IGNORE INTOpredicates (predicate, content_hash)
+    OR IGNORE INTO predicates (predicate, content_hash)
 VALUES
     (?, ?);

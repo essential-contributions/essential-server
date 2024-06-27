@@ -9,7 +9,7 @@ use super::*;
 async fn test_can_query() {
     let storage = MemoryStorage::new();
     let predicate = Predicate::empty();
-    let address = essential_hash::contract_addr::from_contract(&vec![predicate.clone()]);
+    let address = essential_hash::contract_addr::from_contract(&vec![predicate.clone()].into());
     let signed = sign_contract_with_random_keypair(vec![predicate]);
     let key = vec![0; 4];
     let value = vec![1];

@@ -50,9 +50,10 @@ pub fn insert_contract(
     range: Range<usize>,
 ) {
     conn.execute(
-        include_sql!("insert", "contract"),
+        include_sql!("insert", "contracts"),
         params![
             format!("hash{}", contract),
+            "salt".to_string(),
             format!("signature{}", contract),
             unix_time.as_secs(),
             unix_time.subsec_nanos()
@@ -62,7 +63,7 @@ pub fn insert_contract(
 
     for i in range {
         conn.execute(
-            include_sql!("insert", "contract"),
+            include_sql!("insert", "predicates"),
             params![format!("predicate{}", i), format!("predicate_hash{}", i),],
         )
         .unwrap();

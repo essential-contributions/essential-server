@@ -1,4 +1,4 @@
-INSERT INTO predicate_state (contract_id, key, value)
+INSERT INTO contract_state (contract_id, key, value)
 SELECT id, ?, ?
 FROM contracts
 WHERE content_hash = ?

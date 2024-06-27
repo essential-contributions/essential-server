@@ -7,16 +7,19 @@ use test_utils::{
     solution_with_decision_variables,
 };
 
-fn contract(contract: Contract) -> ContractWithAddresses {
+fn contract_with_addr(contract: Contract) -> ContractWithAddresses {
     let signed = sign_contract_with_random_keypair(contract);
     let signature = signed.signature;
+    let salt = signed.contract.salt;
     ContractWithAddresses {
         data: signed
             .contract
+            .predicates
             .into_iter()
-            .map(|predicate| (ContentAddress(essential_hash::hash(&predicate)), predicate))
+            .map(|p| essential_hash::content_addr(&p))
             .collect(),
         signature,
+        salt,
     }
 }
 
@@ -25,19 +28,30 @@ fn list_of_contracts(
 ) -> (
     Vec<ContentAddress>,
     HashMap<ContentAddress, ContractWithAddresses>,
+    HashMap<ContentAddress, Predicate>,
 ) {
     let order = contract
         .iter()
         .map(essential_hash::contract_addr::from_contract)
         .collect();
     let map = contract
-        .into_iter()
+        .iter()
+        .cloned()
         .map(|contract| {
             let addr = essential_hash::contract_addr::from_contract(&contract);
-            (addr, contract(contract))
+            (addr, contract_with_addr(contract))
         })
         .collect();
-    (order, map)
+    let predicates = contract
+        .into_iter()
+        .flat_map(|c| {
+            c.predicates
+                .into_iter()
+                .map(|p| (essential_hash::content_addr(&p), p))
+                .collect::<HashMap<_, _>>()
+        })
+        .collect();
+    (order, map, predicates)
 }
 
 fn create_blocks(blocks: Vec<(u64, crate::Block)>) -> BTreeMap<Duration, crate::Block> {
@@ -52,10 +66,10 @@ fn create_blocks(blocks: Vec<(u64, crate::Block)>) -> BTreeMap<Duration, crate::
 
 #[test]
 fn test_page_contract() {
-    let mut expected = vec![
-        vec![predicate_with_salt(0)],
-        vec![predicate_with_salt(1)],
-        vec![predicate_with_salt(2), predicate_with_salt(3)],
+    let mut expected: Vec<Contract> = vec![
+        vec![predicate_with_salt(0)].into(),
+        vec![predicate_with_salt(1)].into(),
+        vec![predicate_with_salt(2), predicate_with_salt(3)].into(),
     ];
 
     // Paging yields contract ordered by CA, so make sure we expect this order.
@@ -63,30 +77,30 @@ fn test_page_contract() {
         contract.sort_by_key(essential_hash::content_addr);
     }
 
-    let (order, contract) = list_of_contracts(expected.clone());
+    let (order, contract, predicates) = list_of_contracts(expected.clone());
 
-    let r = page_contract(order.iter(), &contract, 0, 1);
+    let r = page_contract(order.iter(), &contract, &predicates, 0, 1);
     assert_eq!(r, vec![expected[0].clone()]);
 
-    let r = page_contract(order.iter(), &contract, 1, 1);
+    let r = page_contract(order.iter(), &contract, &predicates, 1, 1);
     assert_eq!(r, vec![expected[1].clone()]);
 
-    let r = page_contract(order.iter(), &contract, 1, 2);
+    let r = page_contract(order.iter(), &contract, &predicates, 1, 2);
     assert_eq!(r, vec![expected[2].clone()]);
 
-    let r = page_contract(order.iter(), &contract, 0, 2);
+    let r = page_contract(order.iter(), &contract, &predicates, 0, 2);
     assert_eq!(r, vec![expected[0].clone(), expected[1].clone()]);
 
-    let r = page_contract(order.iter(), &contract, 0, 3);
+    let r = page_contract(order.iter(), &contract, &predicates, 0, 3);
     assert_eq!(r, expected);
 }
 
 #[test]
 fn test_page_contract_by_time() {
-    let mut expected = vec![
-        vec![predicate_with_salt(0)],
-        vec![predicate_with_salt(1)],
-        vec![predicate_with_salt(2), predicate_with_salt(3)],
+    let mut expected: Vec<Contract> = vec![
+        vec![predicate_with_salt(0)].into(),
+        vec![predicate_with_salt(1)].into(),
+        vec![predicate_with_salt(2), predicate_with_salt(3)].into(),
     ];
 
     // Paging yields contract ordered by CA, so make sure we expect this order.
@@ -94,23 +108,51 @@ fn test_page_contract_by_time() {
         contract.sort_by_key(essential_hash::content_addr);
     }
 
-    let (order, contract) = list_of_contracts(expected.clone());
+    let (order, contract, predicates) = list_of_contracts(expected.clone());
     let order: BTreeMap<_, _> = order
         .into_iter()
         .enumerate()
         .map(|(i, v)| (duration_secs(i as u64), vec![v]))
         .collect();
 
-    let r = page_contract_by_time(&order, &contract, duration_secs(0)..duration_secs(1), 0, 1);
+    let r = page_contract_by_time(
+        &order,
+        &contract,
+        &predicates,
+        duration_secs(0)..duration_secs(1),
+        0,
+        1,
+    );
     assert_eq!(r, vec![expected[0].clone()]);
 
-    let r = page_contract_by_time(&order, &contract, duration_secs(1)..duration_secs(2), 0, 1);
+    let r = page_contract_by_time(
+        &order,
+        &contract,
+        &predicates,
+        duration_secs(1)..duration_secs(2),
+        0,
+        1,
+    );
     assert_eq!(r, vec![expected[1].clone()]);
 
-    let r = page_contract_by_time(&order, &contract, duration_secs(1)..duration_secs(10), 1, 1);
+    let r = page_contract_by_time(
+        &order,
+        &contract,
+        &predicates,
+        duration_secs(1)..duration_secs(10),
+        1,
+        1,
+    );
     assert_eq!(r, vec![expected[2].clone()]);
 
-    let r = page_contract_by_time(&order, &contract, duration_secs(1)..duration_secs(1), 0, 1);
+    let r = page_contract_by_time(
+        &order,
+        &contract,
+        &predicates,
+        duration_secs(1)..duration_secs(1),
+        0,
+        1,
+    );
     assert!(r.is_empty());
 }
 

@@ -10,7 +10,7 @@ create_test!(update_state);
 async fn update_state<S: Storage>(storage: S) {
     let predicate = sign_contract_with_random_keypair(vec![Predicate::empty()]);
     storage.insert_contract(predicate).await.unwrap();
-    let address = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]);
+    let address = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()].into());
     let key = vec![0; 4];
     let v = storage.update_state(&address, &key, vec![1]).await.unwrap();
     assert!(v.is_empty());
@@ -52,8 +52,9 @@ async fn update_state_batch<S: Storage>(storage: S) {
     storage.insert_contract(predicate).await.unwrap();
     let predicate = sign_contract_with_random_keypair(vec![predicate_with_salt(3)]);
     storage.insert_contract(predicate).await.unwrap();
-    let address_0 = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]);
-    let address_1 = essential_hash::contract_addr::from_contract(&vec![predicate_with_salt(3)]);
+    let address_0 = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()].into());
+    let address_1 =
+        essential_hash::contract_addr::from_contract(&vec![predicate_with_salt(3)].into());
     let key = vec![0; 4];
     let v = storage
         .update_state(&address_0, &key, vec![1])
@@ -105,13 +106,13 @@ async fn insert_contract<S: Storage>(storage: S) {
     let contracts = storage.list_contracts(None, None).await.unwrap();
     let mut s = vec![predicate_with_salt(1), predicate_with_salt(2)];
     s.sort_by_key(essential_hash::content_addr);
-    assert_eq!(contracts, vec![vec![Predicate::empty()], s]);
-    let address = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]);
+    assert_eq!(contracts, vec![vec![Predicate::empty()].into(), s.into()]);
+    let address = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()].into());
     let contract = storage.get_contract(&address).await.unwrap();
     assert_eq!(contract, Some(predicate_0));
 
     let address = PredicateAddress {
-        contract: essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]),
+        contract: essential_hash::contract_addr::from_contract(&vec![Predicate::empty()].into()),
         predicate: essential_hash::content_addr(&Predicate::empty()),
     };
     let predicate = storage.get_predicate(&address).await.unwrap();

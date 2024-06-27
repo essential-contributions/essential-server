@@ -13,8 +13,9 @@ use axum::{
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_server_types::{CheckSolution, QueryStateReads, QueryStateReadsOutput};
 use essential_types::{
+    contract::{Contract, SignedContract},
     convert::word_from_bytes,
-    predicate::{self, Predicate},
+    predicate::Predicate,
     solution::Solution,
     Block, ContentAddress, PredicateAddress, Word,
 };
@@ -87,8 +88,8 @@ where
     // Create all the endpoints.
     let app = Router::new()
         .route("/", get(health_check))
-        .route("/deploy-predicate-contract", post(deploy_contract))
-        .route("/get-predicate-contract/:address", get(get_contract))
+        .route("/deploy-contract", post(deploy_contract))
+        .route("/get-contract/:address", get(get_contract))
         .route("/get-predicate/:contract/:address", get(get_predicate))
         .route("/list-contracts", get(list_contracts))
         .route("/submit-solution", post(submit_solution))
@@ -250,7 +251,7 @@ where
 
 /// The get predicate get endpoint.
 ///
-/// Takes a contract content address and an predicate content address as path parameters.
+/// Takes a contract content address and a predicate content address as path parameters.
 /// Both are encoded as hex.
 async fn get_predicate<S>(
     State(essential): State<Essential<S>>,
@@ -412,7 +413,7 @@ where
     <S as StateRead>::Error: Send,
 {
     let outcome = essential
-        .check_solution_with_data(payload.solution, payload.contract)
+        .check_solution_with_contracts(payload.solution, payload.contracts)
         .await?;
     Ok(Json(outcome))
 }

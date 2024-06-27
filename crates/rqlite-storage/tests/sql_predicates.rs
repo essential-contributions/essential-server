@@ -20,16 +20,24 @@ fn test_insert_contract_double_insert() {
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),
             row.get::<_, String>(2).unwrap(),
-            row.get::<_, usize>(3).unwrap(),
+            row.get::<_, String>(3).unwrap(),
             row.get::<_, usize>(4).unwrap(),
+            row.get::<_, usize>(5).unwrap(),
         )
     });
     assert_eq!(
         result,
-        vec![(1, "hash1".to_string(), "signature1".to_string(), 1, 0,)]
+        vec![(
+            1,
+            "hash1".to_string(),
+            "salt".to_string(),
+            "signature1".to_string(),
+            1,
+            0,
+        )]
     );
 
-    let result = query(&conn, "select * from contract", [], |row| {
+    let result = query(&conn, "select * from predicates", [], |row| {
         (
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),

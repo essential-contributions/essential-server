@@ -1,11 +1,11 @@
 use essential_check as check;
 use essential_storage::Storage;
-use essential_types::{contract::SignedContract, predicate, ContentAddress};
+use essential_types::{contract::SignedContract, ContentAddress};
 
 #[cfg(test)]
 mod tests;
 
-/// Validates an predicate and deploys it to storage.
+/// Validates a predicate and deploys it to storage.
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err(level=tracing::Level::DEBUG), ret(Display)))]
 pub async fn deploy<S>(storage: &S, contract: SignedContract) -> anyhow::Result<ContentAddress>
 where

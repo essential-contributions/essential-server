@@ -2,7 +2,7 @@ use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason},
     CommitData, Storage,
 };
-use essential_types::{ContentAddress, PredicateAddress, Word};
+use essential_types::{contract::Contract, ContentAddress, PredicateAddress, Word};
 use pretty_assertions::assert_eq;
 use test_dbs::create_test;
 use test_utils::{
@@ -31,11 +31,12 @@ async fn insert_contract<S: Storage>(storage: S) {
     // Insert many contracts
     let contracts: Vec<_> = (0..10)
         .map(|i| {
-            let mut contract = vec![
+            let mut contract: Contract = vec![
                 predicate_with_salt(i),
                 predicate_with_salt(i + 1),
                 predicate_with_salt(i + 2),
-            ];
+            ]
+            .into();
             contract.sort_by_key(essential_hash::content_addr);
             sign_contract_with_random_keypair(contract)
         })
@@ -59,11 +60,12 @@ async fn insert_contract<S: Storage>(storage: S) {
     // Insert contracts with storage
     let storage_contracts: Vec<_> = (0..10)
         .map(|i| {
-            let mut contract = vec![
+            let mut contract: Contract = vec![
                 predicate_with_salt_and_state(i, i),
                 predicate_with_salt_and_state(i + 1, i + 1),
                 predicate_with_salt_and_state(i + 2, i + 2),
-            ];
+            ]
+            .into();
             contract.sort_by_key(essential_hash::content_addr);
             sign_contract_with_random_keypair(contract)
         })
@@ -223,7 +225,7 @@ async fn get_predicate<S: Storage>(storage: S) {
     let contract_address2 = essential_hash::contract_addr::from_contract(&contract2.contract);
 
     // Get existing predicate
-    for predicate in &contract.contract {
+    for predicate in &contract.contract.predicates {
         let address = PredicateAddress {
             contract: contract_address.clone(),
             predicate: essential_hash::content_addr(predicate),
@@ -232,7 +234,7 @@ async fn get_predicate<S: Storage>(storage: S) {
         assert_eq!(result, *predicate);
     }
 
-    for predicate in &contract2.contract {
+    for predicate in &contract2.contract.predicates {
         let address = PredicateAddress {
             contract: contract_address2.clone(),
             predicate: essential_hash::content_addr(predicate),

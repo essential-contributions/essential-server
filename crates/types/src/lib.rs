@@ -44,8 +44,8 @@ pub enum SolutionOutcome {
 pub struct CheckSolution {
     /// The solution to check.
     pub solution: Solution,
-    /// The contract this solution depends on.
-    pub contract: Contract,
+    /// The contracts this solution depends on.
+    pub contracts: Vec<Contract>,
 }
 
 /// Query the results of running an ordered list of state read programs.
@@ -126,7 +126,7 @@ pub struct Slots {
 }
 
 impl QueryStateReads {
-    /// Create a query from a solution and an predicate.
+    /// Create a query from a solution and a predicate.
     ///
     /// It is assumed the provided predicate is the predicate that the solution data
     /// at the provided index is solving. This is not checked.

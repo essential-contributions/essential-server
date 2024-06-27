@@ -40,7 +40,7 @@ impl Default for MemoryStorage {
 struct Inner {
     contracts: HashMap<ContentAddress, ContractWithAddresses>,
     predicates: HashMap<ContentAddress, Predicate>,
-    predicate_time_index: BTreeMap<Duration, Vec<ContentAddress>>,
+    contract_time_index: BTreeMap<Duration, Vec<ContentAddress>>,
     solution_pool: HashSet<Hash>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, Vec<(SolutionFailReason, Duration)>>,
@@ -74,14 +74,11 @@ impl ContractWithAddresses {
         addrs
     }
 
-    /// All contract in the contract, ordered by their CA.
-    fn predicates<'pred>(
-        &self,
-        predicates: &'pred HashMap<ContentAddress, Predicate>,
-    ) -> Vec<&'pred Predicate> {
+    /// All predicates in the contract, ordered by their CA.
+    fn predicates_owned(&self, predicates: &HashMap<ContentAddress, Predicate>) -> Vec<Predicate> {
         self.predicate_addrs()
             .into_iter()
-            .map(|addr| &predicates[addr])
+            .filter_map(|addr| predicates.get(addr).cloned())
             .collect()
     }
 
@@ -90,7 +87,7 @@ impl ContractWithAddresses {
     /// Predicates in the returned contract will be ordered by their CA.
     fn signed_contract(&self, predicates: &HashMap<ContentAddress, Predicate>) -> SignedContract {
         let signature = self.signature.clone();
-        let predicates = self.predicates(predicates).into_iter().cloned().collect();
+        let predicates = self.predicates_owned(predicates);
         SignedContract {
             contract: Contract {
                 salt: self.salt,
@@ -166,7 +163,7 @@ impl Storage for MemoryStorage {
             .collect();
 
         let contract_addr =
-            essential_hash::contract_addr::from_predicate_addrs(data.keys().cloned(), salt);
+            essential_hash::contract_addr::from_predicate_addrs(data.keys().cloned(), &salt);
 
         let contract_with_addrs = ContractWithAddresses {
             salt,
@@ -180,7 +177,7 @@ impl Storage for MemoryStorage {
                 .contracts
                 .insert(contract_addr.clone(), contract_with_addrs);
             if contains.is_none() {
-                i.predicate_time_index
+                i.contract_time_index
                     .entry(time)
                     .or_default()
                     .push(contract_addr.clone());
@@ -222,6 +219,12 @@ impl Storage for MemoryStorage {
 
     async fn get_predicate(&self, address: &PredicateAddress) -> anyhow::Result<Option<Predicate>> {
         let v = self.inner.apply(|i| {
+            if i.contracts
+                .get(&address.contract)
+                .map_or(true, |c| !c.data.contains(&address.predicate))
+            {
+                return None;
+            }
             let predicate = i.predicates.get(&address.predicate)?;
             Some(predicate.clone())
         });
@@ -248,8 +251,9 @@ impl Storage for MemoryStorage {
             Some(range) => {
                 let v = self.inner.apply(|i| {
                     values::page_contract_by_time(
-                        &i.predicate_time_index,
+                        &i.contract_time_index,
                         &i.contracts,
+                        &i.predicates,
                         range,
                         page,
                         PAGE_SIZE,
@@ -260,8 +264,9 @@ impl Storage for MemoryStorage {
             None => {
                 let v = self.inner.apply(|i| {
                     values::page_contract(
-                        i.predicate_time_index.values().flatten(),
+                        i.contract_time_index.values().flatten(),
                         &i.contracts,
+                        &i.predicates,
                         page,
                         PAGE_SIZE,
                     )

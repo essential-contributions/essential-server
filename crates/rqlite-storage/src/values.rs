@@ -1,12 +1,15 @@
-use std::{collections::BTreeMap, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
 
 use anyhow::{bail, ensure};
 use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcomes};
 use essential_types::{
     contract::{Contract, SignedContract},
-    predicate::{self, Predicate},
+    predicate::Predicate,
     solution::Solution,
-    Batch, Block, Signature, Word,
+    Batch, Block, Hash, Signature, Word,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -63,10 +66,12 @@ pub fn single_value(queries: &QueryValues) -> Option<&Value> {
 }
 
 pub fn get_contract(queries: QueryValues) -> anyhow::Result<Option<SignedContract>> {
-    // Expecting two results because we made two queries
-    let (signature, contract) = match &queries.queries[..] {
-        [Some(Rows { rows: signature }), Some(Rows { rows: contract })] => (signature, contract),
-        [None, None] => return Ok(None),
+    // Expecting three results because we made two queries
+    let (signature, salt, contract) = match &queries.queries[..] {
+        [Some(Rows { rows: signature }), Some(Rows { rows: salt }), Some(Rows { rows: contract })] => {
+            (signature, salt, contract)
+        }
+        [None, None, None] => return Ok(None),
         _ => bail!("expected two queries {:?}", queries),
     };
 
@@ -80,11 +85,24 @@ pub fn get_contract(queries: QueryValues) -> anyhow::Result<Option<SignedContrac
         bail!("expected a single column");
     };
 
+    // Salt should only have a single row
+    let [Columns { columns: salt }] = &salt[..] else {
+        bail!("expected a single row for salt");
+    };
+
+    // Salt should only have a single column
+    let [Value::String(salt)] = &salt[..] else {
+        bail!("expected a single column for salt");
+    };
+
     // Decode the signature
     let signature: Signature = decode(signature)?;
 
-    // Decode the contract
-    let contract: Contract = contract
+    // Decode the salt
+    let salt: Hash = decode(salt)?;
+
+    // Decode the predicates
+    let predicates: Vec<Predicate> = contract
         .iter()
         .map(|Columns { columns }| {
             let [predicate] = &columns[..] else {
@@ -98,7 +116,7 @@ pub fn get_contract(queries: QueryValues) -> anyhow::Result<Option<SignedContrac
         .collect::<Result<_, _>>()?;
 
     Ok(Some(SignedContract {
-        contract,
+        contract: Contract { predicates, salt },
         signature,
     }))
 }
@@ -145,25 +163,46 @@ pub fn get_solution(
 }
 
 pub fn list_contracts(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Contract>> {
-    // Only expecting a single query.
-    let rows = match &queries[..] {
-        [Some(Rows { rows })] => rows,
-        [None] => return Ok(Vec::new()),
+    // Only expecting two queries.
+    let (salts, predicates) = match &queries[..] {
+        [Some(Rows { rows: salts }), Some(Rows { rows: predicates })] => (salts, predicates),
+        [None, None] => return Ok(Vec::new()),
         _ => bail!("expected a single query {:?}", queries),
     };
 
     // If the query isn't empty there should be at least one row.
-    if rows.is_empty() {
+    if salts.is_empty() || predicates.is_empty() {
         bail!("expected at least one row")
     }
 
-    // Expecting an predicate per row with two columns.
+    let salts =
+        salts.iter().try_fold(
+            HashMap::<_, _>::new(),
+            |mut map, Columns { columns }| match &columns[..] {
+                [serde_json::Value::Number(contract_id), serde_json::Value::String(salt)] => {
+                    match contract_id.as_u64() {
+                        Some(contract_id) => {
+                            let salt: Hash = decode(salt)?;
+                            if map.insert(contract_id, salt).is_none() {
+                                Ok(map)
+                            } else {
+                                Err(anyhow::anyhow!("duplicate contract_id for salt"))
+                            }
+                        }
+                        None => Err(anyhow::anyhow!("failed to parse contract_id")),
+                    }
+                }
+                _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
+            },
+        )?;
+
+    // Expecting a predicate per row with two columns.
     // The first column is the contract_id and the second column is the predicate.
     // The contract are grouped into their respective contracts.
     //
     // TODO: The sql outputs the contract ordered by contract_id, then by predicate id.
     // Could we use this fact to avoid needing to sort them into a BTreeMap?
-    let out = rows
+    let contracts = predicates
         .iter()
         .try_fold(
             BTreeMap::<_, Vec<_>>::new(),
@@ -181,11 +220,20 @@ pub fn list_contracts(QueryValues { queries }: QueryValues) -> anyhow::Result<Ve
                 _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),
             },
         )?
-        // TODO: Is there a way to avoid this double iteration?
-        .into_values()
-        .collect();
+        // // TODO: Is there a way to avoid this double iteration?
+        .into_iter()
+        .map(|(contract_id, predicates)| {
+            let salt = salts
+                .get(&contract_id)
+                .ok_or_else(|| anyhow::anyhow!("missing salt for contract_id"))?;
+            Ok(Contract {
+                salt: *salt,
+                predicates,
+            })
+        })
+        .collect::<anyhow::Result<_>>()?;
 
-    Ok(out)
+    Ok(contracts)
 }
 
 pub fn list_solutions_pool(queries: QueryValues) -> anyhow::Result<Vec<Solution>> {

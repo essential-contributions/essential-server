@@ -6,8 +6,8 @@
 use std::{future::Future, ops::Range, time::Duration};
 
 use essential_types::{
-    contract::{self, Contract, SignedContract},
-    predicate::{self, Predicate},
+    contract::{Contract, SignedContract},
+    predicate::Predicate,
     solution::Solution,
     Block, ContentAddress, Hash, Key, PredicateAddress, Word,
 };

@@ -1,9 +1,9 @@
 SELECT
-    contracts.predicate
+    predicates.predicate
 FROM
-    contract
-    JOIN contract_pairing ON contracts.id = contract_pairing.predicate_id
+    predicates 
+    JOIN contract_pairing ON predicates.id = contract_pairing.predicate_id
     JOIN contracts ON contracts.id = contract_pairing.contract_id
 WHERE
     contracts.content_hash = ?
-    AND contracts.content_hash = ?;
+    AND predicates.content_hash = ?;

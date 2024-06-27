@@ -28,7 +28,7 @@ async fn test_inline_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRangeExtern,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
 
@@ -44,7 +44,7 @@ async fn test_inline_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRangeExtern,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let state_read = vec![read_key_0.clone(), read_key_1];
@@ -118,7 +118,7 @@ async fn test_inline_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRangeExtern,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
 
@@ -298,7 +298,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let read_key_this_dec_var = essential_state_read_vm::asm::to_bytes(vec![
@@ -310,7 +310,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let read_key_this_pre_slot = essential_state_read_vm::asm::to_bytes(vec![
@@ -336,7 +336,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let read_key_this_post_slot = essential_state_read_vm::asm::to_bytes(vec![
@@ -349,7 +349,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let read_other_state = essential_state_read_vm::asm::to_bytes(vec![
@@ -364,7 +364,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(),  // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(),  // slot index
         essential_state_read_vm::asm::StateRead::KeyRangeExtern,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let read_key_other_pre_slot = essential_state_read_vm::asm::to_bytes(vec![
@@ -390,7 +390,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let read_key_other_post_slot = essential_state_read_vm::asm::to_bytes(vec![
@@ -403,7 +403,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let read_key_other_trans_data = essential_state_read_vm::asm::to_bytes(vec![
@@ -417,7 +417,7 @@ async fn test_from_solution_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
     let state_read = vec![
@@ -437,8 +437,11 @@ async fn test_from_solution_query_state_reads() {
         directive: Directive::Satisfy,
     };
 
-    let (addr, storage) =
-        deploy_contracts(vec![vec![predicate.clone()], vec![Predicate::empty()]]).await;
+    let (addr, storage) = deploy_contracts(vec![
+        vec![predicate.clone()].into(),
+        vec![Predicate::empty()].into(),
+    ])
+    .await;
 
     let solution = Solution {
         data: vec![

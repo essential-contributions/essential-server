@@ -21,17 +21,17 @@ cargo run -p essential-rest-server --release -- --help
 ```
 ## API
 > Note that this API is very likely to change as it's currently a WIP.
-### POST `/deploy-predicate-contract`
+### POST `/deploy-contract`
 Body: `SignedPredicates` as JSON \
 Returns: `ContentAddress` as JSON
 
 **Example:**
 ```bash
 curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" \
-    -d '{"contract":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"signature":"721BD7C79A0F303B7EDA3319CE84ADD4AB37BBED21E0570E6334D7864E3B27F121C74A4D8991CB5966BE13BD54544AA81EE26D98E76A3ED6C4BB237529C1188901"}' \
-    http://localhost:59498/deploy-predicate-contract
+    -d '{"contract":{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"signature":"2B157D9FB985A8C35C502092AE953C651D20DED7BEC9021D39497F86BF33849A2DABEF86AD8D22F8C56C97B57CFF02C54457735E64F0D879EE6D31303CBE006E00"}' \
+    http://localhost:59498/deploy-contract
 ```
-### GET `/get-predicate-contract/:address`
+### GET `/get-contract/:address`
 Parameters: 
 - `:address` = `[u8; 32]` as hex string. This is the content address of the contract.
 
@@ -39,7 +39,7 @@ Returns: `Option<SignedContract>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-predicate-contract/6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-contract/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236
 ```
 ### GET `/get-predicate/:contract/:address`
 Parameters: 
@@ -50,7 +50,7 @@ Returns: `Option<Predicate>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-predicate/6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312/709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-predicate/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236/709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C
 ```
 ### GET `/list-contracts`
 Query parameters: 
@@ -69,7 +69,7 @@ Returns: `Hash` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"predicate_to_solve":{"contract":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/submit-solution
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/submit-solution
 ```
 ### GET `/list-solutions-pool`
 Query parameters: 
@@ -90,7 +90,7 @@ Returns: `Option<Word>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/query-state/6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312/00
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/query-state/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236/00
 ```
 ### GET `/list-winning-blocks`
 Query parameters: 
@@ -117,7 +117,7 @@ pub enum SolutionOutcome {
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/solution-outcome/421F1ED9E19132757E2DB127FD35E58E08EFE3D77EE2F96FEA60B75D36251EA2"
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/solution-outcome/11CAD716457F6D6524EF84FBA73D11BB5E18658F6EE72EBAC8A14323B37A68FC
 ```
 ### Post `/check-solution`
 Check a solution against deployed contract without changing state.\
@@ -133,7 +133,7 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"predicate_to_solve":{"contract":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/check-solution
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/check-solution
 ```
 ### Post `/check-solution-with-data`
 Check a solution with all contract without changing state.\
@@ -155,7 +155,7 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"solution":{"data":[{"predicate_to_solve":{"contract":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"contract":[{"state_read":[],"constraints":[],"directive":"Satisfy"}]}' http://localhost:59498/check-solution-with-data
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"solution":{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"contracts":[{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}]}' http://localhost:59498/check-solution-with-data
 ```
 
 ### Post `/query-state-reads`
@@ -183,5 +183,5 @@ pub enum QueryStateReadsOutput {
 These types are defined in the `essential-server-types` crate in this repo.\
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"state_read":[],"index":0,"solution":{"data":[{"predicate_to_solve":{"contract":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"request_type":{"All":"All"}}' http://localhost:59498/query-state-reads
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"state_read":[],"index":0,"solution":{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"request_type":{"All":"All"}}' http://localhost:59498/query-state-reads
 ```

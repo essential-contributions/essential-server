@@ -46,7 +46,7 @@ async fn insert_contract<S: Storage>(storage: S) {
     );
 
     for contract in &contracts {
-        for predicate in &contract.contract {
+        for predicate in &contract.contract.predicates {
             let address = PredicateAddress {
                 contract: essential_hash::contract_addr::from_contract(&contract.contract),
                 predicate: essential_hash::content_addr(predicate),

@@ -75,17 +75,17 @@ pub fn validate_contract(
     Ok(())
 }
 
-/// Ensure that all contract referred to by the solution have been read from the storage.
+/// Ensure that all contracts referred to by the solution have been read from the storage.
 pub fn contains_all_contract(
     solution: &Solution,
-    contract: &HashMap<PredicateAddress, Arc<Predicate>>,
+    predicates: &HashMap<PredicateAddress, Arc<Predicate>>,
 ) -> anyhow::Result<()> {
     anyhow::ensure!(
         solution
             .data
             .iter()
-            .all(|data| contract.contains_key(&data.predicate_to_solve)),
-        "All contract must be in the contract"
+            .all(|data| predicates.contains_key(&data.predicate_to_solve)),
+        "All predicates must be in the contracts"
     );
     Ok(())
 }

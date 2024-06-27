@@ -7,15 +7,16 @@ use essential_server_types::{
 };
 use essential_storage::{StateStorage, Storage};
 use essential_types::{
+    contract::{Contract, SignedContract},
     convert::{bytes_from_word, word_4_from_u8_32},
-    predicate::{self, Predicate},
+    predicate::Predicate,
     solution::{Solution, SolutionData},
     Block, ContentAddress, PredicateAddress, Word,
 };
 use test_utils::{
     empty::Empty, sign_contract_with_random_keypair, solution_with_decision_variables,
 };
-use utils::{contractup, contractup_with_mem, TestServer};
+use utils::{setup, setup_with_mem, TestServer};
 
 mod utils;
 
@@ -26,11 +27,11 @@ async fn test_deploy_contract() {
         url,
         shutdown,
         jh,
-    } = contractup().await;
+    } = setup().await;
 
     let contract = sign_contract_with_random_keypair(vec![Predicate::empty()]);
     let response = client
-        .post(url.join("/deploy-predicate-contract").unwrap())
+        .post(url.join("/deploy-contract").unwrap())
         .json(&contract)
         .send()
         .await
@@ -40,9 +41,7 @@ async fn test_deploy_contract() {
     let expected = essential_hash::contract_addr::from_contract(&contract.contract);
     assert_eq!(address, expected);
 
-    let a = url
-        .join(&format!("/get-predicate-contract/{address}"))
-        .unwrap();
+    let a = url.join(&format!("/get-contract/{address}")).unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
     let contract = response
@@ -77,14 +76,14 @@ async fn test_deploy_contract() {
         .append_pair("page", "0");
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let contract = response.json::<Vec<Contract>>().await.unwrap();
-    assert_eq!(contract, vec![contract.contract.clone()]);
+    let contracts = response.json::<Vec<Contract>>().await.unwrap();
+    assert_eq!(contract.contract, contracts[0].clone());
 
     let a = url.join("/list-contracts").unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let contract = response.json::<Vec<Contract>>().await.unwrap();
-    assert_eq!(contract, vec![contract.contract.clone()]);
+    let contracts = response.json::<Vec<Contract>>().await.unwrap();
+    assert_eq!(contract.contract, contracts[0].clone());
 
     let mut a = url.join("/list-contracts").unwrap();
     a.query_pairs_mut().append_pair("page", "1");
@@ -112,7 +111,7 @@ async fn test_submit_solution() {
         url,
         shutdown,
         jh,
-    } = contractup_with_mem(mem).await;
+    } = setup_with_mem(mem).await;
     let mut solution = solution_with_decision_variables(1);
     solution.data[0].predicate_to_solve = PredicateAddress {
         contract: contract_addr,
@@ -161,7 +160,7 @@ async fn test_query_state() {
         url,
         shutdown,
         jh,
-    } = contractup_with_mem(mem).await;
+    } = setup_with_mem(mem).await;
 
     let a = url
         .join(&format!(
@@ -201,7 +200,7 @@ async fn test_query_state_reads() {
         essential_state_read_vm::asm::Stack::Push(1).into(), // num values to read
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRangeExtern,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect();
 
@@ -218,7 +217,7 @@ async fn test_query_state_reads() {
         url,
         shutdown,
         jh,
-    } = contractup_with_mem(mem).await;
+    } = setup_with_mem(mem).await;
 
     let response = client
         .post(url.join("/query-state-reads").unwrap())
@@ -263,7 +262,7 @@ async fn test_list_winning_blocks() {
         url,
         shutdown,
         jh,
-    } = contractup_with_mem(mem).await;
+    } = setup_with_mem(mem).await;
 
     let mut a = url.join("/list-winning-blocks").unwrap();
     a.query_pairs_mut().append_pair("page", "0");
@@ -291,7 +290,7 @@ async fn test_solution_outcome() {
         url,
         shutdown,
         jh,
-    } = contractup_with_mem(mem).await;
+    } = setup_with_mem(mem).await;
 
     let a = url.join(&format!("/solution-outcome/{ca}")).unwrap();
     let response = client.get(a).send().await.unwrap();
@@ -315,14 +314,14 @@ async fn test_check_solution() {
         url,
         shutdown,
         jh,
-    } = contractup_with_mem(mem).await;
+    } = setup_with_mem(mem).await;
 
-    let contract = essential_hash::contract_addr::from_contract(&contract.contract);
+    let contract_addr = essential_hash::contract_addr::from_contract(&contract.contract);
     let address = essential_hash::content_addr(&contract.contract[0]);
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
         predicate_to_solve: PredicateAddress {
-            contract,
+            contract: contract_addr,
             predicate: address,
         },
         decision_variables: vec![],
@@ -361,15 +360,15 @@ async fn test_check_solution_with_data() {
         url,
         shutdown,
         jh,
-    } = contractup().await;
+    } = setup().await;
 
-    let contract = vec![Predicate::empty()];
-    let contract = ContentAddress(essential_hash::hash(&contract));
-    let address = ContentAddress(essential_hash::hash(&contract[0]));
+    let contract = vec![Predicate::empty()].into();
+    let contract_addr = essential_hash::contract_addr::from_contract(&contract);
+    let address = essential_hash::content_addr(&contract[0]);
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
         predicate_to_solve: PredicateAddress {
-            contract,
+            contract: contract_addr.clone(),
             predicate: address,
         },
         decision_variables: vec![],
@@ -378,7 +377,7 @@ async fn test_check_solution_with_data() {
     });
     let input = CheckSolution {
         solution,
-        contract: contract,
+        contracts: vec![contract],
     };
     let response = client
         .post(url.join("/check-solution-with-data").unwrap())
@@ -386,7 +385,7 @@ async fn test_check_solution_with_data() {
         .send()
         .await
         .unwrap();
-    assert_eq!(response.status(), 200);
+    assert_eq!(response.status(), 200, "{}", response.text().await.unwrap());
     let value = response
         .json::<Option<CheckSolutionOutput>>()
         .await

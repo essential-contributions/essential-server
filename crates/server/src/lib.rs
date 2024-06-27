@@ -15,7 +15,7 @@ pub use essential_storage::Storage;
 use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{
     contract::{Contract, SignedContract},
-    predicate::{self, Predicate},
+    predicate::Predicate,
     solution::Solution,
     Block, ContentAddress, Hash, Key, PredicateAddress, Word,
 };
@@ -103,19 +103,24 @@ where
     pub async fn check_solution_with_contracts(
         &self,
         solution: Solution,
-        contract: Vec<Contract>,
+        contracts: Vec<Contract>,
     ) -> anyhow::Result<CheckSolutionOutput> {
-        let contract = ContentAddress(essential_hash::hash(&contract));
-        let contract: HashMap<_, _> = contract
+        let predicates: HashMap<_, _> = contracts
             .into_iter()
-            .map(|predicate| {
-                (
-                    PredicateAddress {
-                        contract: contract.clone(),
-                        predicate: ContentAddress(essential_hash::hash(&predicate)),
-                    },
-                    Arc::new(predicate),
-                )
+            .flat_map(|contract| {
+                let contract_addr = essential_hash::contract_addr::from_contract(&contract);
+                contract.predicates.into_iter().map({
+                    let contract_addr = contract_addr.clone();
+                    move |predicate| {
+                        (
+                            PredicateAddress {
+                                contract: contract_addr.clone(),
+                                predicate: essential_hash::content_addr(&predicate),
+                            },
+                            Arc::new(predicate),
+                        )
+                    }
+                })
             })
             .collect();
 
@@ -125,7 +130,7 @@ where
         let config = self.config.clone();
         let solution = Arc::new(solution);
         let (_post_state, utility, gas) =
-            checked_state_transition(&transaction, solution, &contract, config).await?;
+            checked_state_transition(&transaction, solution, &predicates, config).await?;
         Ok(CheckSolutionOutput { utility, gas })
     }
 
@@ -234,7 +239,7 @@ where
     let pre = pre_state.view();
     let post = post_state.view();
     let (util, gas) =
-        check::solution::check_contract(&pre, &post, solution.clone(), get_predicate, config)
+        check::solution::check_predicates(&pre, &post, solution.clone(), get_predicate, config)
             .await?;
 
     Ok((post_state, util, gas))

@@ -143,7 +143,7 @@ fn state_read_error_predicate(salt: Word) -> Predicate {
         essential_state_read_vm::asm::Stack::Push(1).into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect()];
     predicate.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
@@ -179,7 +179,7 @@ fn state_read_error_predicate(salt: Word) -> Predicate {
 
 #[tokio::test]
 async fn test_tracing() {
-    std::env::contract_var("RUST_LOG", "trace");
+    std::env::set_var("RUST_LOG", "trace");
     #[cfg(feature = "tracing")]
     let _ = tracing_subscriber::fmt::try_init();
     let predicate: Predicate = state_read_error_predicate(1);

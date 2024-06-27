@@ -13,7 +13,7 @@ use essential_storage::{
 };
 use essential_types::{
     contract::{Contract, SignedContract},
-    predicate, Block, ContentAddress, Hash, Key, Word,
+    Block, ContentAddress, Hash, Key, Word,
 };
 use futures::FutureExt;
 use std::{pin::Pin, sync::Arc, time::Duration};
@@ -327,6 +327,7 @@ impl Storage for RqliteStorage {
         let contract_addr = essential_hash::contract_addr::from_contract(&contract.contract);
         let address = encode(&contract_addr);
         let signature = encode(&contract.signature);
+        let salt = encode(&contract.contract.salt);
 
         // For each predicate, insert the predicate and the contract pairing.
         let contract = contract.contract.iter().flat_map(|predicate| {
@@ -335,7 +336,7 @@ impl Storage for RqliteStorage {
             [
                 include_sql!(
                     owned
-                    "insert/contract.sql",
+                    "insert/predicates.sql",
                     predicate,
                     hash.clone()
                 ),
@@ -350,8 +351,9 @@ impl Storage for RqliteStorage {
 
         // Insert the contract and storage layout then the contract and pairings.
         let mut inserts = vec![include_sql!(owned
-            "insert/contract.sql",
+            "insert/contracts.sql",
             address.clone(),
+            salt,
             signature,
             unix_time.as_secs(),
             unix_time.subsec_nanos()
@@ -438,6 +440,7 @@ impl Storage for RqliteStorage {
         let address = encode(address);
         let sql = &[
             include_sql!("query/get_contract_signature.sql", address.clone()),
+            include_sql!("query/get_contract_salt.sql", address.clone()),
             include_sql!("query/get_contract.sql", address),
         ];
         let queries = self.query_values(sql).await?;
@@ -452,19 +455,31 @@ impl Storage for RqliteStorage {
         let page = page.unwrap_or(0);
         let queries = match time_range {
             Some(range) => {
-                let sql = &[include_sql!(
-                    "query/list_contracts_by_time.sql",
-                    range.start.as_secs(),
-                    range.start.subsec_nanos(),
-                    range.end.as_secs(),
-                    range.end.subsec_nanos(),
-                    PAGE_SIZE,
-                    page
-                )];
+                let sql = &[
+                    include_sql!(
+                        "query/list_contract_salts_by_time.sql",
+                        range.start.as_secs(),
+                        range.start.subsec_nanos(),
+                        range.end.as_secs(),
+                        range.end.subsec_nanos(),
+                        PAGE_SIZE,
+                        page
+                    ),
+                    include_sql!(
+                        "query/list_contracts_by_time.sql",
+                        range.start.as_secs(),
+                        range.start.subsec_nanos(),
+                        range.end.as_secs(),
+                        range.end.subsec_nanos(),
+                        PAGE_SIZE,
+                        page
+                    ),
+                ];
                 self.query_values(sql).await?
             }
             None => {
                 let sql = &[
+                    include_sql!(named "query/list_contract_salts.sql", "page_size" => PAGE_SIZE, "page_number" => page),
                     include_sql!(named "query/list_contracts.sql", "page_size" => PAGE_SIZE, "page_number" => page),
                 ];
                 self.query_values(sql).await?

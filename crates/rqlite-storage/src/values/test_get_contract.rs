@@ -6,7 +6,7 @@ use test_utils::{empty::Empty, predicate_with_salt, sign_contract_with_random_ke
 #[test]
 fn test_empty_query() {
     let queries = QueryValues {
-        queries: vec![None, None],
+        queries: vec![None, None, None],
     };
 
     assert_eq!(get_contract(queries).unwrap(), None);
@@ -15,7 +15,7 @@ fn test_empty_query() {
 #[test]
 fn test_invalid_query() {
     let queries = QueryValues {
-        queries: vec![None, None, None],
+        queries: vec![None, None, None, None],
     };
 
     get_contract(queries).unwrap_err();
@@ -50,12 +50,17 @@ fn test_signature_single_predicate() {
     let SignedContract {
         contract,
         signature,
-    } = sign_contract_with_random_keypair(vec![Predicate::empty()].into());
+    } = sign_contract_with_random_keypair(vec![Predicate::empty()]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![Value::String(encode(&signature))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&contract.salt))],
                 }],
             }),
             Some(Rows {
@@ -80,7 +85,7 @@ fn test_invalid_data() {
     let SignedContract {
         contract,
         signature,
-    } = sign_contract_with_random_keypair(vec![Predicate::empty()].into());
+    } = sign_contract_with_random_keypair(vec![Predicate::empty()]);
 
     let queries = QueryValues {
         queries: vec![
@@ -120,7 +125,7 @@ fn test_single_predicate_without_sig() {
     let SignedContract {
         contract,
         signature: _,
-    } = sign_contract_with_random_keypair(vec![Predicate::empty()].into());
+    } = sign_contract_with_random_keypair(vec![Predicate::empty()]);
     let queries = QueryValues {
         queries: vec![
             None,
@@ -140,14 +145,17 @@ fn test_signature_multiple_predicate() {
     let SignedContract {
         contract,
         signature,
-    } = sign_contract_with_random_keypair(
-        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
-    );
+    } = sign_contract_with_random_keypair(vec![predicate_with_salt(1), predicate_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![Value::String(encode(&signature))],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![Value::String(encode(&contract.salt))],
                 }],
             }),
             Some(Rows {
@@ -176,9 +184,7 @@ fn test_invalid_signature_multiple_predicate() {
     let SignedContract {
         contract,
         signature: _,
-    } = sign_contract_with_random_keypair(
-        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
-    );
+    } = sign_contract_with_random_keypair(vec![predicate_with_salt(1), predicate_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -205,9 +211,7 @@ fn test_signature_multiple_predicate_invalid() {
     let SignedContract {
         contract,
         signature,
-    } = sign_contract_with_random_keypair(
-        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
-    );
+    } = sign_contract_with_random_keypair(vec![predicate_with_salt(1), predicate_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -231,9 +235,7 @@ fn test_multi_column_sig() {
     let SignedContract {
         contract,
         signature,
-    } = sign_contract_with_random_keypair(
-        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
-    );
+    } = sign_contract_with_random_keypair(vec![predicate_with_salt(1), predicate_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -263,9 +265,7 @@ fn test_multi_row_sig() {
     let SignedContract {
         contract,
         signature,
-    } = sign_contract_with_random_keypair(
-        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
-    );
+    } = sign_contract_with_random_keypair(vec![predicate_with_salt(1), predicate_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -297,9 +297,7 @@ fn test_multi_row_predicate() {
     let SignedContract {
         contract,
         signature,
-    } = sign_contract_with_random_keypair(
-        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
-    );
+    } = sign_contract_with_random_keypair(vec![predicate_with_salt(1), predicate_with_salt(2)]);
     let queries = QueryValues {
         queries: vec![
             Some(Rows {

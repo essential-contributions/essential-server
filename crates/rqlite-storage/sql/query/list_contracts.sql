@@ -5,7 +5,7 @@ WITH unique_contract_ids AS (
     ORDER BY contract_id
     LIMIT :page_size OFFSET :page_size * :page_number
 )
--- Step 2: Retrievepredicates for the contracts in the range
+-- Step 2: Retrieve predicates for the contracts in the range
 SELECT
     isp.contract_id,
     i.predicate

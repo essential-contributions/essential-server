@@ -14,17 +14,21 @@ use crate::ContractWithAddresses;
 mod tests;
 
 pub fn page_contract<'a>(
-    predicate_hashes: impl Iterator<Item = &'a ContentAddress>,
+    contract_hashes: impl Iterator<Item = &'a ContentAddress>,
     contract: &HashMap<ContentAddress, ContractWithAddresses>,
+    predicates: &HashMap<ContentAddress, Predicate>,
     page: usize,
     page_size: usize,
 ) -> Vec<Contract> {
     let start = page * page_size;
-    predicate_hashes
+    contract_hashes
         .skip(start)
         .filter_map(|v| {
             let contract = contract.get(v)?;
-            Some(contract.contract().cloned().collect::<Vec<_>>())
+            Some(Contract {
+                predicates: contract.predicates_owned(predicates),
+                salt: contract.salt,
+            })
         })
         .filter(|v| !v.is_empty())
         .take(page_size)
@@ -32,20 +36,24 @@ pub fn page_contract<'a>(
 }
 
 pub fn page_contract_by_time(
-    predicate_times: &BTreeMap<Duration, Vec<ContentAddress>>,
+    contract_times: &BTreeMap<Duration, Vec<ContentAddress>>,
     contract: &HashMap<ContentAddress, ContractWithAddresses>,
+    predicates: &HashMap<ContentAddress, Predicate>,
     range: Range<Duration>,
     page: usize,
     page_size: usize,
 ) -> Vec<Contract> {
     let start = page * page_size;
-    predicate_times
+    contract_times
         .range(range)
         .skip(start)
         .flat_map(|(_, v)| {
             v.iter().filter_map(|v| {
                 let contract = contract.get(v)?;
-                Some(contract.contract().cloned().collect::<Vec<_>>())
+                Some(Contract {
+                    predicates: contract.predicates_owned(predicates),
+                    salt: contract.salt,
+                })
             })
         })
         .filter(|v| !v.is_empty())

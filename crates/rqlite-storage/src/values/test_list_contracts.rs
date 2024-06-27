@@ -6,7 +6,7 @@ use test_utils::predicate_with_salt;
 #[test]
 fn test_empty_query() {
     let queries = QueryValues {
-        queries: vec![None],
+        queries: vec![None, None],
     };
 
     assert!(list_contracts(queries).unwrap().is_empty());
@@ -19,7 +19,7 @@ fn test_invalid_query() {
     list_contracts(queries).unwrap_err();
 
     let queries = QueryValues {
-        queries: vec![None, None],
+        queries: vec![None, None, None],
     };
 
     list_contracts(queries).unwrap_err();
@@ -28,14 +28,24 @@ fn test_invalid_query() {
 #[test]
 fn test_valid_queries() {
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![Columns {
-                columns: vec![
-                    Value::Number(Number::from(1)),
-                    Value::String(encode(&predicate_with_salt(1))),
-                ],
-            }],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![
+                        Value::Number(Number::from(1)),
+                        Value::String(encode(&[0; 32])),
+                    ],
+                }],
+            }),
+            Some(Rows {
+                rows: vec![Columns {
+                    columns: vec![
+                        Value::Number(Number::from(1)),
+                        Value::String(encode(&predicate_with_salt(1))),
+                    ],
+                }],
+            }),
+        ],
     };
 
     let r = list_contracts(queries).unwrap();
@@ -43,28 +53,46 @@ fn test_valid_queries() {
     assert_eq!(r, expected);
 
     let queries = QueryValues {
-        queries: vec![Some(Rows {
-            rows: vec![
-                Columns {
-                    columns: vec![
-                        Value::Number(Number::from(0)),
-                        Value::String(encode(&predicate_with_salt(1))),
-                    ],
-                },
-                Columns {
-                    columns: vec![
-                        Value::Number(Number::from(1)),
-                        Value::String(encode(&predicate_with_salt(1))),
-                    ],
-                },
-                Columns {
-                    columns: vec![
-                        Value::Number(Number::from(1)),
-                        Value::String(encode(&predicate_with_salt(2))),
-                    ],
-                },
-            ],
-        })],
+        queries: vec![
+            Some(Rows {
+                rows: vec![
+                    Columns {
+                        columns: vec![
+                            Value::Number(Number::from(0)),
+                            Value::String(encode(&[0; 32])),
+                        ],
+                    },
+                    Columns {
+                        columns: vec![
+                            Value::Number(Number::from(1)),
+                            Value::String(encode(&[0; 32])),
+                        ],
+                    },
+                ],
+            }),
+            Some(Rows {
+                rows: vec![
+                    Columns {
+                        columns: vec![
+                            Value::Number(Number::from(0)),
+                            Value::String(encode(&predicate_with_salt(1))),
+                        ],
+                    },
+                    Columns {
+                        columns: vec![
+                            Value::Number(Number::from(1)),
+                            Value::String(encode(&predicate_with_salt(1))),
+                        ],
+                    },
+                    Columns {
+                        columns: vec![
+                            Value::Number(Number::from(1)),
+                            Value::String(encode(&predicate_with_salt(2))),
+                        ],
+                    },
+                ],
+            }),
+        ],
     };
 
     let r = list_contracts(queries).unwrap();

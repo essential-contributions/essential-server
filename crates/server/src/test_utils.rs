@@ -1,6 +1,7 @@
 use crate::deploy::deploy;
 use essential_memory_storage::MemoryStorage;
 use essential_types::{
+    contract::Contract,
     predicate::Predicate,
     solution::{Mutation, Solution, SolutionData},
     ContentAddress, PredicateAddress, Word,
@@ -83,7 +84,7 @@ pub fn test_predicate(salt: Word) -> Predicate {
         essential_state_read_vm::asm::Stack::Push(1).into(), // delta
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect()];
     // Program to check pre-mutation value is None and
@@ -107,7 +108,7 @@ pub fn test_predicate(salt: Word) -> Predicate {
     predicate
 }
 
-// Solution that satisfies an predicate with state read and constraint programs.
+// Solution that satisfies a predicate with state read and constraint programs.
 pub async fn test_solution(
     storage: Option<MemoryStorage>,
     salt: Word,
@@ -141,7 +142,7 @@ pub fn counter_predicate(salt: Word) -> Predicate {
         essential_state_read_vm::asm::Stack::Push(1).into(), // delta
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect()];
     predicate.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![

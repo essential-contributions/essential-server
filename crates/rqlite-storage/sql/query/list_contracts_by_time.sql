@@ -1,9 +1,9 @@
 SELECT
     contract_pairing.contract_id,
-    contracts.predicate
+    predicates.predicate
 FROM
-    contracts
-    JOIN contract_pairing ON contracts.id = contract_pairing.predicate_id
+    predicates
+    JOIN contract_pairing ON predicates.id = contract_pairing.predicate_id
 WHERE
     contract_pairing.contract_id IN (
         SELECT
