@@ -98,7 +98,10 @@ where
         .route("/list-winning-blocks", get(list_winning_blocks))
         .route("/solution-outcome/:hash", get(solution_outcome))
         .route("/check-solution", post(check_solution))
-        .route("/check-solution-with-data", post(check_solution_with_data))
+        .route(
+            "/check-solution-with-contracts",
+            post(check_solution_with_contracts),
+        )
         .route("/query-state-reads", post(query_state_reads))
         .with_state(essential.clone());
 
@@ -403,7 +406,7 @@ where
 /// The check solution with data post endpoint.
 ///
 /// Takes a signed solution and a list of contract as a json payload.
-async fn check_solution_with_data<S>(
+async fn check_solution_with_contracts<S>(
     State(essential): State<Essential<S>>,
     Json(payload): Json<CheckSolution>,
 ) -> Result<Json<CheckSolutionOutput>, Error>

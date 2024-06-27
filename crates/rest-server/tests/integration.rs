@@ -380,7 +380,7 @@ async fn test_check_solution_with_data() {
         contracts: vec![contract],
     };
     let response = client
-        .post(url.join("/check-solution-with-data").unwrap())
+        .post(url.join("/check-solution-with-contracts").unwrap())
         .json(&input)
         .send()
         .await
