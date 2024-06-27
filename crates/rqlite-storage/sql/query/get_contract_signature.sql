@@ -1,3 +1,3 @@
 SELECT signature
-FROM intent_sets
+FROM contracts
 WHERE content_hash = ?;

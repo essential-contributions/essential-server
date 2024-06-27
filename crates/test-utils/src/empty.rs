@@ -1,7 +1,7 @@
 use essential_types::{
-    intent::{Directive, Intent},
+    predicate::{Directive, Predicate},
     solution::{Solution, SolutionData},
-    ContentAddress, IntentAddress,
+    ContentAddress, PredicateAddress,
 };
 
 /// Utility trait to provide empty instantiaters for essential types
@@ -10,7 +10,7 @@ pub trait Empty {
     fn empty() -> Self;
 }
 
-impl Empty for Intent {
+impl Empty for Predicate {
     fn empty() -> Self {
         Self {
             state_read: Default::default(),
@@ -26,11 +26,11 @@ impl Empty for ContentAddress {
     }
 }
 
-impl Empty for IntentAddress {
+impl Empty for PredicateAddress {
     fn empty() -> Self {
         Self {
-            set: ContentAddress::empty(),
-            intent: ContentAddress::empty(),
+            contract: ContentAddress::empty(),
+            predicate: ContentAddress::empty(),
         }
     }
 }
@@ -46,7 +46,7 @@ impl Empty for Solution {
 impl Empty for SolutionData {
     fn empty() -> Self {
         Self {
-            intent_to_solve: IntentAddress::empty(),
+            predicate_to_solve: PredicateAddress::empty(),
             decision_variables: Default::default(),
             transient_data: Default::default(),
             state_mutations: Default::default(),

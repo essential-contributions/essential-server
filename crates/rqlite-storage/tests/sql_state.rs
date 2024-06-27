@@ -60,7 +60,7 @@ fn test_update_state() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
 
-    insert_intent_set(&conn, 1, Duration::from_secs(1), 0..2);
+    insert_contract(&conn, 1, Duration::from_secs(1), 0..2);
 
     insert_state(&conn, 1, 20..300);
     insert_state(&conn, 1, 20..300);

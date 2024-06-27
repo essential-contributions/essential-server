@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS intent_sets (
+CREATE TABLE IF NOT EXISTS contracts (
     id INTEGER PRIMARY KEY,
     content_hash BLOB NOT NULL UNIQUE,
     signature BLOB NOT NULL,

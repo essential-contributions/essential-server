@@ -1,10 +1,10 @@
 # Essential Server
 ## Functionality
-- Deploy Intents
+- Deploy Predicates
 - Submit Solutions
 - Query State
-- List Intents
-- List Intent Storage Layout
+- List Predicates
+- List Predicate Storage Layout
 - Update EOA State
-- Sign EOA Authority To Solve Intent
+- Sign EOA Authority To Solve Predicate
 - List Previous Winning Solutions

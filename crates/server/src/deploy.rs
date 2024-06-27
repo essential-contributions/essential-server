@@ -1,21 +1,21 @@
 use essential_check as check;
 use essential_storage::Storage;
-use essential_types::{intent, ContentAddress};
+use essential_types::{contract::SignedContract, predicate, ContentAddress};
 
 #[cfg(test)]
 mod tests;
 
-/// Validates an intent and deploys it to storage.
+/// Validates an predicate and deploys it to storage.
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err(level=tracing::Level::DEBUG), ret(Display)))]
-pub async fn deploy<S>(storage: &S, intent_set: intent::SignedSet) -> anyhow::Result<ContentAddress>
+pub async fn deploy<S>(storage: &S, contract: SignedContract) -> anyhow::Result<ContentAddress>
 where
     S: Storage,
 {
-    check::intent::check_signed_set(&intent_set)?;
-    let intent_set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.set);
+    check::predicate::check_signed_contract(&contract)?;
+    let contract_addr = essential_hash::contract_addr::from_contract(&contract.contract);
 
-    match storage.insert_intent_set(intent_set).await {
-        Ok(()) => Ok(intent_set_addr),
-        Err(err) => anyhow::bail!("Failed to deploy intent set: {}", err),
+    match storage.insert_contract(contract).await {
+        Ok(()) => Ok(contract_addr),
+        Err(err) => anyhow::bail!("Failed to deploy contract: {}", err),
     }
 }

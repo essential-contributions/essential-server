@@ -1,16 +1,16 @@
 use essential_hash::hash;
 use essential_storage::Storage;
-use essential_types::{intent::Intent, solution::Solution, IntentAddress};
+use essential_types::{predicate::Predicate, solution::Solution, PredicateAddress};
 use std::vec;
 use test_dbs::create_test;
-use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
+use test_utils::{empty::Empty, predicate_with_salt, sign_contract_with_random_keypair};
 
 create_test!(update_state);
 
 async fn update_state<S: Storage>(storage: S) {
-    let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    storage.insert_intent_set(intent).await.unwrap();
-    let address = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
+    let predicate = sign_contract_with_random_keypair(vec![Predicate::empty()]);
+    storage.insert_contract(predicate).await.unwrap();
+    let address = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]);
     let key = vec![0; 4];
     let v = storage.update_state(&address, &key, vec![1]).await.unwrap();
     assert!(v.is_empty());
@@ -48,12 +48,12 @@ async fn update_state<S: Storage>(storage: S) {
 create_test!(update_state_batch);
 
 async fn update_state_batch<S: Storage>(storage: S) {
-    let intent = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    storage.insert_intent_set(intent).await.unwrap();
-    let intent = sign_intent_set_with_random_keypair(vec![intent_with_salt(3)]);
-    storage.insert_intent_set(intent).await.unwrap();
-    let address_0 = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
-    let address_1 = essential_hash::intent_set_addr::from_intents(&vec![intent_with_salt(3)]);
+    let predicate = sign_contract_with_random_keypair(vec![Predicate::empty()]);
+    storage.insert_contract(predicate).await.unwrap();
+    let predicate = sign_contract_with_random_keypair(vec![predicate_with_salt(3)]);
+    storage.insert_contract(predicate).await.unwrap();
+    let address_0 = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]);
+    let address_1 = essential_hash::contract_addr::from_contract(&vec![predicate_with_salt(3)]);
     let key = vec![0; 4];
     let v = storage
         .update_state(&address_0, &key, vec![1])
@@ -94,29 +94,29 @@ async fn update_state_batch<S: Storage>(storage: S) {
     assert_eq!(v, vec![8]);
 }
 
-create_test!(insert_intent_set);
+create_test!(insert_contract);
 
-async fn insert_intent_set<S: Storage>(storage: S) {
-    let intent_0 = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    storage.insert_intent_set(intent_0.clone()).await.unwrap();
-    let intent_1 =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
-    storage.insert_intent_set(intent_1).await.unwrap();
-    let intent_sets = storage.list_intent_sets(None, None).await.unwrap();
-    let mut s = vec![intent_with_salt(1), intent_with_salt(2)];
+async fn insert_contract<S: Storage>(storage: S) {
+    let predicate_0 = sign_contract_with_random_keypair(vec![Predicate::empty()]);
+    storage.insert_contract(predicate_0.clone()).await.unwrap();
+    let predicate_1 =
+        sign_contract_with_random_keypair(vec![predicate_with_salt(1), predicate_with_salt(2)]);
+    storage.insert_contract(predicate_1).await.unwrap();
+    let contracts = storage.list_contracts(None, None).await.unwrap();
+    let mut s = vec![predicate_with_salt(1), predicate_with_salt(2)];
     s.sort_by_key(essential_hash::content_addr);
-    assert_eq!(intent_sets, vec![vec![Intent::empty()], s]);
-    let address = essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]);
-    let intent_set = storage.get_intent_set(&address).await.unwrap();
-    assert_eq!(intent_set, Some(intent_0));
+    assert_eq!(contracts, vec![vec![Predicate::empty()], s]);
+    let address = essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]);
+    let contract = storage.get_contract(&address).await.unwrap();
+    assert_eq!(contract, Some(predicate_0));
 
-    let address = IntentAddress {
-        set: essential_hash::intent_set_addr::from_intents(&vec![Intent::empty()]),
-        intent: essential_hash::content_addr(&Intent::empty()),
+    let address = PredicateAddress {
+        contract: essential_hash::contract_addr::from_contract(&vec![Predicate::empty()]),
+        predicate: essential_hash::content_addr(&Predicate::empty()),
     };
-    let intent = storage.get_intent(&address).await.unwrap();
+    let predicate = storage.get_predicate(&address).await.unwrap();
 
-    assert_eq!(intent, Some(Intent::empty()));
+    assert_eq!(predicate, Some(Predicate::empty()));
 }
 
 create_test!(insert_solution_into_pool);

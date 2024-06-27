@@ -1,37 +1,40 @@
 use super::*;
 use essential_storage::failed_solution::SolutionFailReason;
-use essential_types::Batch;
+use essential_types::{contract::Contract, Batch};
 use std::vec;
 use test_utils::{
-    duration_secs, intent_with_salt, sign_intent_set_with_random_keypair,
+    duration_secs, predicate_with_salt, sign_contract_with_random_keypair,
     solution_with_decision_variables,
 };
 
-fn intent_set(intents: Vec<Intent>) -> IntentSet {
-    let signed = sign_intent_set_with_random_keypair(intents);
+fn contract(contract: Contract) -> ContractWithAddresses {
+    let signed = sign_contract_with_random_keypair(contract);
     let signature = signed.signature;
-    IntentSet {
+    ContractWithAddresses {
         data: signed
-            .set
+            .contract
             .into_iter()
-            .map(|intent| (ContentAddress(essential_hash::hash(&intent)), intent))
+            .map(|predicate| (ContentAddress(essential_hash::hash(&predicate)), predicate))
             .collect(),
         signature,
     }
 }
 
-fn list_of_intent_sets(
-    intents: Vec<Vec<Intent>>,
-) -> (Vec<ContentAddress>, HashMap<ContentAddress, IntentSet>) {
-    let order = intents
+fn list_of_contracts(
+    contract: Vec<Contract>,
+) -> (
+    Vec<ContentAddress>,
+    HashMap<ContentAddress, ContractWithAddresses>,
+) {
+    let order = contract
         .iter()
-        .map(essential_hash::intent_set_addr::from_intents)
+        .map(essential_hash::contract_addr::from_contract)
         .collect();
-    let map = intents
+    let map = contract
         .into_iter()
-        .map(|intents| {
-            let addr = essential_hash::intent_set_addr::from_intents(&intents);
-            (addr, intent_set(intents))
+        .map(|contract| {
+            let addr = essential_hash::contract_addr::from_contract(&contract);
+            (addr, contract(contract))
         })
         .collect();
     (order, map)
@@ -48,66 +51,66 @@ fn create_blocks(blocks: Vec<(u64, crate::Block)>) -> BTreeMap<Duration, crate::
 }
 
 #[test]
-fn test_page_intents() {
+fn test_page_contract() {
     let mut expected = vec![
-        vec![intent_with_salt(0)],
-        vec![intent_with_salt(1)],
-        vec![intent_with_salt(2), intent_with_salt(3)],
+        vec![predicate_with_salt(0)],
+        vec![predicate_with_salt(1)],
+        vec![predicate_with_salt(2), predicate_with_salt(3)],
     ];
 
-    // Paging yields intents ordered by CA, so make sure we expect this order.
-    for set in &mut expected {
-        set.sort_by_key(essential_hash::content_addr);
+    // Paging yields contract ordered by CA, so make sure we expect this order.
+    for contract in &mut expected {
+        contract.sort_by_key(essential_hash::content_addr);
     }
 
-    let (order, intents) = list_of_intent_sets(expected.clone());
+    let (order, contract) = list_of_contracts(expected.clone());
 
-    let r = page_intents(order.iter(), &intents, 0, 1);
+    let r = page_contract(order.iter(), &contract, 0, 1);
     assert_eq!(r, vec![expected[0].clone()]);
 
-    let r = page_intents(order.iter(), &intents, 1, 1);
+    let r = page_contract(order.iter(), &contract, 1, 1);
     assert_eq!(r, vec![expected[1].clone()]);
 
-    let r = page_intents(order.iter(), &intents, 1, 2);
+    let r = page_contract(order.iter(), &contract, 1, 2);
     assert_eq!(r, vec![expected[2].clone()]);
 
-    let r = page_intents(order.iter(), &intents, 0, 2);
+    let r = page_contract(order.iter(), &contract, 0, 2);
     assert_eq!(r, vec![expected[0].clone(), expected[1].clone()]);
 
-    let r = page_intents(order.iter(), &intents, 0, 3);
+    let r = page_contract(order.iter(), &contract, 0, 3);
     assert_eq!(r, expected);
 }
 
 #[test]
-fn test_page_intents_by_time() {
+fn test_page_contract_by_time() {
     let mut expected = vec![
-        vec![intent_with_salt(0)],
-        vec![intent_with_salt(1)],
-        vec![intent_with_salt(2), intent_with_salt(3)],
+        vec![predicate_with_salt(0)],
+        vec![predicate_with_salt(1)],
+        vec![predicate_with_salt(2), predicate_with_salt(3)],
     ];
 
-    // Paging yields intents ordered by CA, so make sure we expect this order.
-    for set in &mut expected {
-        set.sort_by_key(essential_hash::content_addr);
+    // Paging yields contract ordered by CA, so make sure we expect this order.
+    for contract in &mut expected {
+        contract.sort_by_key(essential_hash::content_addr);
     }
 
-    let (order, intents) = list_of_intent_sets(expected.clone());
+    let (order, contract) = list_of_contracts(expected.clone());
     let order: BTreeMap<_, _> = order
         .into_iter()
         .enumerate()
         .map(|(i, v)| (duration_secs(i as u64), vec![v]))
         .collect();
 
-    let r = page_intents_by_time(&order, &intents, duration_secs(0)..duration_secs(1), 0, 1);
+    let r = page_contract_by_time(&order, &contract, duration_secs(0)..duration_secs(1), 0, 1);
     assert_eq!(r, vec![expected[0].clone()]);
 
-    let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(2), 0, 1);
+    let r = page_contract_by_time(&order, &contract, duration_secs(1)..duration_secs(2), 0, 1);
     assert_eq!(r, vec![expected[1].clone()]);
 
-    let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(10), 1, 1);
+    let r = page_contract_by_time(&order, &contract, duration_secs(1)..duration_secs(10), 1, 1);
     assert_eq!(r, vec![expected[2].clone()]);
 
-    let r = page_intents_by_time(&order, &intents, duration_secs(1)..duration_secs(1), 0, 1);
+    let r = page_contract_by_time(&order, &contract, duration_secs(1)..duration_secs(1), 0, 1);
     assert!(r.is_empty());
 }
 

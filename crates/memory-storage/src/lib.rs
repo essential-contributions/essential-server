@@ -6,9 +6,10 @@ use essential_storage::{
     key_range, CommitData, QueryState, StateStorage, Storage,
 };
 use essential_types::{
-    intent::{self, Intent},
+    contract::{Contract, SignedContract},
+    predicate::Predicate,
     solution::Solution,
-    ContentAddress, Hash, IntentAddress, Key, Signature, Word,
+    ContentAddress, Hash, Key, PredicateAddress, Signature, Word,
 };
 use futures::future::FutureExt;
 use std::{
@@ -37,8 +38,9 @@ impl Default for MemoryStorage {
 
 #[derive(Default, Debug)]
 struct Inner {
-    intents: HashMap<ContentAddress, IntentSet>,
-    intent_time_index: BTreeMap<Duration, Vec<ContentAddress>>,
+    contracts: HashMap<ContentAddress, ContractWithAddresses>,
+    predicates: HashMap<ContentAddress, Predicate>,
+    predicate_time_index: BTreeMap<Duration, Vec<ContentAddress>>,
     solution_pool: HashSet<Hash>,
     solution_time_index: BTreeMap<Duration, Vec<Hash>>,
     failed_solution_pool: HashMap<Hash, Vec<(SolutionFailReason, Duration)>>,
@@ -58,31 +60,44 @@ struct Block {
 }
 
 #[derive(Debug)]
-struct IntentSet {
-    data: HashMap<ContentAddress, Intent>,
+struct ContractWithAddresses {
+    salt: Hash,
+    data: HashSet<ContentAddress>,
     signature: Signature,
 }
 
-impl IntentSet {
-    /// All intent addresses ordered by their CA.
-    fn intent_addrs(&self) -> Vec<&ContentAddress> {
-        let mut addrs: Vec<_> = self.data.keys().collect();
+impl ContractWithAddresses {
+    /// All predicate addresses ordered by their CA.
+    fn predicate_addrs(&self) -> Vec<&ContentAddress> {
+        let mut addrs: Vec<_> = self.data.iter().collect();
         addrs.sort();
         addrs
     }
 
-    /// All intents in the set, ordered by their CA.
-    fn intents(&self) -> impl '_ + Iterator<Item = &Intent> {
-        self.intent_addrs().into_iter().map(|addr| &self.data[addr])
+    /// All contract in the contract, ordered by their CA.
+    fn predicates<'pred>(
+        &self,
+        predicates: &'pred HashMap<ContentAddress, Predicate>,
+    ) -> Vec<&'pred Predicate> {
+        self.predicate_addrs()
+            .into_iter()
+            .map(|addr| &predicates[addr])
+            .collect()
     }
 
-    /// Re-construct the `intent::SignedSet`.
+    /// Re-construct the `SignedContract`.
     ///
-    /// Intents in the returned set will be ordered by their CA.
-    fn signed_set(&self) -> intent::SignedSet {
+    /// Predicates in the returned contract will be ordered by their CA.
+    fn signed_contract(&self, predicates: &HashMap<ContentAddress, Predicate>) -> SignedContract {
         let signature = self.signature.clone();
-        let set = self.intents().cloned().collect();
-        intent::SignedSet { set, signature }
+        let predicates = self.predicates(predicates).into_iter().cloned().collect();
+        SignedContract {
+            contract: Contract {
+                salt: self.salt,
+                predicates,
+            },
+            signature,
+        }
     }
 }
 
@@ -136,27 +151,41 @@ impl QueryState for MemoryStorage {
 }
 
 impl Storage for MemoryStorage {
-    async fn insert_intent_set(&self, signed: intent::SignedSet) -> anyhow::Result<()> {
-        let intent::SignedSet { set, signature } = signed;
+    async fn insert_contract(&self, signed: SignedContract) -> anyhow::Result<()> {
+        let SignedContract {
+            contract,
+            signature,
+        } = signed;
 
-        let data: HashMap<_, _> = set
+        let salt = contract.salt;
+
+        let data: HashMap<_, _> = contract
+            .predicates
             .into_iter()
-            .map(|intent| (essential_hash::content_addr(&intent), intent))
+            .map(|p| (essential_hash::content_addr(&p), p))
             .collect();
 
-        let set_addr = essential_hash::intent_set_addr::from_intent_addrs(data.keys().cloned());
+        let contract_addr =
+            essential_hash::contract_addr::from_predicate_addrs(data.keys().cloned(), salt);
 
-        let set = IntentSet { data, signature };
+        let contract_with_addrs = ContractWithAddresses {
+            salt,
+            data: data.keys().cloned().collect(),
+            signature,
+        };
         let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
         self.inner.apply(|i| {
-            let contains = i.intents.insert(set_addr.clone(), set);
+            i.predicates.extend(data);
+            let contains = i
+                .contracts
+                .insert(contract_addr.clone(), contract_with_addrs);
             if contains.is_none() {
-                i.intent_time_index
+                i.predicate_time_index
                     .entry(time)
                     .or_default()
-                    .push(set_addr.clone());
+                    .push(contract_addr.clone());
             }
-            i.state.entry(set_addr).or_default();
+            i.state.entry(contract_addr).or_default();
             Ok(())
         })
     }
@@ -191,37 +220,36 @@ impl Storage for MemoryStorage {
             .apply(|i| move_solutions_to_failed(i, solutions, hashes))
     }
 
-    async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
+    async fn get_predicate(&self, address: &PredicateAddress) -> anyhow::Result<Option<Predicate>> {
         let v = self.inner.apply(|i| {
-            let set = i.intents.get(&address.set)?;
-            let intent = set.data.get(&address.intent)?;
-            Some(intent.clone())
+            let predicate = i.predicates.get(&address.predicate)?;
+            Some(predicate.clone())
         });
         Ok(v)
     }
 
-    async fn get_intent_set(
+    async fn get_contract(
         &self,
         address: &ContentAddress,
-    ) -> anyhow::Result<Option<intent::SignedSet>> {
+    ) -> anyhow::Result<Option<SignedContract>> {
         let v = self
             .inner
-            .apply(|i| Some(i.intents.get(address)?.signed_set()));
+            .apply(|i| Some(i.contracts.get(address)?.signed_contract(&i.predicates)));
         Ok(v)
     }
 
-    async fn list_intent_sets(
+    async fn list_contracts(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
         page: Option<usize>,
-    ) -> anyhow::Result<Vec<Vec<Intent>>> {
+    ) -> anyhow::Result<Vec<Contract>> {
         let page = page.unwrap_or(0);
         match time_range {
             Some(range) => {
                 let v = self.inner.apply(|i| {
-                    values::page_intents_by_time(
-                        &i.intent_time_index,
-                        &i.intents,
+                    values::page_contract_by_time(
+                        &i.predicate_time_index,
+                        &i.contracts,
                         range,
                         page,
                         PAGE_SIZE,
@@ -231,9 +259,9 @@ impl Storage for MemoryStorage {
             }
             None => {
                 let v = self.inner.apply(|i| {
-                    values::page_intents(
-                        i.intent_time_index.values().flatten(),
-                        &i.intents,
+                    values::page_contract(
+                        i.predicate_time_index.values().flatten(),
+                        &i.contracts,
                         page,
                         PAGE_SIZE,
                     )
@@ -477,8 +505,8 @@ impl StateRead for MemoryStorage {
     type Future =
         Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<Word>>, Self::Error>> + Send>>;
 
-    fn key_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+    fn key_range(&self, contract_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { key_range(&storage, set_addr, key, num_words).await }.boxed()
+        async move { key_range(&storage, contract_addr, key, num_words).await }.boxed()
     }
 }

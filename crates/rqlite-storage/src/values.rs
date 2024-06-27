@@ -3,7 +3,8 @@ use std::{collections::BTreeMap, time::Duration};
 use anyhow::{bail, ensure};
 use essential_storage::failed_solution::{CheckOutcome, FailedSolution, SolutionOutcomes};
 use essential_types::{
-    intent::{self, Intent},
+    contract::{Contract, SignedContract},
+    predicate::{self, Predicate},
     solution::Solution,
     Batch, Block, Signature, Word,
 };
@@ -13,13 +14,13 @@ use serde_json::Value;
 use crate::{decode, RESULTS_KEY};
 
 #[cfg(test)]
-mod test_get_intent_set;
+mod test_get_contract;
 #[cfg(test)]
 mod test_get_solution;
 #[cfg(test)]
-mod test_list_failed_solutions;
+mod test_list_contracts;
 #[cfg(test)]
-mod test_list_intent_sets;
+mod test_list_failed_solutions;
 #[cfg(test)]
 mod test_list_solutions;
 #[cfg(test)]
@@ -61,10 +62,10 @@ pub fn single_value(queries: &QueryValues) -> Option<&Value> {
     None
 }
 
-pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::SignedSet>> {
+pub fn get_contract(queries: QueryValues) -> anyhow::Result<Option<SignedContract>> {
     // Expecting two results because we made two queries
-    let (signature, intents) = match &queries.queries[..] {
-        [Some(Rows { rows: signature }), Some(Rows { rows: intents })] => (signature, intents),
+    let (signature, contract) = match &queries.queries[..] {
+        [Some(Rows { rows: signature }), Some(Rows { rows: contract })] => (signature, contract),
         [None, None] => return Ok(None),
         _ => bail!("expected two queries {:?}", queries),
     };
@@ -82,22 +83,22 @@ pub fn get_intent_set(queries: QueryValues) -> anyhow::Result<Option<intent::Sig
     // Decode the signature
     let signature: Signature = decode(signature)?;
 
-    // Decode the intents
-    let intents: Vec<Intent> = intents
+    // Decode the contract
+    let contract: Contract = contract
         .iter()
         .map(|Columns { columns }| {
-            let [intent] = &columns[..] else {
+            let [predicate] = &columns[..] else {
                 bail!("expected a single column");
             };
-            match intent {
-                serde_json::Value::String(intent) => decode(intent),
+            match predicate {
+                serde_json::Value::String(predicate) => decode(predicate),
                 _ => Err(anyhow::anyhow!("unexpected column type")),
             }
         })
         .collect::<Result<_, _>>()?;
 
-    Ok(Some(intent::SignedSet {
-        set: intents,
+    Ok(Some(SignedContract {
+        contract,
         signature,
     }))
 }
@@ -143,7 +144,7 @@ pub fn get_solution(
     }))
 }
 
-pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Vec<Intent>>> {
+pub fn list_contracts(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Contract>> {
     // Only expecting a single query.
     let rows = match &queries[..] {
         [Some(Rows { rows })] => rows,
@@ -156,25 +157,25 @@ pub fn list_intent_sets(QueryValues { queries }: QueryValues) -> anyhow::Result<
         bail!("expected at least one row")
     }
 
-    // Expecting an intent per row with two columns.
-    // The first column is the set_id and the second column is the intent.
-    // The intents are grouped into their respective sets.
+    // Expecting an predicate per row with two columns.
+    // The first column is the contract_id and the second column is the predicate.
+    // The contract are grouped into their respective contracts.
     //
-    // TODO: The sql outputs the intents ordered by set_id, then by intent id.
+    // TODO: The sql outputs the contract ordered by contract_id, then by predicate id.
     // Could we use this fact to avoid needing to sort them into a BTreeMap?
     let out = rows
         .iter()
         .try_fold(
             BTreeMap::<_, Vec<_>>::new(),
             |mut map, Columns { columns }| match &columns[..] {
-                [serde_json::Value::Number(set_id), serde_json::Value::String(intent)] => {
-                    match set_id.as_u64() {
-                        Some(set_id) => {
-                            let intent: Intent = decode(intent)?;
-                            map.entry(set_id).or_default().push(intent);
+                [serde_json::Value::Number(contract_id), serde_json::Value::String(predicate)] => {
+                    match contract_id.as_u64() {
+                        Some(contract_id) => {
+                            let predicate: Predicate = decode(predicate)?;
+                            map.entry(contract_id).or_default().push(predicate);
                             Ok(map)
                         }
-                        None => Err(anyhow::anyhow!("failed to parse set_id")),
+                        None => Err(anyhow::anyhow!("failed to parse contract_id")),
                     }
                 }
                 _ => Err(anyhow::anyhow!("unexpected columns: {:?}", columns)),

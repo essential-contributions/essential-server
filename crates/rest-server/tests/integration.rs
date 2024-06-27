@@ -8,66 +8,68 @@ use essential_server_types::{
 use essential_storage::{StateStorage, Storage};
 use essential_types::{
     convert::{bytes_from_word, word_4_from_u8_32},
-    intent::{self, Intent},
+    predicate::{self, Predicate},
     solution::{Solution, SolutionData},
-    Block, ContentAddress, IntentAddress, Word,
+    Block, ContentAddress, PredicateAddress, Word,
 };
 use test_utils::{
-    empty::Empty, sign_intent_set_with_random_keypair, solution_with_decision_variables,
+    empty::Empty, sign_contract_with_random_keypair, solution_with_decision_variables,
 };
-use utils::{setup, setup_with_mem, TestServer};
+use utils::{contractup, contractup_with_mem, TestServer};
 
 mod utils;
 
 #[tokio::test]
-async fn test_deploy_intent_set() {
+async fn test_deploy_contract() {
     let TestServer {
         client,
         url,
         shutdown,
         jh,
-    } = setup().await;
+    } = contractup().await;
 
-    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
+    let contract = sign_contract_with_random_keypair(vec![Predicate::empty()]);
     let response = client
-        .post(url.join("/deploy-intent-set").unwrap())
-        .json(&intent_set)
+        .post(url.join("/deploy-predicate-contract").unwrap())
+        .json(&contract)
         .send()
         .await
         .unwrap();
     assert_eq!(response.status(), 200);
     let address = response.json::<ContentAddress>().await.unwrap();
-    let expected = essential_hash::intent_set_addr::from_intents(&intent_set.set);
+    let expected = essential_hash::contract_addr::from_contract(&contract.contract);
     assert_eq!(address, expected);
 
-    let a = url.join(&format!("/get-intent-set/{address}")).unwrap();
+    let a = url
+        .join(&format!("/get-predicate-contract/{address}"))
+        .unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let set = response
-        .json::<Option<intent::SignedSet>>()
+    let contract = response
+        .json::<Option<SignedContract>>()
         .await
         .unwrap()
         .unwrap();
 
-    assert_eq!(set, intent_set);
+    assert_eq!(contract, contract);
 
-    let intent_address = IntentAddress {
-        set: address,
-        intent: essential_hash::content_addr(&intent_set.set[0]),
+    let predicate_address = PredicateAddress {
+        contract: address,
+        predicate: essential_hash::content_addr(&contract.contract[0]),
     };
     let a = url
         .join(&format!(
-            "/get-intent/{}/{}",
-            intent_address.set, intent_address.intent,
+            "/get-predicate/{}/{}",
+            predicate_address.contract, predicate_address.predicate,
         ))
         .unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let intent = response.json::<Option<Intent>>().await.unwrap().unwrap();
+    let predicate = response.json::<Option<Predicate>>().await.unwrap().unwrap();
 
-    assert_eq!(intent, intent_set.set[0]);
+    assert_eq!(predicate, contract.contract[0]);
 
-    let mut a = url.join("/list-intent-sets").unwrap();
+    let mut a = url.join("/list-contracts").unwrap();
     let time = std::time::UNIX_EPOCH.elapsed().unwrap() + Duration::from_secs(600);
     a.query_pairs_mut()
         .append_pair("start", "0")
@@ -75,21 +77,21 @@ async fn test_deploy_intent_set() {
         .append_pair("page", "0");
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let intents = response.json::<Vec<Vec<Intent>>>().await.unwrap();
-    assert_eq!(intents, vec![intent_set.set.clone()]);
+    let contract = response.json::<Vec<Contract>>().await.unwrap();
+    assert_eq!(contract, vec![contract.contract.clone()]);
 
-    let a = url.join("/list-intent-sets").unwrap();
+    let a = url.join("/list-contracts").unwrap();
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let intents = response.json::<Vec<Vec<Intent>>>().await.unwrap();
-    assert_eq!(intents, vec![intent_set.set.clone()]);
+    let contract = response.json::<Vec<Contract>>().await.unwrap();
+    assert_eq!(contract, vec![contract.contract.clone()]);
 
-    let mut a = url.join("/list-intent-sets").unwrap();
+    let mut a = url.join("/list-contracts").unwrap();
     a.query_pairs_mut().append_pair("page", "1");
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let intents = response.json::<Vec<Vec<Intent>>>().await.unwrap();
-    assert!(intents.is_empty());
+    let contract = response.json::<Vec<Contract>>().await.unwrap();
+    assert!(contract.is_empty());
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
@@ -97,24 +99,24 @@ async fn test_deploy_intent_set() {
 
 #[tokio::test]
 async fn test_submit_solution() {
-    let intent = Intent::empty();
-    let intent_addr = essential_hash::content_addr(&intent);
-    let intent_set = sign_intent_set_with_random_keypair(vec![intent]);
-    let set_addr = essential_hash::intent_set_addr::from_intents(&intent_set.set);
+    let predicate = Predicate::empty();
+    let predicate_addr = essential_hash::content_addr(&predicate);
+    let contract = sign_contract_with_random_keypair(vec![predicate]);
+    let contract_addr = essential_hash::contract_addr::from_contract(&contract.contract);
 
     let mem = MemoryStorage::new();
-    mem.insert_intent_set(intent_set).await.unwrap();
+    mem.insert_contract(contract).await.unwrap();
 
     let TestServer {
         client,
         url,
         shutdown,
         jh,
-    } = setup_with_mem(mem).await;
+    } = contractup_with_mem(mem).await;
     let mut solution = solution_with_decision_variables(1);
-    solution.data[0].intent_to_solve = IntentAddress {
-        set: set_addr,
-        intent: intent_addr,
+    solution.data[0].predicate_to_solve = PredicateAddress {
+        contract: contract_addr,
+        predicate: predicate_addr,
     };
     let response = client
         .post(url.join("/submit-solution").unwrap())
@@ -146,12 +148,12 @@ async fn test_submit_solution() {
 
 #[tokio::test]
 async fn test_query_state() {
-    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    let address = essential_hash::intent_set_addr::from_intents(&intent_set.set);
+    let contract = sign_contract_with_random_keypair(vec![Predicate::empty()]);
+    let address = essential_hash::contract_addr::from_contract(&contract.contract);
     let key = vec![0; 4];
 
     let mem = MemoryStorage::new();
-    mem.insert_intent_set(intent_set).await.unwrap();
+    mem.insert_contract(contract).await.unwrap();
     mem.update_state(&address, &key, vec![42]).await.unwrap();
 
     let TestServer {
@@ -159,7 +161,7 @@ async fn test_query_state() {
         url,
         shutdown,
         jh,
-    } = setup_with_mem(mem).await;
+    } = contractup_with_mem(mem).await;
 
     let a = url
         .join(&format!(
@@ -183,8 +185,8 @@ async fn test_query_state() {
 
 #[tokio::test]
 async fn test_query_state_reads() {
-    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
-    let address = essential_hash::intent_set_addr::from_intents(&intent_set.set);
+    let contract = sign_contract_with_random_keypair(vec![Predicate::empty()]);
+    let address = essential_hash::contract_addr::from_contract(&contract.contract);
     let addr_words = word_4_from_u8_32(address.0);
 
     let read_key: Vec<u8> = essential_state_read_vm::asm::to_bytes(vec![
@@ -206,7 +208,7 @@ async fn test_query_state_reads() {
     let query = QueryStateReads::inline_empty(vec![read_key], StateReadRequestType::default());
 
     let mem = MemoryStorage::new();
-    mem.insert_intent_set(intent_set).await.unwrap();
+    mem.insert_contract(contract).await.unwrap();
     mem.update_state(&address, &vec![0], vec![42])
         .await
         .unwrap();
@@ -216,7 +218,7 @@ async fn test_query_state_reads() {
         url,
         shutdown,
         jh,
-    } = setup_with_mem(mem).await;
+    } = contractup_with_mem(mem).await;
 
     let response = client
         .post(url.join("/query-state-reads").unwrap())
@@ -261,7 +263,7 @@ async fn test_list_winning_blocks() {
         url,
         shutdown,
         jh,
-    } = setup_with_mem(mem).await;
+    } = contractup_with_mem(mem).await;
 
     let mut a = url.join("/list-winning-blocks").unwrap();
     a.query_pairs_mut().append_pair("page", "0");
@@ -289,7 +291,7 @@ async fn test_solution_outcome() {
         url,
         shutdown,
         jh,
-    } = setup_with_mem(mem).await;
+    } = contractup_with_mem(mem).await;
 
     let a = url.join(&format!("/solution-outcome/{ca}")).unwrap();
     let response = client.get(a).send().await.unwrap();
@@ -304,24 +306,24 @@ async fn test_solution_outcome() {
 
 #[tokio::test]
 async fn test_check_solution() {
-    let intent_set = sign_intent_set_with_random_keypair(vec![Intent::empty()]);
+    let contract = sign_contract_with_random_keypair(vec![Predicate::empty()]);
     let mem = MemoryStorage::new();
-    mem.insert_intent_set(intent_set.clone()).await.unwrap();
+    mem.insert_contract(contract.clone()).await.unwrap();
 
     let TestServer {
         client,
         url,
         shutdown,
         jh,
-    } = setup_with_mem(mem).await;
+    } = contractup_with_mem(mem).await;
 
-    let set = essential_hash::intent_set_addr::from_intents(&intent_set.set);
-    let address = essential_hash::content_addr(&intent_set.set[0]);
+    let contract = essential_hash::contract_addr::from_contract(&contract.contract);
+    let address = essential_hash::content_addr(&contract.contract[0]);
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
-        intent_to_solve: IntentAddress {
-            set,
-            intent: address,
+        predicate_to_solve: PredicateAddress {
+            contract,
+            predicate: address,
         },
         decision_variables: vec![],
         state_mutations: vec![],
@@ -359,16 +361,16 @@ async fn test_check_solution_with_data() {
         url,
         shutdown,
         jh,
-    } = setup().await;
+    } = contractup().await;
 
-    let intent_set = vec![Intent::empty()];
-    let set = ContentAddress(essential_hash::hash(&intent_set));
-    let address = ContentAddress(essential_hash::hash(&intent_set[0]));
+    let contract = vec![Predicate::empty()];
+    let contract = ContentAddress(essential_hash::hash(&contract));
+    let address = ContentAddress(essential_hash::hash(&contract[0]));
     let mut solution = Solution::empty();
     solution.data.push(SolutionData {
-        intent_to_solve: IntentAddress {
-            set,
-            intent: address,
+        predicate_to_solve: PredicateAddress {
+            contract,
+            predicate: address,
         },
         decision_variables: vec![],
         state_mutations: vec![],
@@ -376,7 +378,7 @@ async fn test_check_solution_with_data() {
     });
     let input = CheckSolution {
         solution,
-        intents: intent_set,
+        contract: contract,
     };
     let response = client
         .post(url.join("/check-solution-with-data").unwrap())

@@ -1,12 +1,12 @@
-use crate::test_utils::deploy_intent;
+use crate::test_utils::deploy_predicate;
 use essential_storage::Storage;
-use essential_types::intent::Intent;
+use essential_types::predicate::Predicate;
 use test_utils::empty::Empty;
 
 #[tokio::test]
 async fn test_deploy() {
-    let intent = Intent::empty();
-    let (address, storage) = deploy_intent(intent.clone()).await;
-    let result = storage.get_intent(&address).await.unwrap();
-    assert_eq!(result, Some(intent));
+    let predicate = Predicate::empty();
+    let (address, storage) = deploy_predicate(predicate.clone()).await;
+    let result = storage.get_predicate(&address).await.unwrap();
+    assert_eq!(result, Some(predicate));
 }

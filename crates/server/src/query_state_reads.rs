@@ -44,9 +44,9 @@ impl<S> Recorder<S> {
     }
 
     /// Record new key value pairs at a contract address.
-    fn record(&self, set: ContentAddress, f: impl FnOnce(&mut BTreeMap<Key, Value>)) {
+    fn record(&self, contract: ContentAddress, f: impl FnOnce(&mut BTreeMap<Key, Value>)) {
         self.inner.record.apply(|r| {
-            f(r.0.entry(set).or_default());
+            f(r.0.entry(contract).or_default());
         });
     }
 
@@ -184,7 +184,7 @@ where
 
     fn key_range(
         &self,
-        set_addr: essential_types::ContentAddress,
+        contract_addr: essential_types::ContentAddress,
         key: essential_types::Key,
         num_values: usize,
     ) -> Self::Future {
@@ -192,12 +192,13 @@ where
         let mut out = Vec::with_capacity(num_values);
         async move {
             // Read the keys and values.
-            let values = key_range(&s.inner.storage, set_addr.clone(), key, num_values).await?;
+            let values =
+                key_range(&s.inner.storage, contract_addr.clone(), key, num_values).await?;
 
             // Record the keys and values if enabled
             // otherwise just return the values.
             if s.enabled {
-                s.record(set_addr, |r| {
+                s.record(contract_addr, |r| {
                     for (k, v) in values {
                         out.push(v.clone());
                         r.insert(k, v);
@@ -215,7 +216,7 @@ where
 // Key range query that collects the keys and values read.
 async fn key_range<S>(
     storage: &TransactionStorage<S>,
-    set_addr: ContentAddress,
+    contract_addr: ContentAddress,
     mut key: Key,
     num_words: usize,
 ) -> anyhow::Result<Vec<(Key, Value)>>
@@ -224,7 +225,7 @@ where
 {
     let mut words = Vec::with_capacity(num_words);
     for _ in 0..num_words {
-        let slot = storage.query_state(&set_addr, &key).await?;
+        let slot = storage.query_state(&contract_addr, &key).await?;
         words.push((key.clone(), slot));
         key = next_key(key).ok_or_else(|| anyhow::anyhow!("Failed to find next key"))?
     }

@@ -1,6 +1,7 @@
 use super::*;
 use crate::encode;
-use test_utils::{empty::Empty, intent_with_salt, sign_intent_set_with_random_keypair};
+use essential_types::contract::SignedContract;
+use test_utils::{empty::Empty, predicate_with_salt, sign_contract_with_random_keypair};
 
 #[test]
 fn test_empty_query() {
@@ -8,7 +9,7 @@ fn test_empty_query() {
         queries: vec![None, None],
     };
 
-    assert_eq!(get_intent_set(queries).unwrap(), None);
+    assert_eq!(get_contract(queries).unwrap(), None);
 }
 
 #[test]
@@ -17,15 +18,15 @@ fn test_invalid_query() {
         queries: vec![None, None, None],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
     let queries = QueryValues {
         queries: vec![None],
     };
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 
     let queries = QueryValues { queries: vec![] };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
@@ -41,13 +42,15 @@ fn test_signature_only() {
         ],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
-fn test_signature_single_intent() {
-    let intent::SignedSet { set, signature } =
-        sign_intent_set_with_random_keypair(vec![Intent::empty()]);
+fn test_signature_single_predicate() {
+    let SignedContract {
+        contract,
+        signature,
+    } = sign_contract_with_random_keypair(vec![Predicate::empty()].into());
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -57,15 +60,15 @@ fn test_signature_single_intent() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&set[0]))],
+                    columns: vec![Value::String(encode(&contract[0]))],
                 }],
             }),
         ],
     };
 
-    let r = get_intent_set(queries).unwrap().unwrap();
-    let expected = intent::SignedSet {
-        set: vec![Intent::empty()],
+    let r = get_contract(queries).unwrap().unwrap();
+    let expected = SignedContract {
+        contract: vec![Predicate::empty()].into(),
         signature,
     };
     assert_eq!(r, expected);
@@ -74,8 +77,10 @@ fn test_signature_single_intent() {
 #[test]
 fn test_invalid_data() {
     let invalid = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx".to_string();
-    let intent::SignedSet { set, signature } =
-        sign_intent_set_with_random_keypair(vec![Intent::empty()]);
+    let SignedContract {
+        contract,
+        signature,
+    } = sign_contract_with_random_keypair(vec![Predicate::empty()].into());
 
     let queries = QueryValues {
         queries: vec![
@@ -86,12 +91,12 @@ fn test_invalid_data() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&set[0]))],
+                    columns: vec![Value::String(encode(&contract[0]))],
                 }],
             }),
         ],
     };
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![
@@ -107,31 +112,37 @@ fn test_invalid_data() {
             }),
         ],
     };
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
-fn test_single_intent_without_sig() {
-    let intent::SignedSet { set, signature: _ } =
-        sign_intent_set_with_random_keypair(vec![Intent::empty()]);
+fn test_single_predicate_without_sig() {
+    let SignedContract {
+        contract,
+        signature: _,
+    } = sign_contract_with_random_keypair(vec![Predicate::empty()].into());
     let queries = QueryValues {
         queries: vec![
             None,
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&set[0]))],
+                    columns: vec![Value::String(encode(&contract[0]))],
                 }],
             }),
         ],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
-fn test_signature_multiple_intent() {
-    let intent::SignedSet { set, signature } =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+fn test_signature_multiple_predicate() {
+    let SignedContract {
+        contract,
+        signature,
+    } = sign_contract_with_random_keypair(
+        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
+    );
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -142,28 +153,32 @@ fn test_signature_multiple_intent() {
             Some(Rows {
                 rows: vec![
                     Columns {
-                        columns: vec![Value::String(encode(&set[0]))],
+                        columns: vec![Value::String(encode(&contract[0]))],
                     },
                     Columns {
-                        columns: vec![Value::String(encode(&set[1]))],
+                        columns: vec![Value::String(encode(&contract[1]))],
                     },
                 ],
             }),
         ],
     };
 
-    let r = get_intent_set(queries).unwrap().unwrap();
-    let expected = intent::SignedSet {
-        set: vec![intent_with_salt(1), intent_with_salt(2)],
+    let r = get_contract(queries).unwrap().unwrap();
+    let expected = SignedContract {
+        contract: vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
         signature,
     };
     assert_eq!(r, expected);
 }
 
 #[test]
-fn test_invalid_signature_multiple_intent() {
-    let intent::SignedSet { set, signature: _ } =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+fn test_invalid_signature_multiple_predicate() {
+    let SignedContract {
+        contract,
+        signature: _,
+    } = sign_contract_with_random_keypair(
+        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
+    );
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -174,21 +189,25 @@ fn test_invalid_signature_multiple_intent() {
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![
-                        Value::String(encode(&set[0])),
-                        Value::String(encode(&set[1])),
+                        Value::String(encode(&contract[0])),
+                        Value::String(encode(&contract[1])),
                     ],
                 }],
             }),
         ],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
-fn test_signature_multiple_intent_invalid() {
-    let intent::SignedSet { set, signature } =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+fn test_signature_multiple_predicate_invalid() {
+    let SignedContract {
+        contract,
+        signature,
+    } = sign_contract_with_random_keypair(
+        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
+    );
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -198,19 +217,23 @@ fn test_signature_multiple_intent_invalid() {
             }),
             Some(Rows {
                 rows: vec![Columns {
-                    columns: vec![Value::String(encode(&set[0])), Value::Bool(true)],
+                    columns: vec![Value::String(encode(&contract[0])), Value::Bool(true)],
                 }],
             }),
         ],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
 fn test_multi_column_sig() {
-    let intent::SignedSet { set, signature } =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let SignedContract {
+        contract,
+        signature,
+    } = sign_contract_with_random_keypair(
+        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
+    );
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -224,21 +247,25 @@ fn test_multi_column_sig() {
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![
-                        Value::String(encode(&set[0])),
-                        Value::String(encode(&set[1])),
+                        Value::String(encode(&contract[0])),
+                        Value::String(encode(&contract[1])),
                     ],
                 }],
             }),
         ],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
 fn test_multi_row_sig() {
-    let intent::SignedSet { set, signature } =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+    let SignedContract {
+        contract,
+        signature,
+    } = sign_contract_with_random_keypair(
+        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
+    );
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -254,21 +281,25 @@ fn test_multi_row_sig() {
             Some(Rows {
                 rows: vec![Columns {
                     columns: vec![
-                        Value::String(encode(&set[0])),
-                        Value::String(encode(&set[1])),
+                        Value::String(encode(&contract[0])),
+                        Value::String(encode(&contract[1])),
                     ],
                 }],
             }),
         ],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }
 
 #[test]
-fn test_multi_row_intent() {
-    let intent::SignedSet { set, signature } =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(1), intent_with_salt(2)]);
+fn test_multi_row_predicate() {
+    let SignedContract {
+        contract,
+        signature,
+    } = sign_contract_with_random_keypair(
+        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
+    );
     let queries = QueryValues {
         queries: vec![
             Some(Rows {
@@ -280,14 +311,14 @@ fn test_multi_row_intent() {
                 rows: vec![
                     Columns {
                         columns: vec![
-                            Value::String(encode(&set[0])),
-                            Value::String(encode(&set[1])),
+                            Value::String(encode(&contract[0])),
+                            Value::String(encode(&contract[1])),
                         ],
                     },
                     Columns {
                         columns: vec![
-                            Value::String(encode(&set[0])),
-                            Value::String(encode(&set[1])),
+                            Value::String(encode(&contract[0])),
+                            Value::String(encode(&contract[1])),
                         ],
                     },
                 ],
@@ -295,5 +326,5 @@ fn test_multi_row_intent() {
         ],
     };
 
-    get_intent_set(queries).unwrap_err();
+    get_contract(queries).unwrap_err();
 }

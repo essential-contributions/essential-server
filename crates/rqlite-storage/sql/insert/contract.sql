@@ -1,5 +1,5 @@
 INSERT
-    OR IGNORE INTO intent_sets (
+    OR IGNORE INTO contracts (
         content_hash,
         signature,
         created_at_seconds,

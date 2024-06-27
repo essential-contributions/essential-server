@@ -620,7 +620,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-gen"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "essential-asm-spec",
  "essential-types",
@@ -632,7 +632,7 @@ dependencies = [
 [[package]]
 name = "essential-asm-spec"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "serde",
  "serde_yaml",
@@ -641,7 +641,7 @@ dependencies = [
 [[package]]
 name = "essential-check"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "essential-constraint-vm",
  "essential-hash",
@@ -657,7 +657,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "essential-asm-gen",
  "essential-types",
@@ -667,7 +667,7 @@ dependencies = [
 [[package]]
 name = "essential-constraint-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "ed25519-dalek",
  "essential-constraint-asm",
@@ -682,7 +682,7 @@ dependencies = [
 [[package]]
 name = "essential-hash"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "essential-types",
  "postcard",
@@ -693,7 +693,7 @@ dependencies = [
 [[package]]
 name = "essential-lock"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 
 [[package]]
 name = "essential-memory-storage"
@@ -801,18 +801,17 @@ dependencies = [
 [[package]]
 name = "essential-sign"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "essential-hash",
  "essential-types",
  "secp256k1",
- "serde",
 ]
 
 [[package]]
 name = "essential-state-asm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "essential-asm-gen",
  "essential-constraint-asm",
@@ -822,7 +821,7 @@ dependencies = [
 [[package]]
 name = "essential-state-read-vm"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "essential-constraint-vm",
  "essential-state-asm",
@@ -860,7 +859,7 @@ dependencies = [
 [[package]]
 name = "essential-types"
 version = "0.1.0"
-source = "git+ssh://git@github.com/essential-contributions/essential-base.git#e0038f43190df2eb1824f0f553a68b3173877499"
+source = "git+ssh://git@github.com/essential-contributions/essential-base.git?branch=freesig/rename#15d81bb95bd51604fcaac89ec9a4408ed1c2d1db"
 dependencies = [
  "hex",
  "serde",

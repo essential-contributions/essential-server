@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use essential_server_types::{CheckSolution, QueryStateReads};
-use essential_types::{intent::Intent, IntentAddress};
-use test_utils::{empty::Empty, sign_intent_set_with_random_keypair, solution_with_intent};
+use essential_types::{predicate::Predicate, PredicateAddress};
+use test_utils::{empty::Empty, sign_contract_with_random_keypair, solution_with_predicate};
 use tokio::process::Command;
-use utils::{setup, TestServer};
+use utils::{contractup, TestServer};
 
 mod utils;
 
@@ -16,7 +16,7 @@ async fn test_readme_curl() {
 
     let TestServer {
         url, shutdown, jh, ..
-    } = setup().await;
+    } = contractup().await;
 
     let port = url.port().unwrap();
 
@@ -69,13 +69,13 @@ async fn test_readme_curl() {
 #[test]
 #[ignore = "Just a utility, not really a test"]
 fn create_readme_inputs() {
-    let predicate = Intent::empty();
-    let signed = sign_intent_set_with_random_keypair(vec![predicate]);
-    let address = IntentAddress {
-        set: essential_hash::intent_set_addr::from_intents(&signed.set),
-        intent: essential_hash::content_addr(&signed.set[0]),
+    let predicate = Predicate::empty();
+    let signed = sign_contract_with_random_keypair(vec![predicate]);
+    let address = PredicateAddress {
+        contract: essential_hash::contract_addr::from_contract(&signed.contract),
+        predicate: essential_hash::content_addr(&signed.contract[0]),
     };
-    let solution = solution_with_intent(address.clone());
+    let solution = solution_with_predicate(address.clone());
     fn ser<T: serde::Serialize>(t: T) {
         println!("{}", serde_json::to_string(&t).unwrap());
     }
@@ -86,17 +86,17 @@ fn create_readme_inputs() {
     ser(&signed);
 
     p("get contract");
-    p(&address.set);
+    p(&address.contract);
 
     p("get predicate");
-    p(&address.set);
-    p(&address.intent);
+    p(&address.contract);
+    p(&address.predicate);
 
     p("submit solution");
     ser(&solution);
 
     p("query state");
-    p(&address.set);
+    p(&address.contract);
     p(hex::encode_upper(vec![0]));
 
     p("solution outcome");
@@ -108,11 +108,15 @@ fn create_readme_inputs() {
     p("check solution with data");
     ser(CheckSolution {
         solution: solution.clone(),
-        intents: signed.set.clone(),
+        contract: signed.contract.clone(),
     });
 
     p("query-state-reads");
-    let query =
-        QueryStateReads::from_solution(solution.clone(), 0, &signed.set[0], Default::default());
+    let query = QueryStateReads::from_solution(
+        solution.clone(),
+        0,
+        &signed.contract[0],
+        Default::default(),
+    );
     ser(query);
 }

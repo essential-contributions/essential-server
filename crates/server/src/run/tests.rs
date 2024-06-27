@@ -1,14 +1,14 @@
 use crate::{
     deploy::deploy,
     solution::submit_solution,
-    test_utils::{counter_intent, counter_solution, deploy_intent, test_solution},
+    test_utils::{counter_predicate, counter_solution, deploy_predicate, test_solution},
 };
 use essential_memory_storage::MemoryStorage;
 use essential_state_read_vm::StateRead;
 use essential_storage::{QueryState, Storage};
-use essential_types::{intent::Intent, ContentAddress, IntentAddress, Word};
+use essential_types::{predicate::Predicate, ContentAddress, PredicateAddress, Word};
 use std::time::Duration;
-use test_utils::{empty::Empty, sign_intent_set_with_random_keypair};
+use test_utils::{empty::Empty, sign_contract_with_random_keypair};
 
 use super::RUN_LOOP_FREQUENCY;
 
@@ -33,7 +33,7 @@ async fn test_run() {
 
     let first_state_mutation = &solution.data[0].state_mutations[0];
     let mutation_key = first_state_mutation.key.clone();
-    let mutation_address = solution.data[0].intent_to_solve.set.clone();
+    let mutation_address = solution.data[0].predicate_to_solve.contract.clone();
 
     submit_solution(&storage, solution.clone()).await.unwrap();
 
@@ -72,13 +72,13 @@ async fn test_run() {
 
 #[tokio::test]
 async fn test_counter() {
-    let intent = counter_intent(1);
-    let (intent_address, storage) = deploy_intent(intent.clone()).await;
+    let predicate = counter_predicate(1);
+    let (predicate_address, storage) = deploy_predicate(predicate.clone()).await;
 
-    let solution = counter_solution(intent_address.clone(), 1).await;
-    let solution2 = counter_solution(intent_address.clone(), 2).await;
-    let solution3 = counter_solution(intent_address.clone(), 3).await;
-    let solution4 = counter_solution(intent_address.clone(), 4).await;
+    let solution = counter_solution(predicate_address.clone(), 1).await;
+    let solution2 = counter_solution(predicate_address.clone(), 2).await;
+    let solution3 = counter_solution(predicate_address.clone(), 3).await;
+    let solution4 = counter_solution(predicate_address.clone(), 4).await;
 
     let mutation_key = solution.data[0].state_mutations[0].key.clone();
     let solution_clone = solution.clone();
@@ -91,7 +91,7 @@ async fn test_counter() {
     submit_solution(&storage, solution4.clone()).await.unwrap();
 
     let pre_state = storage
-        .query_state(&intent_address.set, &mutation_key)
+        .query_state(&predicate_address.contract, &mutation_key)
         .await
         .unwrap();
     assert!(pre_state.is_empty());
@@ -99,7 +99,7 @@ async fn test_counter() {
     run(&storage).await.unwrap();
 
     let post_state = storage
-        .query_state(&intent_address.set, &mutation_key)
+        .query_state(&predicate_address.contract, &mutation_key)
         .await
         .unwrap();
     assert_eq!(post_state, vec![2]);
@@ -117,7 +117,7 @@ async fn test_counter() {
     run(&storage).await.unwrap();
 
     let post_state = storage
-        .query_state(&intent_address.set, &mutation_key)
+        .query_state(&predicate_address.contract, &mutation_key)
         .await
         .unwrap();
     assert_eq!(post_state, vec![4]);
@@ -130,9 +130,9 @@ async fn test_counter() {
     assert!(solutions.contains(&solution4));
 }
 
-fn state_read_error_intent(salt: Word) -> Intent {
-    let mut intent = Intent::empty();
-    intent.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
+fn state_read_error_predicate(salt: Word) -> Predicate {
+    let mut predicate = Predicate::empty();
+    predicate.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
         essential_state_read_vm::asm::Stack::Push(1).into(),
         essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
@@ -146,7 +146,7 @@ fn state_read_error_intent(salt: Word) -> Intent {
         essential_state_read_vm::asm::ControlFlow::Halt.into(),
     ])
     .collect()];
-    intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
+    predicate.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
         essential_constraint_vm::asm::Stack::Push(salt).into(),
         essential_constraint_vm::asm::Stack::Pop.into(),
         // Jump distance
@@ -174,25 +174,25 @@ fn state_read_error_intent(salt: Word) -> Intent {
         essential_constraint_vm::asm::Pred::Eq.into(),
     ])
     .collect()];
-    intent
+    predicate
 }
 
 #[tokio::test]
 async fn test_tracing() {
-    std::env::set_var("RUST_LOG", "trace");
+    std::env::contract_var("RUST_LOG", "trace");
     #[cfg(feature = "tracing")]
     let _ = tracing_subscriber::fmt::try_init();
-    let intent: Intent = state_read_error_intent(1);
+    let predicate: Predicate = state_read_error_predicate(1);
 
     let storage = MemoryStorage::default();
-    let intent_hash = ContentAddress(essential_hash::hash(&intent));
-    let set = sign_intent_set_with_random_keypair(vec![intent]);
-    let result = deploy(&storage, set).await.unwrap();
-    let intent_address = IntentAddress {
-        set: result,
-        intent: intent_hash,
+    let predicate_hash = ContentAddress(essential_hash::hash(&predicate));
+    let contract = sign_contract_with_random_keypair(vec![predicate]);
+    let result = deploy(&storage, contract).await.unwrap();
+    let predicate_address = PredicateAddress {
+        contract: result,
+        predicate: predicate_hash,
     };
-    let solution = counter_solution(intent_address.clone(), 1).await;
+    let solution = counter_solution(predicate_address.clone(), 1).await;
     submit_solution(&storage, solution.clone()).await.unwrap();
     run(&storage).await.unwrap();
 }

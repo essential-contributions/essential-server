@@ -9,13 +9,13 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 clap = { version = "4.5.4", features = ["derive"] }
 criterion = "0.5"
-essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-lock = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
-essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git" }
+essential-check = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "freesig/rename" }
+essential-constraint-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "freesig/rename" }
+essential-hash = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "freesig/rename" }
+essential-lock = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "freesig/rename" }
+essential-sign = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "freesig/rename" }
+essential-state-read-vm = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "freesig/rename" }
+essential-types = { git = "ssh://git@github.com/essential-contributions/essential-base.git", branch = "freesig/rename" }
 futures = "0.3.30"
 hex = "0.4.3"
 hyper = "1.3.1"

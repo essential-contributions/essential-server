@@ -14,11 +14,11 @@ pub struct TestServer {
     pub jh: tokio::task::JoinHandle<anyhow::Result<()>>,
 }
 
-pub async fn setup() -> TestServer {
-    setup_with_mem(MemoryStorage::new()).await
+pub async fn contractup() -> TestServer {
+    contractup_with_mem(MemoryStorage::new()).await
 }
 
-pub async fn setup_with_mem(mem: MemoryStorage) -> TestServer {
+pub async fn contractup_with_mem(mem: MemoryStorage) -> TestServer {
     let config = Default::default();
     let (tx, rx) = tokio::sync::oneshot::channel();
     let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
@@ -32,7 +32,7 @@ pub async fn setup_with_mem(mem: MemoryStorage) -> TestServer {
         .unwrap();
     let mut url = reqwest::Url::parse(CLIENT).unwrap();
     let port = rx.await.unwrap().port();
-    url.set_port(Some(port)).unwrap();
+    url.contract_port(Some(port)).unwrap();
 
     TestServer {
         client,

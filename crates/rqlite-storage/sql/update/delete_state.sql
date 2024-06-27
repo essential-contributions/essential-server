@@ -1,12 +1,12 @@
 DELETE FROM
-    intent_state
+    predicate_state
 WHERE
-    set_id = (
+    contract_id = (
         SELECT
-            intent_sets.id
+            contracts.id
         FROM
-            intent_sets
+            contracts
         WHERE
-            intent_sets.content_hash = ?
+            contracts.content_hash = ?
     )
     AND KEY = ?;

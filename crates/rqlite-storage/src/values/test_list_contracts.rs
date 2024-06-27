@@ -1,7 +1,7 @@
 use super::*;
 use crate::encode;
 use serde_json::Number;
-use test_utils::intent_with_salt;
+use test_utils::predicate_with_salt;
 
 #[test]
 fn test_empty_query() {
@@ -9,20 +9,20 @@ fn test_empty_query() {
         queries: vec![None],
     };
 
-    assert!(list_intent_sets(queries).unwrap().is_empty());
+    assert!(list_contracts(queries).unwrap().is_empty());
 }
 
 #[test]
 fn test_invalid_query() {
     let queries = QueryValues { queries: vec![] };
 
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![None, None],
     };
 
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 }
 
 #[test]
@@ -32,14 +32,14 @@ fn test_valid_queries() {
             rows: vec![Columns {
                 columns: vec![
                     Value::Number(Number::from(1)),
-                    Value::String(encode(&intent_with_salt(1))),
+                    Value::String(encode(&predicate_with_salt(1))),
                 ],
             }],
         })],
     };
 
-    let r = list_intent_sets(queries).unwrap();
-    let expected = vec![vec![intent_with_salt(1)]];
+    let r = list_contracts(queries).unwrap();
+    let expected = vec![vec![predicate_with_salt(1)].into()];
     assert_eq!(r, expected);
 
     let queries = QueryValues {
@@ -48,29 +48,29 @@ fn test_valid_queries() {
                 Columns {
                     columns: vec![
                         Value::Number(Number::from(0)),
-                        Value::String(encode(&intent_with_salt(1))),
+                        Value::String(encode(&predicate_with_salt(1))),
                     ],
                 },
                 Columns {
                     columns: vec![
                         Value::Number(Number::from(1)),
-                        Value::String(encode(&intent_with_salt(1))),
+                        Value::String(encode(&predicate_with_salt(1))),
                     ],
                 },
                 Columns {
                     columns: vec![
                         Value::Number(Number::from(1)),
-                        Value::String(encode(&intent_with_salt(2))),
+                        Value::String(encode(&predicate_with_salt(2))),
                     ],
                 },
             ],
         })],
     };
 
-    let r = list_intent_sets(queries).unwrap();
+    let r = list_contracts(queries).unwrap();
     let expected = vec![
-        vec![intent_with_salt(1)],
-        vec![intent_with_salt(1), intent_with_salt(2)],
+        vec![predicate_with_salt(1)].into(),
+        vec![predicate_with_salt(1), predicate_with_salt(2)].into(),
     ];
     assert_eq!(r, expected);
 }
@@ -84,19 +84,19 @@ fn test_invalid_data() {
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
                     Value::Bool(true),
-                    Value::String(encode(&intent_with_salt(1))),
+                    Value::String(encode(&predicate_with_salt(1))),
                 ],
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
@@ -108,19 +108,19 @@ fn test_invalid_data() {
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
             rows: vec![Columns {
                 columns: vec![
                     Value::Number(Number::from_f64(1.0).unwrap()),
-                    Value::String(encode(&intent_with_salt(1))),
+                    Value::String(encode(&predicate_with_salt(1))),
                 ],
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 }
 
 #[test]
@@ -130,13 +130,13 @@ fn test_wrong_num_columns() {
             rows: vec![Columns {
                 columns: vec![
                     Value::Number(Number::from(1)),
-                    Value::String(encode(&intent_with_salt(1))),
+                    Value::String(encode(&predicate_with_salt(1))),
                     Value::Number(Number::from(1)),
                 ],
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 
     let queries = QueryValues {
         queries: vec![Some(Rows {
@@ -145,7 +145,7 @@ fn test_wrong_num_columns() {
             }],
         })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 }
 
 #[test]
@@ -153,5 +153,5 @@ fn test_wrong_num_rows() {
     let queries = QueryValues {
         queries: vec![Some(Rows { rows: vec![] })],
     };
-    list_intent_sets(queries).unwrap_err();
+    list_contracts(queries).unwrap_err();
 }

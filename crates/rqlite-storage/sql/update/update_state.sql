@@ -1,5 +1,5 @@
-INSERT INTO intent_state (set_id, key, value)
+INSERT INTO predicate_state (contract_id, key, value)
 SELECT id, ?, ?
-FROM intent_sets
+FROM contracts
 WHERE content_hash = ?
-ON CONFLICT (set_id, key) DO UPDATE SET value = EXCLUDED.value;
+ON CONFLICT (contract_id, key) DO UPDATE SET value = EXCLUDED.value;

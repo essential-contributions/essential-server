@@ -1,15 +1,15 @@
 SELECT
-    intent_set_pairing.set_id,
-    intents.intent
+    contract_pairing.contract_id,
+    contracts.predicate
 FROM
-    intents
-    JOIN intent_set_pairing ON intents.id = intent_set_pairing.intent_id
+    contracts
+    JOIN contract_pairing ON contracts.id = contract_pairing.predicate_id
 WHERE
-    intent_set_pairing.set_id IN (
+    contract_pairing.contract_id IN (
         SELECT
             id
         FROM
-            intent_sets
+            contracts
         WHERE
             (
                 created_at_seconds > :start_seconds
@@ -29,5 +29,5 @@ WHERE
             :page_size OFFSET :page_size * :page_number
     )
 ORDER BY
-    intent_set_pairing.set_id,
-    intent_set_pairing.id;
+    contract_pairing.contract_id,
+    contract_pairing.id;
