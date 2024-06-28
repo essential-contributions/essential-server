@@ -6,9 +6,10 @@
 use std::{future::Future, ops::Range, time::Duration};
 
 use essential_types::{
-    intent::{self, Intent},
+    contract::{Contract, SignedContract},
+    predicate::Predicate,
     solution::Solution,
-    Block, ContentAddress, Hash, IntentAddress, Key, Word,
+    Block, ContentAddress, Hash, Key, PredicateAddress, Word,
 };
 use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes};
 
@@ -30,10 +31,10 @@ pub struct CommitData<'a> {
 /// All inserts and updates are idempotent.
 pub trait Storage: StateStorage {
     // Updates
-    /// Insert a set of intents with their storage layout.
-    fn insert_intent_set(
+    /// Insert a contract with their storage layout.
+    fn insert_contract(
         &self,
-        intent: intent::SignedSet,
+        predicate: SignedContract,
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
     /// Add a solution to the pool of unsolved solutions.
@@ -55,27 +56,27 @@ pub trait Storage: StateStorage {
     ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
 
     // Reads
-    /// Get an individual intent.
-    /// Note that the same intent might be in multiple sets.
-    fn get_intent(
+    /// Get an individual predicate.
+    /// Note that the same predicate might be in multiple contracts.
+    fn get_predicate(
         &self,
-        address: &IntentAddress,
-    ) -> impl Future<Output = anyhow::Result<Option<Intent>>> + Send;
+        address: &PredicateAddress,
+    ) -> impl Future<Output = anyhow::Result<Option<Predicate>>> + Send;
 
-    /// Get the entire intent set.
-    fn get_intent_set(
+    /// Get the entire contract.
+    fn get_contract(
         &self,
         address: &ContentAddress,
-    ) -> impl Future<Output = anyhow::Result<Option<intent::SignedSet>>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Option<SignedContract>>> + Send;
 
-    /// List all intents. This will paginate the results. The page is 0-indexed.
+    /// List all contracts. This will paginate the results. The page is 0-indexed.
     /// A time range can optionally be provided to filter the results.
     /// The time is duration since the Unix epoch.
-    fn list_intent_sets(
+    fn list_contracts(
         &self,
         time_range: Option<Range<Duration>>,
         page: Option<usize>,
-    ) -> impl Future<Output = anyhow::Result<Vec<Vec<Intent>>>> + Send;
+    ) -> impl Future<Output = anyhow::Result<Vec<Contract>>> + Send;
 
     /// List all solutions in the pool.
     fn list_solutions_pool(
@@ -147,7 +148,7 @@ pub trait QueryState {
 /// Get a range of words from the state.
 pub async fn key_range<S, E>(
     storage: &S,
-    set_addr: ContentAddress,
+    contract_addr: ContentAddress,
     mut key: Key,
     num_words: usize,
 ) -> Result<Vec<Vec<Word>>, E>
@@ -157,7 +158,7 @@ where
 {
     let mut words = vec![];
     for _ in 0..num_words {
-        let slot = storage.query_state(&set_addr, &key).await?;
+        let slot = storage.query_state(&contract_addr, &key).await?;
         words.push(slot);
         key = next_key(key).ok_or_else(|| anyhow::anyhow!("Failed to find next key"))?
     }

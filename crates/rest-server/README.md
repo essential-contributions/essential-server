@@ -21,47 +21,47 @@ cargo run -p essential-rest-server --release -- --help
 ```
 ## API
 > Note that this API is very likely to change as it's currently a WIP.
-### POST `/deploy-intent-set`
-Body: `SignedIntents` as JSON \
+### POST `/deploy-contract`
+Body: `SignedPredicates` as JSON \
 Returns: `ContentAddress` as JSON
 
 **Example:**
 ```bash
 curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" \
-    -d '{"set":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"signature":"721BD7C79A0F303B7EDA3319CE84ADD4AB37BBED21E0570E6334D7864E3B27F121C74A4D8991CB5966BE13BD54544AA81EE26D98E76A3ED6C4BB237529C1188901"}' \
-    http://localhost:59498/deploy-intent-set
+    -d '{"contract":{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":"0000000000000000000000000000000000000000000000000000000000000000"},"signature":"D7B64C906BD6CA28DB9F02F21A295A96E134C13DB31F86E6A8A9BA5680A073D61ED8039FA47C26F24D5ED08808854332723BA274D9E0BDE5276D79DE82C25C9901"}' \
+    http://localhost:59498/deploy-contract
 ```
-### GET `/get-intent-set/:address`
+### GET `/get-contract/:address`
 Parameters: 
-- `:address` = `[u8; 32]` as hex string. This is the content address of the intent set.
+- `:address` = `[u8; 32]` as hex string. This is the content address of the contract.
 
-Returns: `Option<Signed<Vec<Intent>>>` as JSON
+Returns: `Option<SignedContract>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-intent-set/6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-contract/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236
 ```
-### GET `/get-intent/:set/:address`
+### GET `/get-predicate/:contract/:address`
 Parameters: 
-- `:set` = `[u8; 32]` as hex string. This is the content address of the intent set.
-- `:address` = `[u8; 32]` as hex string. This is the content address of the intent.
+- `:contract` = `[u8; 32]` as hex string. This is the content address of the contract.
+- `:address` = `[u8; 32]` as hex string. This is the content address of the predicate.
 
-Returns: `Option<Intent>` as JSON
+Returns: `Option<Predicate>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-intent/6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312/709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-predicate/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236/709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C
 ```
-### GET `/list-intent-sets`
+### GET `/list-contracts`
 Query parameters: 
-- *Optional* `{ start: u64, end: u64 }`. This is the time range to list set within. It is inclusive of the start and exclusive of the end.
-- *Optional* `{ page: u64 }`. This is the page number to list sets from. The default is 0.
+- *Optional* `{ start: u64, end: u64 }`. This is the time range to list contract within. It is inclusive of the start and exclusive of the end.
+- *Optional* `{ page: u64 }`. This is the page number to list contracts from. The default is 0.
 
-Returns: `Vec<Vec<Intent>>` as JSON
+Returns: `Vec<Contract>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-intent-sets?start=0&end=1&page=0"
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-contracts?start=0&end=1&page=0"
 ```
 ### POST `/submit-solution`
 Body: `Solution` as JSON \
@@ -69,11 +69,11 @@ Returns: `Hash` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"intent_to_solve":{"set":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","intent":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/submit-solution
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/submit-solution
 ```
 ### GET `/list-solutions-pool`
 Query parameters: 
-- *Optional* `{ page: u64 }`. This is the page number to list sets from. The default is 0.
+- *Optional* `{ page: u64 }`. This is the page number to list contracts from. The default is 0.
 
 Returns: `Vec<Solution>` as JSON
 
@@ -83,19 +83,19 @@ curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://
 ```
 ### GET `/query-state/:address/:key`
 Parameters: 
-- `:address` = `[u8; 32]` as hex string. This is the content address of the intent set.
+- `:address` = `[u8; 32]` as hex string. This is the content address of the contract.
 - `:key` = `Vec<u8>` as hex string. This is the key of the state.
 
 Returns: `Option<Word>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/query-state/6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312/00
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/query-state/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236/00
 ```
 ### GET `/list-winning-blocks`
 Query parameters: 
-- *Optional* `{ start: u64, end: u64 }`. This is the time range to list set within. It is inclusive of the start and exclusive of the end.
-- *Optional* `{ page: u64 }`. This is the page number to list sets from. The default is 0.
+- *Optional* `{ start: u64, end: u64 }`. This is the time range to list contract within. It is inclusive of the start and exclusive of the end.
+- *Optional* `{ page: u64 }`. This is the page number to list contracts from. The default is 0.
 
 Returns: `Vec<Block>` as JSON
 
@@ -117,10 +117,10 @@ pub enum SolutionOutcome {
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/solution-outcome/421F1ED9E19132757E2DB127FD35E58E08EFE3D77EE2F96FEA60B75D36251EA2"
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/solution-outcome/11CAD716457F6D6524EF84FBA73D11BB5E18658F6EE72EBAC8A14323B37A68FC
 ```
 ### Post `/check-solution`
-Check a solution against deployed intents without changing state.\
+Check a solution against deployed contract without changing state.\
 This is a dry run of the solution.\
 Body: `Solution` as JSON \
 Returns: `CheckSolutionOutput` as JSON
@@ -133,16 +133,16 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"intent_to_solve":{"set":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","intent":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/check-solution
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]}' http://localhost:59498/check-solution
 ```
-### Post `/check-solution-with-data`
-Check a solution with all intents without changing state.\
+### Post `/check-solution-with-contracts`
+Check a solution with all contract without changing state.\
 This is a dry run of the solution.\
 Body: `CheckSolution` as JSON \
 ```rust
 struct CheckSolution {
     solution: Solution,
-    intents: Vec<Intent>,
+    contract: Contract,
 }
 ```
 Returns: `CheckSolutionOutput` as JSON
@@ -155,7 +155,7 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"solution":{"data":[{"intent_to_solve":{"set":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","intent":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"intents":[{"state_read":[],"constraints":[],"directive":"Satisfy"}]}' http://localhost:59498/check-solution-with-data
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"solution":{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"contracts":[{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":"0000000000000000000000000000000000000000000000000000000000000000"}]}' http://localhost:59498/check-solution-with-contracts
 ```
 
 ### Post `/query-state-reads`
@@ -183,5 +183,5 @@ pub enum QueryStateReadsOutput {
 These types are defined in the `essential-server-types` crate in this repo.\
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"state_read":[],"index":0,"solution":{"data":[{"intent_to_solve":{"set":"6649489D9791B73EAAF1C416B003E1CA6A01BB731EF5CA96BB090BF39004C312","intent":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"request_type":{"All":"All"}}' http://localhost:59498/query-state-reads
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"state_read":[],"index":0,"solution":{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"request_type":{"All":"All"}}' http://localhost:59498/query-state-reads
 ```

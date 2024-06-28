@@ -2,80 +2,82 @@ use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason},
     CommitData, Storage,
 };
-use essential_types::{ContentAddress, IntentAddress, Word};
+use essential_types::{contract::Contract, ContentAddress, PredicateAddress, Word};
 use pretty_assertions::assert_eq;
 use test_dbs::create_test;
 use test_utils::{
-    empty::Empty, intent_with_salt, intent_with_salt_and_state,
-    sign_intent_set_with_random_keypair, solution_with_all_inputs,
+    empty::Empty, predicate_with_salt, predicate_with_salt_and_state,
+    sign_contract_with_random_keypair, solution_with_all_inputs,
 };
 
-create_test!(insert_intent_set);
+create_test!(insert_contract);
 
-async fn insert_intent_set<S: Storage>(storage: S) {
+async fn insert_contract<S: Storage>(storage: S) {
     // Double insert is a idempotent
-    let mut set = sign_intent_set_with_random_keypair(vec![
-        intent_with_salt(0),
-        intent_with_salt(1),
-        intent_with_salt(2),
+    let mut contract = sign_contract_with_random_keypair(vec![
+        predicate_with_salt(0),
+        predicate_with_salt(1),
+        predicate_with_salt(2),
     ]);
-    set.set.sort_by_key(essential_hash::content_addr);
+    contract.contract.sort_by_key(essential_hash::content_addr);
 
-    storage.insert_intent_set(set.clone()).await.unwrap();
+    storage.insert_contract(contract.clone()).await.unwrap();
 
-    storage.insert_intent_set(set.clone()).await.unwrap();
+    storage.insert_contract(contract.clone()).await.unwrap();
 
-    let result = storage.list_intent_sets(None, None).await.unwrap();
-    assert_eq!(result, vec![set.set.clone()]);
+    let result = storage.list_contracts(None, None).await.unwrap();
+    assert_eq!(result, vec![contract.contract.clone()]);
 
-    // Insert many sets
-    let sets: Vec<_> = (0..10)
+    // Insert many contracts
+    let contracts: Vec<_> = (0..10)
         .map(|i| {
-            let mut set = vec![
-                intent_with_salt(i),
-                intent_with_salt(i + 1),
-                intent_with_salt(i + 2),
-            ];
-            set.sort_by_key(essential_hash::content_addr);
-            sign_intent_set_with_random_keypair(set)
+            let mut contract: Contract = vec![
+                predicate_with_salt(i),
+                predicate_with_salt(i + 1),
+                predicate_with_salt(i + 2),
+            ]
+            .into();
+            contract.sort_by_key(essential_hash::content_addr);
+            sign_contract_with_random_keypair(contract)
         })
         .collect();
 
-    let mut expected: Vec<_> = sets.iter().map(|s| s.set.clone()).collect();
+    let mut expected: Vec<_> = contracts.iter().map(|s| s.contract.clone()).collect();
 
-    for set in &sets {
-        storage.insert_intent_set(set.clone()).await.unwrap();
+    for contract in &contracts {
+        storage.insert_contract(contract.clone()).await.unwrap();
     }
 
-    let result = storage.list_intent_sets(None, None).await.unwrap();
+    let result = storage.list_contracts(None, None).await.unwrap();
     assert_eq!(result, expected);
 
-    // Insert empty set
+    // Insert empty contract
     storage
-        .insert_intent_set(sign_intent_set_with_random_keypair(vec![]))
+        .insert_contract(sign_contract_with_random_keypair(vec![]))
         .await
         .unwrap();
 
-    // Insert sets with storage
-    let storage_sets: Vec<_> = (0..10)
+    // Insert contracts with storage
+    let storage_contracts: Vec<_> = (0..10)
         .map(|i| {
-            let mut set = vec![
-                intent_with_salt_and_state(i, i),
-                intent_with_salt_and_state(i + 1, i + 1),
-                intent_with_salt_and_state(i + 2, i + 2),
-            ];
-            set.sort_by_key(essential_hash::content_addr);
-            sign_intent_set_with_random_keypair(set)
+            let mut contract: Contract = vec![
+                predicate_with_salt_and_state(i, i),
+                predicate_with_salt_and_state(i + 1, i + 1),
+                predicate_with_salt_and_state(i + 2, i + 2),
+            ]
+            .into();
+            contract.sort_by_key(essential_hash::content_addr);
+            sign_contract_with_random_keypair(contract)
         })
         .collect();
 
-    expected.extend(storage_sets.iter().map(|s| s.set.clone()));
+    expected.extend(storage_contracts.iter().map(|s| s.contract.clone()));
 
-    for set in &storage_sets {
-        storage.insert_intent_set(set.clone()).await.unwrap();
+    for contract in &storage_contracts {
+        storage.insert_contract(contract.clone()).await.unwrap();
     }
 
-    let result = storage.list_intent_sets(None, None).await.unwrap();
+    let result = storage.list_contracts(None, None).await.unwrap();
     assert_eq!(result, expected);
 }
 
@@ -201,140 +203,140 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
     assert_eq!(result[2].number, 2);
 }
 
-create_test!(get_intent);
+create_test!(get_predicate);
 
-async fn get_intent<S: Storage>(storage: S) {
-    let mut set = sign_intent_set_with_random_keypair(vec![
-        intent_with_salt(0),
-        intent_with_salt(1),
-        intent_with_salt(2),
+async fn get_predicate<S: Storage>(storage: S) {
+    let mut contract = sign_contract_with_random_keypair(vec![
+        predicate_with_salt(0),
+        predicate_with_salt(1),
+        predicate_with_salt(2),
     ]);
-    set.set.sort_by_key(essential_hash::content_addr);
+    contract.contract.sort_by_key(essential_hash::content_addr);
 
-    storage.insert_intent_set(set.clone()).await.unwrap();
+    storage.insert_contract(contract.clone()).await.unwrap();
 
-    let mut set2 =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(0), intent_with_salt(1)]);
-    set2.set.sort_by_key(essential_hash::content_addr);
+    let mut contract2 =
+        sign_contract_with_random_keypair(vec![predicate_with_salt(0), predicate_with_salt(1)]);
+    contract2.contract.sort_by_key(essential_hash::content_addr);
 
-    storage.insert_intent_set(set2.clone()).await.unwrap();
+    storage.insert_contract(contract2.clone()).await.unwrap();
 
-    let set_address = essential_hash::intent_set_addr::from_intents(&set.set);
-    let set_address2 = essential_hash::intent_set_addr::from_intents(&set2.set);
+    let contract_address = essential_hash::contract_addr::from_contract(&contract.contract);
+    let contract_address2 = essential_hash::contract_addr::from_contract(&contract2.contract);
 
-    // Get existing intent
-    for intent in &set.set {
-        let address = IntentAddress {
-            set: set_address.clone(),
-            intent: essential_hash::content_addr(intent),
+    // Get existing predicate
+    for predicate in &contract.contract.predicates {
+        let address = PredicateAddress {
+            contract: contract_address.clone(),
+            predicate: essential_hash::content_addr(predicate),
         };
-        let result = storage.get_intent(&address).await.unwrap().unwrap();
-        assert_eq!(result, *intent);
+        let result = storage.get_predicate(&address).await.unwrap().unwrap();
+        assert_eq!(result, *predicate);
     }
 
-    for intent in &set2.set {
-        let address = IntentAddress {
-            set: set_address2.clone(),
-            intent: essential_hash::content_addr(intent),
+    for predicate in &contract2.contract.predicates {
+        let address = PredicateAddress {
+            contract: contract_address2.clone(),
+            predicate: essential_hash::content_addr(predicate),
         };
-        let result = storage.get_intent(&address).await.unwrap().unwrap();
-        assert_eq!(result, *intent);
+        let result = storage.get_predicate(&address).await.unwrap().unwrap();
+        assert_eq!(result, *predicate);
     }
 
-    // Get missing intent
-    let address = IntentAddress::empty();
-    let result = storage.get_intent(&address).await.unwrap();
+    // Get missing predicate
+    let address = PredicateAddress::empty();
+    let result = storage.get_predicate(&address).await.unwrap();
     assert!(result.is_none());
 
-    let address = IntentAddress {
-        set: set_address.clone(),
-        intent: ContentAddress::empty(),
+    let address = PredicateAddress {
+        contract: contract_address.clone(),
+        predicate: ContentAddress::empty(),
     };
-    let result = storage.get_intent(&address).await.unwrap();
+    let result = storage.get_predicate(&address).await.unwrap();
     assert!(result.is_none());
 
-    let address = IntentAddress {
-        set: ContentAddress::empty(),
-        intent: essential_hash::content_addr(&set.set[0]),
+    let address = PredicateAddress {
+        contract: ContentAddress::empty(),
+        predicate: essential_hash::content_addr(&contract.contract[0]),
     };
-    let result = storage.get_intent(&address).await.unwrap();
+    let result = storage.get_predicate(&address).await.unwrap();
     assert!(result.is_none());
 
-    // Wrong set
-    let address = IntentAddress {
-        set: set_address2.clone(),
-        intent: essential_hash::content_addr(&intent_with_salt(2)),
+    // Wrong contract
+    let address = PredicateAddress {
+        contract: contract_address2.clone(),
+        predicate: essential_hash::content_addr(&predicate_with_salt(2)),
     };
-    let result = storage.get_intent(&address).await.unwrap();
+    let result = storage.get_predicate(&address).await.unwrap();
     assert!(result.is_none());
 }
 
-create_test!(get_intent_set);
+create_test!(get_contract);
 
-async fn get_intent_set<S: Storage>(storage: S) {
-    let mut sets = vec![];
+async fn get_contract<S: Storage>(storage: S) {
+    let mut contracts = vec![];
     for i in 0..2 {
-        let mut set = sign_intent_set_with_random_keypair(vec![
-            intent_with_salt(i),
-            intent_with_salt(i + 1),
-            intent_with_salt(i + 2),
+        let mut contract = sign_contract_with_random_keypair(vec![
+            predicate_with_salt(i),
+            predicate_with_salt(i + 1),
+            predicate_with_salt(i + 2),
         ]);
-        set.set.sort_by_key(essential_hash::content_addr);
+        contract.contract.sort_by_key(essential_hash::content_addr);
 
-        storage.insert_intent_set(set.clone()).await.unwrap();
-        sets.push(set);
+        storage.insert_contract(contract.clone()).await.unwrap();
+        contracts.push(contract);
     }
 
-    // Get existing sets
-    for set in &sets {
-        let address = essential_hash::intent_set_addr::from_intents(&set.set);
-        let result = storage.get_intent_set(&address).await.unwrap().unwrap();
-        assert_eq!(result.signature, set.signature);
-        assert_eq!(result.set, set.set);
+    // Get existing contracts
+    for contract in &contracts {
+        let address = essential_hash::contract_addr::from_contract(&contract.contract);
+        let result = storage.get_contract(&address).await.unwrap().unwrap();
+        assert_eq!(result.signature, contract.signature);
+        assert_eq!(result.contract, contract.contract);
     }
 
-    // Get missing set
+    // Get missing contract
     let result = storage
-        .get_intent_set(&ContentAddress::empty())
+        .get_contract(&ContentAddress::empty())
         .await
         .unwrap();
     assert!(result.is_none());
 }
 
-create_test!(list_intent_sets);
+create_test!(list_contracts);
 
-async fn list_intent_sets<S: Storage>(storage: S) {
+async fn list_contracts<S: Storage>(storage: S) {
     // List empty
-    let result = storage.list_intent_sets(None, None).await.unwrap();
+    let result = storage.list_contracts(None, None).await.unwrap();
     assert!(result.is_empty());
 
-    let mut sets = vec![];
+    let mut contracts = vec![];
     for i in 0..102 {
-        let mut set = sign_intent_set_with_random_keypair(vec![
-            intent_with_salt(i),
-            intent_with_salt(i + 1),
-            intent_with_salt(i + 2),
+        let mut contract = sign_contract_with_random_keypair(vec![
+            predicate_with_salt(i),
+            predicate_with_salt(i + 1),
+            predicate_with_salt(i + 2),
         ]);
-        set.set.sort_by_key(essential_hash::content_addr);
+        contract.contract.sort_by_key(essential_hash::content_addr);
 
-        storage.insert_intent_set(set.clone()).await.unwrap();
-        sets.push(set.set);
+        storage.insert_contract(contract.clone()).await.unwrap();
+        contracts.push(contract.contract);
     }
 
     // List up to page size
-    let result = storage.list_intent_sets(None, None).await.unwrap();
-    assert_eq!(&result[..], &sets[0..100]);
+    let result = storage.list_contracts(None, None).await.unwrap();
+    assert_eq!(&result[..], &contracts[0..100]);
 
     // List first page
-    let result = storage.list_intent_sets(None, Some(0)).await.unwrap();
-    assert_eq!(&result[..], &sets[0..100]);
+    let result = storage.list_contracts(None, Some(0)).await.unwrap();
+    assert_eq!(&result[..], &contracts[0..100]);
 
     // List second page
-    let result = storage.list_intent_sets(None, Some(1)).await.unwrap();
-    assert_eq!(&result[..], &sets[100..102]);
+    let result = storage.list_contracts(None, Some(1)).await.unwrap();
+    assert_eq!(&result[..], &contracts[100..102]);
 
     // List empty third page
-    let result = storage.list_intent_sets(None, Some(2)).await.unwrap();
+    let result = storage.list_contracts(None, Some(2)).await.unwrap();
     assert!(result.is_empty());
 
     // List within time
@@ -344,21 +346,21 @@ async fn list_intent_sets<S: Storage>(storage: S) {
     let start = time - std::time::Duration::from_secs(100);
     let end = time + std::time::Duration::from_secs(100);
     let result = storage
-        .list_intent_sets(Some(start..end), None)
+        .list_contracts(Some(start..end), None)
         .await
         .unwrap();
-    assert_eq!(&result[..], &sets[0..100]);
+    assert_eq!(&result[..], &contracts[0..100]);
 
     // List within time and page
     let result = storage
-        .list_intent_sets(Some(start..end), Some(1))
+        .list_contracts(Some(start..end), Some(1))
         .await
         .unwrap();
-    assert_eq!(&result[..], &sets[100..102]);
+    assert_eq!(&result[..], &contracts[100..102]);
 
     // List within time and empty page
     let result = storage
-        .list_intent_sets(Some(start..end), Some(2))
+        .list_contracts(Some(start..end), Some(2))
         .await
         .unwrap();
     assert!(result.is_empty());
@@ -366,7 +368,7 @@ async fn list_intent_sets<S: Storage>(storage: S) {
     // List outside time
     let end = time - std::time::Duration::from_secs(80);
     let result = storage
-        .list_intent_sets(Some(start..end), None)
+        .list_contracts(Some(start..end), None)
         .await
         .unwrap();
     assert!(result.is_empty());
@@ -743,16 +745,16 @@ async fn commit_block<S: Storage>(storage: S) {
             .unwrap();
     }
 
-    let mut set = sign_intent_set_with_random_keypair(vec![
-        intent_with_salt(0),
-        intent_with_salt(1),
-        intent_with_salt(2),
+    let mut contract = sign_contract_with_random_keypair(vec![
+        predicate_with_salt(0),
+        predicate_with_salt(1),
+        predicate_with_salt(2),
     ]);
-    set.set.sort_by_key(essential_hash::content_addr);
+    contract.contract.sort_by_key(essential_hash::content_addr);
 
-    storage.insert_intent_set(set.clone()).await.unwrap();
+    storage.insert_contract(contract.clone()).await.unwrap();
 
-    let address = essential_hash::intent_set_addr::from_intents(&set.set);
+    let address = essential_hash::contract_addr::from_contract(&contract.contract);
 
     let failed = [(hashes[1], SolutionFailReason::NotComposable)];
     let solved = [hashes[2]];
@@ -794,16 +796,16 @@ async fn commit_block<S: Storage>(storage: S) {
 create_test!(update_state);
 
 async fn update_state<S: Storage>(storage: S) {
-    let mut set = sign_intent_set_with_random_keypair(vec![
-        intent_with_salt(0),
-        intent_with_salt(1),
-        intent_with_salt(2),
+    let mut contract = sign_contract_with_random_keypair(vec![
+        predicate_with_salt(0),
+        predicate_with_salt(1),
+        predicate_with_salt(2),
     ]);
-    set.set.sort_by_key(essential_hash::content_addr);
+    contract.contract.sort_by_key(essential_hash::content_addr);
 
-    storage.insert_intent_set(set.clone()).await.unwrap();
+    storage.insert_contract(contract.clone()).await.unwrap();
 
-    let address = essential_hash::intent_set_addr::from_intents(&set.set);
+    let address = essential_hash::contract_addr::from_contract(&contract.contract);
 
     for i in 0..10 {
         let r = storage
@@ -832,16 +834,16 @@ async fn update_state<S: Storage>(storage: S) {
 create_test!(update_state_batch);
 
 async fn update_state_batch<S: Storage>(storage: S) {
-    let mut set = sign_intent_set_with_random_keypair(vec![
-        intent_with_salt(0),
-        intent_with_salt(1),
-        intent_with_salt(2),
+    let mut contract = sign_contract_with_random_keypair(vec![
+        predicate_with_salt(0),
+        predicate_with_salt(1),
+        predicate_with_salt(2),
     ]);
-    set.set.sort_by_key(essential_hash::content_addr);
+    contract.contract.sort_by_key(essential_hash::content_addr);
 
-    storage.insert_intent_set(set.clone()).await.unwrap();
+    storage.insert_contract(contract.clone()).await.unwrap();
 
-    let address = essential_hash::intent_set_addr::from_intents(&set.set);
+    let address = essential_hash::contract_addr::from_contract(&contract.contract);
 
     let updates = (0..10)
         .map(|i| (address.clone(), vec![i as Word], vec![i as Word]))

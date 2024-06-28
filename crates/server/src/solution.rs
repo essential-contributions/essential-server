@@ -1,7 +1,7 @@
 use essential_check as check;
 use essential_storage::{StateStorage, Storage};
 use essential_transaction_storage::TransactionStorage;
-use essential_types::{intent::Intent, solution::Solution, ContentAddress, IntentAddress};
+use essential_types::{predicate::Predicate, solution::Solution, ContentAddress, PredicateAddress};
 use std::{collections::HashMap, sync::Arc};
 
 pub(crate) mod read;
@@ -16,10 +16,10 @@ where
 {
     check::solution::check(&solution)?;
 
-    // Validation of intents being read from storage.
-    let intents: HashMap<IntentAddress, Arc<Intent>> =
-        read::read_intents_from_storage(&solution, storage).await?;
-    validate_intents(&solution, &intents)?;
+    // Validation of contract being read from storage.
+    let contract: HashMap<PredicateAddress, Arc<Predicate>> =
+        read::read_contract_from_storage(&solution, storage).await?;
+    validate_contract(&solution, &contract)?;
 
     // Insert the solution into the pool.
     let solution_hash = essential_hash::content_addr(&solution);
@@ -40,7 +40,7 @@ where
     for data in &solution.data {
         for mutation in data.state_mutations.iter() {
             storage.apply_state(
-                &data.intent_to_solve.set,
+                &data.predicate_to_solve.contract,
                 mutation.key.clone(),
                 mutation.value.clone(),
             );
@@ -64,28 +64,28 @@ where
     Ok(post_state)
 }
 
-/// Validate what we can of the solution's associated intents without performing execution.
+/// Validate what we can of the solution's associated contract without performing execution.
 #[cfg_attr(feature = "tracing", tracing::instrument(skip_all, err))]
-pub fn validate_intents(
+pub fn validate_contract(
     solution: &Solution,
-    intents: &HashMap<IntentAddress, Arc<Intent>>,
+    contract: &HashMap<PredicateAddress, Arc<Predicate>>,
 ) -> anyhow::Result<()> {
-    // The map must contain all intents referred to by solution data.
-    contains_all_intents(solution, intents)?;
+    // The map must contain all contract referred to by solution data.
+    contains_all_contract(solution, contract)?;
     Ok(())
 }
 
-/// Ensure that all intents referred to by the solution have been read from the storage.
-pub fn contains_all_intents(
+/// Ensure that all contracts referred to by the solution have been read from the storage.
+pub fn contains_all_contract(
     solution: &Solution,
-    intents: &HashMap<IntentAddress, Arc<Intent>>,
+    predicates: &HashMap<PredicateAddress, Arc<Predicate>>,
 ) -> anyhow::Result<()> {
     anyhow::ensure!(
         solution
             .data
             .iter()
-            .all(|data| intents.contains_key(&data.intent_to_solve)),
-        "All intents must be in the set"
+            .all(|data| predicates.contains_key(&data.predicate_to_solve)),
+        "All predicates must be in the contracts"
     );
     Ok(())
 }

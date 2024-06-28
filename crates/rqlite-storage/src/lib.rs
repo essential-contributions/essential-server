@@ -11,7 +11,10 @@ use essential_storage::{
     failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes},
     key_range, CommitData, QueryState, StateStorage, Storage,
 };
-use essential_types::{intent, Block, ContentAddress, Hash, Key, Word};
+use essential_types::{
+    contract::{Contract, SignedContract},
+    Block, ContentAddress, Hash, Key, Word,
+};
 use futures::FutureExt;
 use std::{pin::Pin, sync::Arc, time::Duration};
 use thiserror::Error;
@@ -122,13 +125,13 @@ impl RqliteStorage {
     /// This is idempotent.
     pub async fn create_tables(&self) -> anyhow::Result<()> {
         let creates = &[
-            include_sql!("create/intents.sql"),
-            include_sql!("create/intent_sets.sql"),
-            include_sql!("create/intent_set_pairing.sql"),
+            include_sql!("create/predicates.sql"),
+            include_sql!("create/contracts.sql"),
+            include_sql!("create/contract_pairing.sql"),
             include_sql!("create/solutions.sql"),
             include_sql!("create/solutions_pool.sql"),
             include_sql!("create/solved.sql"),
-            include_sql!("create/intent_state.sql"),
+            include_sql!("create/contract_state.sql"),
             include_sql!("create/batch.sql"),
             include_sql!("create/failed_solutions.sql"),
             include_sql!("index/solved_batch_id.sql"),
@@ -313,47 +316,49 @@ impl QueryState for RqliteStorage {
 }
 
 impl Storage for RqliteStorage {
-    async fn insert_intent_set(&self, mut intents: intent::SignedSet) -> anyhow::Result<()> {
-        // Get the time this intent set was created at.
+    async fn insert_contract(&self, mut contract: SignedContract) -> anyhow::Result<()> {
+        // Get the time this contract was created at.
         let created_at = std::time::SystemTime::now();
         let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
 
-        intents.set.sort_by_key(essential_hash::content_addr);
+        contract.contract.sort_by_key(essential_hash::content_addr);
 
         // Encode the data into hex blobs.
-        let set_addr = essential_hash::intent_set_addr::from_intents(&intents.set);
-        let address = encode(&set_addr);
-        let signature = encode(&intents.signature);
+        let contract_addr = essential_hash::contract_addr::from_contract(&contract.contract);
+        let address = encode(&contract_addr);
+        let signature = encode(&contract.signature);
+        let salt = encode(&contract.contract.salt);
 
-        // For each intent, insert the intent and the intent set pairing.
-        let intents = intents.set.iter().flat_map(|intent| {
-            let hash = encode(&essential_hash::content_addr(&intent));
-            let intent = encode(&intent);
+        // For each predicate, insert the predicate and the contract pairing.
+        let contract = contract.contract.iter().flat_map(|predicate| {
+            let hash = encode(&essential_hash::content_addr(&predicate));
+            let predicate = encode(&predicate);
             [
                 include_sql!(
                     owned
-                    "insert/intents.sql",
-                    intent,
+                    "insert/predicates.sql",
+                    predicate,
                     hash.clone()
                 ),
                 include_sql!(
                     owned
-                    "insert/intent_set_pairing.sql",
+                    "insert/contract_pairing.sql",
                     address.clone(),
                     hash
                 ),
             ]
         });
 
-        // Insert the intent set and storage layout then the intents and pairings.
+        // Insert the contract and storage layout then the contract and pairings.
         let mut inserts = vec![include_sql!(owned
-            "insert/intent_set.sql",
+            "insert/contracts.sql",
             address.clone(),
+            salt,
             signature,
             unix_time.as_secs(),
             unix_time.subsec_nanos()
         )];
-        inserts.extend(intents);
+        inserts.extend(contract);
 
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
@@ -407,63 +412,80 @@ impl Storage for RqliteStorage {
         self.execute(&sql[..]).await
     }
 
-    async fn get_intent(
+    async fn get_predicate(
         &self,
-        address: &essential_types::IntentAddress,
-    ) -> anyhow::Result<Option<essential_types::intent::Intent>> {
-        let set = encode(&address.set);
-        let intent_hash = encode(&address.intent);
-        let sql = &[include_sql!("query/get_intent.sql", set, intent_hash)];
+        address: &essential_types::PredicateAddress,
+    ) -> anyhow::Result<Option<essential_types::predicate::Predicate>> {
+        let contract = encode(&address.contract);
+        let predicate_hash = encode(&address.predicate);
+        let sql = &[include_sql!(
+            "query/get_predicate.sql",
+            contract,
+            predicate_hash
+        )];
         let queries = self.query_values(sql).await?;
 
         // Expecting single query, single row, single column
         match single_value(&queries) {
-            Some(serde_json::Value::String(intent)) => Ok(Some(decode(intent)?)),
+            Some(serde_json::Value::String(predicate)) => Ok(Some(decode(predicate)?)),
             None => Ok(None),
-            _ => bail!("Intent stored incorrectly"),
+            _ => bail!("Predicate stored incorrectly"),
         }
     }
 
-    async fn get_intent_set(
+    async fn get_contract(
         &self,
         address: &essential_types::ContentAddress,
-    ) -> anyhow::Result<Option<intent::SignedSet>> {
+    ) -> anyhow::Result<Option<SignedContract>> {
         let address = encode(address);
         let sql = &[
-            include_sql!("query/get_intent_set_signature.sql", address.clone()),
-            include_sql!("query/get_intent_set.sql", address),
+            include_sql!("query/get_contract_signature.sql", address.clone()),
+            include_sql!("query/get_contract_salt.sql", address.clone()),
+            include_sql!("query/get_contract.sql", address),
         ];
         let queries = self.query_values(sql).await?;
-        values::get_intent_set(queries)
+        values::get_contract(queries)
     }
 
-    async fn list_intent_sets(
+    async fn list_contracts(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
         page: Option<usize>,
-    ) -> anyhow::Result<Vec<Vec<essential_types::intent::Intent>>> {
+    ) -> anyhow::Result<Vec<Contract>> {
         let page = page.unwrap_or(0);
         let queries = match time_range {
             Some(range) => {
-                let sql = &[include_sql!(
-                    "query/list_intent_sets_by_time.sql",
-                    range.start.as_secs(),
-                    range.start.subsec_nanos(),
-                    range.end.as_secs(),
-                    range.end.subsec_nanos(),
-                    PAGE_SIZE,
-                    page
-                )];
+                let sql = &[
+                    include_sql!(
+                        "query/list_contract_salts_by_time.sql",
+                        range.start.as_secs(),
+                        range.start.subsec_nanos(),
+                        range.end.as_secs(),
+                        range.end.subsec_nanos(),
+                        PAGE_SIZE,
+                        page
+                    ),
+                    include_sql!(
+                        "query/list_contracts_by_time.sql",
+                        range.start.as_secs(),
+                        range.start.subsec_nanos(),
+                        range.end.as_secs(),
+                        range.end.subsec_nanos(),
+                        PAGE_SIZE,
+                        page
+                    ),
+                ];
                 self.query_values(sql).await?
             }
             None => {
                 let sql = &[
-                    include_sql!(named "query/list_intent_sets.sql", "page_size" => PAGE_SIZE, "page_number" => page),
+                    include_sql!(named "query/list_contract_salts.sql", "page_size" => PAGE_SIZE, "page_number" => page),
+                    include_sql!(named "query/list_contracts.sql", "page_size" => PAGE_SIZE, "page_number" => page),
                 ];
                 self.query_values(sql).await?
             }
         };
-        values::list_intent_sets(queries)
+        values::list_contracts(queries)
     }
 
     async fn list_solutions_pool(
@@ -667,8 +689,8 @@ impl StateRead for RqliteStorage {
     type Future =
         Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<Word>>, Self::Error>> + Send>>;
 
-    fn key_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+    fn key_range(&self, contract_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { key_range(&storage, set_addr, key, num_words).await }.boxed()
+        async move { key_range(&storage, contract_addr, key, num_words).await }.boxed()
     }
 }

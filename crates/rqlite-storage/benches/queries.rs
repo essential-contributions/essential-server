@@ -1,10 +1,10 @@
 use core::time;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use essential_storage::failed_solution::SolutionFailReason;
-use essential_types::{intent::SignedSet, solution::Solution, ContentAddress, Hash, Word};
+use essential_types::{contract::SignedContract, solution::Solution, ContentAddress, Hash, Word};
 use std::fs::read_dir;
 use test_utils::{
-    intent_with_salt, sign_intent_set_with_random_keypair, solution_with_all_inputs_fixed_size,
+    predicate_with_salt, sign_contract_with_random_keypair, solution_with_all_inputs_fixed_size,
 };
 
 use rusqlite::{named_params, params, Connection};
@@ -25,16 +25,18 @@ macro_rules! include_sql {
 pub fn bench(c: &mut Criterion) {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
-    let sets = (0..100).map(|i| {
-        let mut set =
-            sign_intent_set_with_random_keypair(vec![intent_with_salt(i), intent_with_salt(i + 1)]);
-        set.set.sort_by_key(essential_hash::content_addr);
-        set
+    let contracts = (0..100).map(|i| {
+        let mut contract = sign_contract_with_random_keypair(vec![
+            predicate_with_salt(i),
+            predicate_with_salt(i + 1),
+        ]);
+        contract.contract.sort_by_key(essential_hash::content_addr);
+        contract
     });
 
     let mut addresses = vec![];
-    for set in sets {
-        let address = insert_intent(&conn, set);
+    for contract in contracts {
+        let address = insert_predicate(&conn, contract);
         addresses.push(address);
     }
 
@@ -71,31 +73,33 @@ pub fn bench(c: &mut Criterion) {
         })
     });
 
-    let mut set =
-        sign_intent_set_with_random_keypair(vec![intent_with_salt(0), intent_with_salt(1)]);
-    set.set.sort_by_key(essential_hash::content_addr);
-    let sets = (100..10_000).map(|i| {
-        let mut set =
-            sign_intent_set_with_random_keypair(vec![intent_with_salt(i), intent_with_salt(i + 1)]);
-        set.set.sort_by_key(essential_hash::content_addr);
-        set
+    let mut contract =
+        sign_contract_with_random_keypair(vec![predicate_with_salt(0), predicate_with_salt(1)]);
+    contract.contract.sort_by_key(essential_hash::content_addr);
+    let contracts = (100..10_000).map(|i| {
+        let mut contract = sign_contract_with_random_keypair(vec![
+            predicate_with_salt(i),
+            predicate_with_salt(i + 1),
+        ]);
+        contract.contract.sort_by_key(essential_hash::content_addr);
+        contract
     });
 
-    for set in sets {
-        insert_intent(&conn, set);
+    for contract in contracts {
+        insert_predicate(&conn, contract);
     }
 
-    c.bench_function("insert_intent", |b| {
+    c.bench_function("insert_predicate", |b| {
         b.iter(|| {
-            insert_intent(&conn, set.clone());
+            insert_predicate(&conn, contract.clone());
         })
     });
 
-    c.bench_function("list_intent_sets", |b| {
+    c.bench_function("list_contracts", |b| {
         b.iter(|| {
             let r = query(
                 &conn,
-                include_sql!("query", "list_intent_sets"),
+                include_sql!("query", "list_contracts"),
                 [0, 100],
                 |row| {
                     (
@@ -108,11 +112,11 @@ pub fn bench(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("list_intent_sets_by_time", |b| {
+    c.bench_function("list_contracts_by_time", |b| {
         b.iter(|| {
             let r = query(
                 &conn,
-                include_sql!("query", "list_intent_sets_by_time"),
+                include_sql!("query", "list_contracts_by_time"),
                 named_params! {
                     ":page_size": 100,
                     ":page_number": 0,
@@ -132,11 +136,11 @@ pub fn bench(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("get_intent_set", |b| {
+    c.bench_function("get_contract", |b| {
         b.iter(|| {
             let r = query(
                 &conn,
-                include_sql!("query", "get_intent_set"),
+                include_sql!("query", "get_contract"),
                 [encode(&addresses[0])],
                 |row| (row.get::<_, String>(0).unwrap(),),
             );
@@ -144,14 +148,14 @@ pub fn bench(c: &mut Criterion) {
         })
     });
 
-    let intent_addr = essential_hash::content_addr(&set.set[0]);
+    let predicate_addr = essential_hash::content_addr(&contract.contract[0]);
 
-    c.bench_function("get_intent", |b| {
+    c.bench_function("get_predicate", |b| {
         b.iter(|| {
             let r = query(
                 &conn,
-                include_sql!("query", "get_intent"),
-                [encode(&addresses[0]), encode(&intent_addr)],
+                include_sql!("query", "get_predicate"),
+                [encode(&addresses[0]), encode(&predicate_addr)],
                 |row| (row.get::<_, String>(0).unwrap(),),
             );
             black_box(r);
@@ -386,35 +390,35 @@ fn decode<T: serde::de::DeserializeOwned>(value: &str) -> anyhow::Result<T> {
     Ok(postcard::from_bytes(&value)?)
 }
 
-fn insert_intent(conn: &Connection, set: SignedSet) -> ContentAddress {
-    let set_address = essential_hash::intent_set_addr::from_intents(&set.set);
+fn insert_predicate(conn: &Connection, contract: SignedContract) -> ContentAddress {
+    let contract_address = essential_hash::contract_addr::from_contract(&contract.contract);
     let time = time::Duration::from_secs(1);
-    let address = encode(&set_address);
+    let address = encode(&contract_address);
     conn.execute(
-        include_sql!("insert", "intent_set"),
+        include_sql!("insert", "contracts"),
         params![
             address.clone(),
-            encode(&set.signature),
+            encode(&contract.signature),
             time.as_secs(),
             time.subsec_nanos()
         ],
     )
     .unwrap();
 
-    for intent in &set.set {
-        let hash = encode(&essential_hash::content_addr(&intent));
+    for predicate in &contract.contract.predicates {
+        let hash = encode(&essential_hash::content_addr(&predicate));
         conn.execute(
-            include_sql!("insert", "intents"),
-            [encode(intent), hash.clone()],
+            include_sql!("insert", "predicates"),
+            [encode(predicate), hash.clone()],
         )
         .unwrap();
         conn.execute(
-            include_sql!("insert", "intent_set_pairing"),
+            include_sql!("insert", "contract_pairing"),
             params![address.clone(), hash,],
         )
         .unwrap();
     }
-    set_address
+    contract_address
 }
 
 fn insert_solution(conn: &Connection, solution: &Solution) -> Hash {

@@ -4,46 +4,56 @@ use std::{
     time::Duration,
 };
 
-use essential_types::{intent::Intent, solution::Solution, Batch, ContentAddress};
+use essential_types::{
+    contract::Contract, predicate::Predicate, solution::Solution, Batch, ContentAddress,
+};
 
-use crate::IntentSet;
+use crate::ContractWithAddresses;
 
 #[cfg(test)]
 mod tests;
 
-pub fn page_intents<'a>(
-    intent_hashes: impl Iterator<Item = &'a ContentAddress>,
-    intents: &HashMap<ContentAddress, IntentSet>,
+pub fn page_contract<'a>(
+    contract_hashes: impl Iterator<Item = &'a ContentAddress>,
+    contract: &HashMap<ContentAddress, ContractWithAddresses>,
+    predicates: &HashMap<ContentAddress, Predicate>,
     page: usize,
     page_size: usize,
-) -> Vec<Vec<Intent>> {
+) -> Vec<Contract> {
     let start = page * page_size;
-    intent_hashes
+    contract_hashes
         .skip(start)
         .filter_map(|v| {
-            let set = intents.get(v)?;
-            Some(set.intents().cloned().collect::<Vec<_>>())
+            let contract = contract.get(v)?;
+            Some(Contract {
+                predicates: contract.predicates_owned(predicates),
+                salt: contract.salt,
+            })
         })
         .filter(|v| !v.is_empty())
         .take(page_size)
         .collect()
 }
 
-pub fn page_intents_by_time(
-    intent_times: &BTreeMap<Duration, Vec<ContentAddress>>,
-    intents: &HashMap<ContentAddress, IntentSet>,
+pub fn page_contract_by_time(
+    contract_times: &BTreeMap<Duration, Vec<ContentAddress>>,
+    contract: &HashMap<ContentAddress, ContractWithAddresses>,
+    predicates: &HashMap<ContentAddress, Predicate>,
     range: Range<Duration>,
     page: usize,
     page_size: usize,
-) -> Vec<Vec<Intent>> {
+) -> Vec<Contract> {
     let start = page * page_size;
-    intent_times
+    contract_times
         .range(range)
         .skip(start)
         .flat_map(|(_, v)| {
             v.iter().filter_map(|v| {
-                let set = intents.get(v)?;
-                Some(set.intents().cloned().collect::<Vec<_>>())
+                let contract = contract.get(v)?;
+                Some(Contract {
+                    predicates: contract.predicates_owned(predicates),
+                    salt: contract.salt,
+                })
             })
         })
         .filter(|v| !v.is_empty())

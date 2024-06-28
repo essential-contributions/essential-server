@@ -65,9 +65,9 @@ where
     type Future =
         Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<Word>>, Self::Error>> + Send>>;
 
-    fn key_range(&self, set_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
+    fn key_range(&self, contract_addr: ContentAddress, key: Key, num_words: usize) -> Self::Future {
         let storage = self.clone();
-        async move { key_range(&storage, set_addr, key, num_words).await }.boxed()
+        async move { key_range(&storage, contract_addr, key, num_words).await }.boxed()
     }
 }
 

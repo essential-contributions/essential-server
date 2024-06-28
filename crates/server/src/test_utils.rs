@@ -1,29 +1,30 @@
 use crate::deploy::deploy;
 use essential_memory_storage::MemoryStorage;
 use essential_types::{
-    intent::Intent,
+    contract::Contract,
+    predicate::Predicate,
     solution::{Mutation, Solution, SolutionData},
-    ContentAddress, IntentAddress, Word,
+    ContentAddress, PredicateAddress, Word,
 };
-use test_utils::{empty::Empty, sign_intent_set_with_random_keypair, solution_with_intent};
+use test_utils::{empty::Empty, sign_contract_with_random_keypair, solution_with_predicate};
 
 // Empty valid solution.
-// Sign an empty valid intent and deploy it to newly created memory storage,
-// create a solution with the signed intent address.
+// Sign an empty valid predicate and deploy it to newly created memory storage,
+// create a solution with the signed predicate address.
 pub async fn sanity_solution() -> (Solution, MemoryStorage) {
-    let (intent_address, storage) = deploy_intent(Intent::empty()).await;
-    let solution = solution_with_intent(intent_address);
+    let (predicate_address, storage) = deploy_predicate(Predicate::empty()).await;
+    let solution = solution_with_predicate(predicate_address);
     (solution, storage)
 }
 
-// Sign and deploy given intent to newly created memory storage.
-pub async fn deploy_intent(intent: Intent) -> (IntentAddress, MemoryStorage) {
-    deploy_intent_to_storage(MemoryStorage::default(), intent).await
+// Sign and deploy given predicate to newly created memory storage.
+pub async fn deploy_predicate(predicate: Predicate) -> (PredicateAddress, MemoryStorage) {
+    deploy_predicate_to_storage(MemoryStorage::default(), predicate).await
 }
 
 pub async fn deploy_contracts(
-    contracts: Vec<Vec<Intent>>,
-) -> (Vec<Vec<IntentAddress>>, MemoryStorage) {
+    contracts: Vec<Contract>,
+) -> (Vec<Vec<PredicateAddress>>, MemoryStorage) {
     let mut s = MemoryStorage::default();
     let mut addresses = Vec::new();
     for contract in contracts {
@@ -34,18 +35,18 @@ pub async fn deploy_contracts(
     (addresses, s)
 }
 
-// Sign and deploy given intent to newly created memory storage.
-pub async fn deploy_intent_to_storage(
+// Sign and deploy given predicate to newly created memory storage.
+pub async fn deploy_predicate_to_storage(
     storage: MemoryStorage,
-    intent: Intent,
-) -> (IntentAddress, MemoryStorage) {
-    let intent_hash = ContentAddress(essential_hash::hash(&intent));
-    let intent = sign_intent_set_with_random_keypair(vec![intent]);
-    let result = deploy(&storage, intent).await.unwrap();
+    predicate: Predicate,
+) -> (PredicateAddress, MemoryStorage) {
+    let predicate_hash = ContentAddress(essential_hash::hash(&predicate));
+    let predicate = sign_contract_with_random_keypair(vec![predicate]);
+    let result = deploy(&storage, predicate).await.unwrap();
     (
-        IntentAddress {
-            set: result,
-            intent: intent_hash,
+        PredicateAddress {
+            contract: result,
+            predicate: predicate_hash,
         },
         storage,
     )
@@ -53,26 +54,26 @@ pub async fn deploy_intent_to_storage(
 
 pub async fn deploy_contract_to_storage(
     storage: MemoryStorage,
-    contract: Vec<Intent>,
-) -> (Vec<IntentAddress>, MemoryStorage) {
-    let contract_hash = essential_hash::intent_set_addr::from_intents(&contract);
+    contract: Contract,
+) -> (Vec<PredicateAddress>, MemoryStorage) {
+    let contract_hash = essential_hash::contract_addr::from_contract(&contract);
     let addresses = contract
         .iter()
-        .map(|intent| IntentAddress {
-            set: contract_hash.clone(),
-            intent: essential_hash::content_addr(intent),
+        .map(|predicate| PredicateAddress {
+            contract: contract_hash.clone(),
+            predicate: essential_hash::content_addr(predicate),
         })
         .collect();
-    let contract = sign_intent_set_with_random_keypair(contract);
+    let contract = sign_contract_with_random_keypair(contract);
     deploy(&storage, contract).await.unwrap();
     (addresses, storage)
 }
 
-pub fn test_intent(salt: Word) -> Intent {
-    // Intent that expects the value of previously unset state slot with index 0 to be 42.
-    let mut intent = Intent::empty();
+pub fn test_predicate(salt: Word) -> Predicate {
+    // Predicate that expects the value of previously uncontract state slot with index 0 to be 42.
+    let mut predicate = Predicate::empty();
     // Program to read state slot 0.
-    intent.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
+    predicate.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
         essential_state_read_vm::asm::Stack::Push(1).into(),
         essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
@@ -83,12 +84,12 @@ pub fn test_intent(salt: Word) -> Intent {
         essential_state_read_vm::asm::Stack::Push(1).into(), // delta
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect()];
     // Program to check pre-mutation value is None and
     // post-mutation value is 42 at slot 0.
-    intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
+    predicate.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
         essential_constraint_vm::asm::Stack::Push(salt).into(), // Salt
         essential_constraint_vm::asm::Stack::Pop.into(),
         essential_constraint_vm::asm::Stack::Push(0).into(), // slot
@@ -104,20 +105,20 @@ pub fn test_intent(salt: Word) -> Intent {
         essential_constraint_vm::asm::Pred::And.into(),
     ])
     .collect()];
-    intent
+    predicate
 }
 
-// Solution that satisfies an intent with state read and constraint programs.
+// Solution that satisfies a predicate with state read and constraint programs.
 pub async fn test_solution(
     storage: Option<MemoryStorage>,
     salt: Word,
 ) -> (Solution, MemoryStorage) {
-    let (intent_address, storage) =
-        deploy_intent_to_storage(storage.unwrap_or_default(), test_intent(salt)).await;
+    let (predicate_address, storage) =
+        deploy_predicate_to_storage(storage.unwrap_or_default(), test_predicate(salt)).await;
     let mut solution = Solution::empty();
     let solution_decision_variables = vec![vec![42]];
     solution.data = vec![SolutionData {
-        intent_to_solve: intent_address.clone(),
+        predicate_to_solve: predicate_address.clone(),
         decision_variables: solution_decision_variables,
         state_mutations: vec![Mutation {
             key: vec![0, 0, 0, 0],
@@ -128,9 +129,9 @@ pub async fn test_solution(
     (solution, storage)
 }
 
-pub fn counter_intent(salt: Word) -> Intent {
-    let mut intent = Intent::empty();
-    intent.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
+pub fn counter_predicate(salt: Word) -> Predicate {
+    let mut predicate = Predicate::empty();
+    predicate.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
         essential_state_read_vm::asm::Stack::Push(1).into(),
         essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
@@ -141,10 +142,10 @@ pub fn counter_intent(salt: Word) -> Intent {
         essential_state_read_vm::asm::Stack::Push(1).into(), // delta
         essential_state_read_vm::asm::Stack::Push(0).into(), // slot index
         essential_state_read_vm::asm::StateRead::KeyRange,
-        essential_state_read_vm::asm::ControlFlow::Halt.into(),
+        essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect()];
-    intent.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
+    predicate.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
         // Salt
         essential_constraint_vm::asm::Stack::Push(salt).into(),
         essential_constraint_vm::asm::Stack::Pop.into(),
@@ -181,14 +182,14 @@ pub fn counter_intent(salt: Word) -> Intent {
         essential_constraint_vm::asm::Pred::And.into(),
     ])
     .collect()];
-    intent
+    predicate
 }
 
-pub async fn counter_solution(intent_address: IntentAddress, final_value: Word) -> Solution {
+pub async fn counter_solution(predicate_address: PredicateAddress, final_value: Word) -> Solution {
     let mut solution = Solution::empty();
     let solution_decision_variables = vec![vec![final_value]];
     solution.data = vec![SolutionData {
-        intent_to_solve: intent_address.clone(),
+        predicate_to_solve: predicate_address.clone(),
         decision_variables: solution_decision_variables,
         state_mutations: vec![Mutation {
             key: vec![0, 0, 0, 0],

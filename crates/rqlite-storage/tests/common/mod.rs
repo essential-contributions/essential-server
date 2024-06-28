@@ -43,12 +43,18 @@ where
         .collect()
 }
 
-pub fn insert_intent_set(conn: &Connection, set: usize, unix_time: Duration, range: Range<usize>) {
+pub fn insert_contract(
+    conn: &Connection,
+    contract: usize,
+    unix_time: Duration,
+    range: Range<usize>,
+) {
     conn.execute(
-        include_sql!("insert", "intent_set"),
+        include_sql!("insert", "contracts"),
         params![
-            format!("hash{}", set),
-            format!("signature{}", set),
+            format!("hash{}", contract),
+            "salt".to_string(),
+            format!("signature{}", contract),
             unix_time.as_secs(),
             unix_time.subsec_nanos()
         ],
@@ -57,13 +63,13 @@ pub fn insert_intent_set(conn: &Connection, set: usize, unix_time: Duration, ran
 
     for i in range {
         conn.execute(
-            include_sql!("insert", "intents"),
-            params![format!("intent{}", i), format!("intent_hash{}", i),],
+            include_sql!("insert", "predicates"),
+            params![format!("predicate{}", i), format!("predicate_hash{}", i),],
         )
         .unwrap();
         conn.execute(
-            include_sql!("insert", "intent_set_pairing"),
-            params![format!("hash{}", set), format!("intent_hash{}", i),],
+            include_sql!("insert", "contract_pairing"),
+            params![format!("hash{}", contract), format!("predicate_hash{}", i),],
         )
         .unwrap();
     }

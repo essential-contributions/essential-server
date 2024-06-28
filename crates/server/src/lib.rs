@@ -6,7 +6,7 @@
 
 use essential_check::{
     self as check,
-    solution::{CheckIntentConfig, Utility},
+    solution::{CheckPredicateConfig, Utility},
 };
 pub use essential_server_types::{CheckSolutionOutput, SolutionOutcome};
 pub use essential_state_read_vm::{Gas, StateRead};
@@ -14,12 +14,13 @@ use essential_storage::failed_solution::CheckOutcome;
 pub use essential_storage::Storage;
 use essential_transaction_storage::{Transaction, TransactionStorage};
 use essential_types::{
-    intent::{self, Intent},
+    contract::{Contract, SignedContract},
+    predicate::Predicate,
     solution::Solution,
-    Block, ContentAddress, Hash, IntentAddress, Key, Word,
+    Block, ContentAddress, Hash, Key, PredicateAddress, Word,
 };
 use run::{Handle, Shutdown};
-use solution::read::read_intents_from_storage;
+use solution::read::read_contract_from_storage;
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
 mod deploy;
@@ -37,7 +38,7 @@ where
     storage: S,
     // Currently only check-related config, though we may want to add a
     // top-level `Config` type for other kinds of configuration (e.g. gas costs).
-    config: Arc<CheckIntentConfig>,
+    config: Arc<CheckPredicateConfig>,
 }
 
 #[derive(Debug, Clone)]
@@ -63,7 +64,7 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    pub fn new(storage: S, config: Arc<CheckIntentConfig>) -> Self {
+    pub fn new(storage: S, config: Arc<CheckPredicateConfig>) -> Self {
         Self { storage, config }
     }
 
@@ -73,7 +74,7 @@ where
     {
         let (mut handle, shutdown) = Handle::new();
         let jh = tokio::spawn(async move { self.run(shutdown, config.run_loop_interval).await });
-        handle.set_jh(jh);
+        handle.contract_jh(jh);
         Ok(handle)
     }
 
@@ -81,40 +82,45 @@ where
         run::run(&self.storage, shutdown, run_loop_interval).await
     }
 
-    pub async fn deploy_intent_set(
+    pub async fn deploy_contract(
         &self,
-        intents: intent::SignedSet,
+        contract: SignedContract,
     ) -> anyhow::Result<ContentAddress> {
-        deploy::deploy(&self.storage, intents).await
+        deploy::deploy(&self.storage, contract).await
     }
 
     pub async fn check_solution(&self, solution: Solution) -> anyhow::Result<CheckSolutionOutput> {
         check::solution::check(&solution)?;
-        let intents = read_intents_from_storage(&solution, &self.storage).await?;
+        let contract = read_contract_from_storage(&solution, &self.storage).await?;
         let transaction = self.storage.clone().transaction();
         let solution = Arc::new(solution);
         let config = self.config.clone();
         let (_post_state, utility, gas) =
-            checked_state_transition(&transaction, solution, &intents, config).await?;
+            checked_state_transition(&transaction, solution, &contract, config).await?;
         Ok(CheckSolutionOutput { utility, gas })
     }
 
-    pub async fn check_solution_with_data(
+    pub async fn check_solution_with_contracts(
         &self,
         solution: Solution,
-        intents: Vec<Intent>,
+        contracts: Vec<Contract>,
     ) -> anyhow::Result<CheckSolutionOutput> {
-        let set = ContentAddress(essential_hash::hash(&intents));
-        let intents: HashMap<_, _> = intents
+        let predicates: HashMap<_, _> = contracts
             .into_iter()
-            .map(|intent| {
-                (
-                    IntentAddress {
-                        set: set.clone(),
-                        intent: ContentAddress(essential_hash::hash(&intent)),
-                    },
-                    Arc::new(intent),
-                )
+            .flat_map(|contract| {
+                let contract_addr = essential_hash::contract_addr::from_contract(&contract);
+                contract.predicates.into_iter().map({
+                    let contract_addr = contract_addr.clone();
+                    move |predicate| {
+                        (
+                            PredicateAddress {
+                                contract: contract_addr.clone(),
+                                predicate: essential_hash::content_addr(&predicate),
+                            },
+                            Arc::new(predicate),
+                        )
+                    }
+                })
             })
             .collect();
 
@@ -124,7 +130,7 @@ where
         let config = self.config.clone();
         let solution = Arc::new(solution);
         let (_post_state, utility, gas) =
-            checked_state_transition(&transaction, solution, &intents, config).await?;
+            checked_state_transition(&transaction, solution, &predicates, config).await?;
         Ok(CheckSolutionOutput { utility, gas })
     }
 
@@ -155,23 +161,26 @@ where
             .unwrap_or_default())
     }
 
-    pub async fn get_intent(&self, address: &IntentAddress) -> anyhow::Result<Option<Intent>> {
-        self.storage.get_intent(address).await
+    pub async fn get_predicate(
+        &self,
+        address: &PredicateAddress,
+    ) -> anyhow::Result<Option<Predicate>> {
+        self.storage.get_predicate(address).await
     }
 
-    pub async fn get_intent_set(
+    pub async fn get_contract(
         &self,
         address: &ContentAddress,
-    ) -> anyhow::Result<Option<intent::SignedSet>> {
-        self.storage.get_intent_set(address).await
+    ) -> anyhow::Result<Option<SignedContract>> {
+        self.storage.get_contract(address).await
     }
 
-    pub async fn list_intent_sets(
+    pub async fn list_contracts(
         &self,
         time_range: Option<Range<Duration>>,
         page: Option<usize>,
-    ) -> anyhow::Result<Vec<Vec<Intent>>> {
-        self.storage.list_intent_sets(time_range, page).await
+    ) -> anyhow::Result<Vec<Contract>> {
+        self.storage.list_contracts(time_range, page).await
     }
 
     pub async fn list_solutions_pool(&self, page: Option<usize>) -> anyhow::Result<Vec<Solution>> {
@@ -205,7 +214,7 @@ where
 
 /// Performs the three main steps of producing a state transition.
 ///
-/// 1. Validates the given `intents` against the given `solution` prior to execution.
+/// 1. Validates the given `contract` against the given `solution` prior to execution.
 /// 2. Clones the `pre_state` storage transaction and creates the proposed `post_state`.
 /// 3. Checks that the solution's data satisfies all constraints.
 ///
@@ -213,15 +222,15 @@ where
 pub(crate) async fn checked_state_transition<S>(
     pre_state: &TransactionStorage<S>,
     solution: Arc<Solution>,
-    intents: &HashMap<IntentAddress, Arc<Intent>>,
-    config: Arc<check::solution::CheckIntentConfig>,
+    contract: &HashMap<PredicateAddress, Arc<Predicate>>,
+    config: Arc<check::solution::CheckPredicateConfig>,
 ) -> anyhow::Result<(TransactionStorage<S>, Utility, Gas)>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
 {
     // Pre-execution validation.
-    solution::validate_intents(&solution, intents)?;
-    let get_intent = |addr: &IntentAddress| intents[addr].clone();
+    solution::validate_contract(&solution, contract)?;
+    let get_predicate = |addr: &PredicateAddress| contract[addr].clone();
 
     // Create the post state for constraint checking.
     let post_state = solution::create_post_state(pre_state, &solution)?;
@@ -230,7 +239,8 @@ where
     let pre = pre_state.view();
     let post = post_state.view();
     let (util, gas) =
-        check::solution::check_intents(&pre, &post, solution.clone(), get_intent, config).await?;
+        check::solution::check_predicates(&pre, &post, solution.clone(), get_predicate, config)
+            .await?;
 
     Ok((post_state, util, gas))
 }

@@ -1,19 +1,19 @@
 use essential_memory_storage::MemoryStorage;
 use essential_storage::{QueryState, Storage};
-use essential_types::intent::Intent;
-use test_utils::{empty::Empty, sign_intent_set_with_random_keypair};
+use essential_types::predicate::Predicate;
+use test_utils::{empty::Empty, sign_contract_with_random_keypair};
 
 use super::*;
 
 #[tokio::test]
 async fn test_can_query() {
     let storage = MemoryStorage::new();
-    let intent = Intent::empty();
-    let address = essential_hash::intent_set_addr::from_intents(&vec![intent.clone()]);
-    let signed = sign_intent_set_with_random_keypair(vec![intent]);
+    let predicate = Predicate::empty();
+    let address = essential_hash::contract_addr::from_contract(&vec![predicate.clone()].into());
+    let signed = sign_contract_with_random_keypair(vec![predicate]);
     let key = vec![0; 4];
     let value = vec![1];
-    storage.insert_intent_set(signed).await.unwrap();
+    storage.insert_contract(signed).await.unwrap();
     storage.update_state(&address, &key, value).await.unwrap();
 
     let mut storage = storage.transaction();

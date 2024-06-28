@@ -7,29 +7,37 @@ use common::*;
 mod common;
 
 #[test]
-fn test_insert_intent_set_double_insert() {
+fn test_insert_contract_double_insert() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
 
     // Double insert is a noop
-    insert_intent_set(&conn, 1, Duration::from_secs(1), 0..2);
-    insert_intent_set(&conn, 1, Duration::from_secs(1), 0..2);
+    insert_contract(&conn, 1, Duration::from_secs(1), 0..2);
+    insert_contract(&conn, 1, Duration::from_secs(1), 0..2);
 
-    let result = query(&conn, "select * from intent_sets", [], |row| {
+    let result = query(&conn, "select * from contracts", [], |row| {
         (
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),
             row.get::<_, String>(2).unwrap(),
-            row.get::<_, usize>(3).unwrap(),
+            row.get::<_, String>(3).unwrap(),
             row.get::<_, usize>(4).unwrap(),
+            row.get::<_, usize>(5).unwrap(),
         )
     });
     assert_eq!(
         result,
-        vec![(1, "hash1".to_string(), "signature1".to_string(), 1, 0,)]
+        vec![(
+            1,
+            "hash1".to_string(),
+            "salt".to_string(),
+            "signature1".to_string(),
+            1,
+            0,
+        )]
     );
 
-    let result = query(&conn, "select * from intents", [], |row| {
+    let result = query(&conn, "select * from predicates", [], |row| {
         (
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, String>(1).unwrap(),
@@ -39,12 +47,12 @@ fn test_insert_intent_set_double_insert() {
     assert_eq!(
         result,
         vec![
-            (1, "intent0".to_string(), "intent_hash0".to_string(),),
-            (2, "intent1".to_string(), "intent_hash1".to_string(),),
+            (1, "predicate0".to_string(), "predicate_hash0".to_string(),),
+            (2, "predicate1".to_string(), "predicate_hash1".to_string(),),
         ]
     );
 
-    let result = query(&conn, "select * from intent_set_pairing", [], |row| {
+    let result = query(&conn, "select * from contract_pairing", [], |row| {
         (
             row.get::<_, usize>(0).unwrap(),
             row.get::<_, usize>(1).unwrap(),
@@ -55,16 +63,16 @@ fn test_insert_intent_set_double_insert() {
 }
 
 #[test]
-fn test_intent_gets() {
+fn test_predicate_gets() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
 
-    insert_intent_set(&conn, 1, Duration::from_secs(1), 0..2);
-    insert_intent_set(&conn, 2, Duration::from_secs(2), 1..3);
+    insert_contract(&conn, 1, Duration::from_secs(1), 0..2);
+    insert_contract(&conn, 2, Duration::from_secs(2), 1..3);
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent_set_signature"),
+        include_sql!("query", "get_contract_signature"),
         ["hash1"],
         |row| row.get::<_, String>(0).unwrap(),
     );
@@ -72,7 +80,7 @@ fn test_intent_gets() {
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent_set_signature"),
+        include_sql!("query", "get_contract_signature"),
         ["hash2"],
         |row| row.get::<_, String>(0).unwrap(),
     );
@@ -80,64 +88,70 @@ fn test_intent_gets() {
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent"),
-        ["hash1", "intent_hash1"],
+        include_sql!("query", "get_predicate"),
+        ["hash1", "predicate_hash1"],
         |row| row.get::<_, String>(0).unwrap(),
     );
-    assert_eq!(result, vec!["intent1".to_string()]);
+    assert_eq!(result, vec!["predicate1".to_string()]);
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent"),
-        ["hash2", "intent_hash1"],
+        include_sql!("query", "get_predicate"),
+        ["hash2", "predicate_hash1"],
         |row| row.get::<_, String>(0).unwrap(),
     );
-    assert_eq!(result, vec!["intent1".to_string()]);
+    assert_eq!(result, vec!["predicate1".to_string()]);
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent"),
-        ["hash2", "intent_hash2"],
+        include_sql!("query", "get_predicate"),
+        ["hash2", "predicate_hash2"],
         |row| row.get::<_, String>(0).unwrap(),
     );
-    assert_eq!(result, vec!["intent2".to_string()]);
+    assert_eq!(result, vec!["predicate2".to_string()]);
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent"),
-        ["hash1", "intent_hash2"],
+        include_sql!("query", "get_predicate"),
+        ["hash1", "predicate_hash2"],
         |row| row.get::<_, String>(0).unwrap(),
     );
     assert!(result.is_empty());
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent_set"),
+        include_sql!("query", "get_contract"),
         ["hash1"],
         |row| row.get::<_, String>(0).unwrap(),
     );
-    assert_eq!(result, vec!["intent0".to_string(), "intent1".to_string(),]);
+    assert_eq!(
+        result,
+        vec!["predicate0".to_string(), "predicate1".to_string(),]
+    );
 
     let result = query(
         &conn,
-        include_sql!("query", "get_intent_set"),
+        include_sql!("query", "get_contract"),
         ["hash2"],
         |row| row.get::<_, String>(0).unwrap(),
     );
-    assert_eq!(result, vec!["intent1".to_string(), "intent2".to_string(),]);
+    assert_eq!(
+        result,
+        vec!["predicate1".to_string(), "predicate2".to_string(),]
+    );
 }
 
 #[test]
-fn test_list_intent_sets() {
+fn test_list_contracts() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
 
-    insert_intent_set(&conn, 1, Duration::from_secs(1), 0..2);
-    insert_intent_set(&conn, 2, Duration::from_secs(2), 1..3);
+    insert_contract(&conn, 1, Duration::from_secs(1), 0..2);
+    insert_contract(&conn, 2, Duration::from_secs(2), 1..3);
 
     let result = query(
         &conn,
-        include_sql!("query", "list_intent_sets"),
+        include_sql!("query", "list_contracts"),
         named_params! {
             ":page_size": 1,
             ":page_number": 0,
@@ -152,12 +166,12 @@ fn test_list_intent_sets() {
 
     assert_eq!(
         result,
-        vec![(1, "intent0".to_string()), (1, "intent1".to_string()),]
+        vec![(1, "predicate0".to_string()), (1, "predicate1".to_string()),]
     );
 
     let result = query(
         &conn,
-        include_sql!("query", "list_intent_sets"),
+        include_sql!("query", "list_contracts"),
         named_params! {
             ":page_size": 1,
             ":page_number": 1,
@@ -172,12 +186,12 @@ fn test_list_intent_sets() {
 
     assert_eq!(
         result,
-        vec![(2, "intent1".to_string()), (2, "intent2".to_string()),]
+        vec![(2, "predicate1".to_string()), (2, "predicate2".to_string()),]
     );
 
     let result = query(
         &conn,
-        include_sql!("query", "list_intent_sets"),
+        include_sql!("query", "list_contracts"),
         named_params! {
             ":page_size": 2,
             ":page_number": 0,
@@ -193,25 +207,25 @@ fn test_list_intent_sets() {
     assert_eq!(
         result,
         vec![
-            (1, "intent0".to_string()),
-            (1, "intent1".to_string()),
-            (2, "intent1".to_string()),
-            (2, "intent2".to_string()),
+            (1, "predicate0".to_string()),
+            (1, "predicate1".to_string()),
+            (2, "predicate1".to_string()),
+            (2, "predicate2".to_string()),
         ]
     );
 }
 
 #[test]
-fn test_list_intent_sets_by_time() {
+fn test_list_contracts_by_time() {
     let conn = Connection::open_in_memory().unwrap();
     create_tables(&conn);
 
-    insert_intent_set(&conn, 1, Duration::new(22, 33), 0..2);
-    insert_intent_set(&conn, 2, Duration::new(44, 12), 1..3);
+    insert_contract(&conn, 1, Duration::new(22, 33), 0..2);
+    insert_contract(&conn, 2, Duration::new(44, 12), 1..3);
 
     let result = query(
         &conn,
-        include_sql!("query", "list_intent_sets_by_time"),
+        include_sql!("query", "list_contracts_by_time"),
         named_params! {
             ":page_size": 1,
             ":page_number": 0,
@@ -230,12 +244,12 @@ fn test_list_intent_sets_by_time() {
 
     assert_eq!(
         result,
-        vec![(1, "intent0".to_string()), (1, "intent1".to_string()),]
+        vec![(1, "predicate0".to_string()), (1, "predicate1".to_string()),]
     );
 
     let result = query(
         &conn,
-        include_sql!("query", "list_intent_sets_by_time"),
+        include_sql!("query", "list_contracts_by_time"),
         named_params! {
             ":page_size": 1,
             ":page_number": 0,
@@ -253,12 +267,12 @@ fn test_list_intent_sets_by_time() {
     );
     assert_eq!(
         result,
-        vec![(2, "intent1".to_string()), (2, "intent2".to_string()),]
+        vec![(2, "predicate1".to_string()), (2, "predicate2".to_string()),]
     );
 
     let result = query(
         &conn,
-        include_sql!("query", "list_intent_sets_by_time"),
+        include_sql!("query", "list_contracts_by_time"),
         named_params! {
             ":page_size": 1,
             ":page_number": 0,
@@ -277,12 +291,12 @@ fn test_list_intent_sets_by_time() {
 
     assert_eq!(
         result,
-        vec![(1, "intent0".to_string()), (1, "intent1".to_string()),]
+        vec![(1, "predicate0".to_string()), (1, "predicate1".to_string()),]
     );
 
     let result = query(
         &conn,
-        include_sql!("query", "list_intent_sets_by_time"),
+        include_sql!("query", "list_contracts_by_time"),
         named_params! {
             ":page_size": 2,
             ":page_number": 0,
@@ -302,10 +316,10 @@ fn test_list_intent_sets_by_time() {
     assert_eq!(
         result,
         vec![
-            (1, "intent0".to_string()),
-            (1, "intent1".to_string()),
-            (2, "intent1".to_string()),
-            (2, "intent2".to_string()),
+            (1, "predicate0".to_string()),
+            (1, "predicate1".to_string()),
+            (2, "predicate1".to_string()),
+            (2, "predicate2".to_string()),
         ]
     );
 }

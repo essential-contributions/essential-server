@@ -1,4 +1,4 @@
-use crate::{solution::read::read_intents_from_storage, PRUNE_FAILED_STORAGE_OLDER_THAN};
+use crate::{solution::read::read_contract_from_storage, PRUNE_FAILED_STORAGE_OLDER_THAN};
 use anyhow::Context;
 use essential_hash::hash;
 use essential_state_read_vm::StateRead;
@@ -123,13 +123,13 @@ where
         // Put the solution into an Arc so it's cheap to clone.
         let solution = Arc::new(solution);
 
-        // Get the intents for this solution.
-        let intents = read_intents_from_storage(&solution, storage).await?;
+        // Get the contract for this solution.
+        let contract = read_contract_from_storage(&solution, storage).await?;
 
-        // Apply the proposed mutations, check the intents and return the result.
+        // Apply the proposed mutations, check the contract and return the result.
         let config = Default::default();
 
-        match crate::checked_state_transition(&transaction, solution.clone(), &intents, config)
+        match crate::checked_state_transition(&transaction, solution.clone(), &contract, config)
             .await
         {
             Ok((post_state, util, _gas)) => {
@@ -167,7 +167,7 @@ impl Handle {
         (Self { tx, jh: None }, Shutdown(rx))
     }
 
-    pub fn set_jh(&mut self, jh: tokio::task::JoinHandle<anyhow::Result<()>>) {
+    pub fn contract_jh(&mut self, jh: tokio::task::JoinHandle<anyhow::Result<()>>) {
         self.jh = Some(jh);
     }
 

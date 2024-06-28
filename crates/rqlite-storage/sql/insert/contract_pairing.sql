@@ -1,12 +1,12 @@
 INSERT OR IGNORE INTO
-    intent_set_pairing (set_id, intent_id)
+    contract_pairing (contract_id, predicate_id)
 VALUES
     (
         (
             SELECT
                 id
             FROM
-                intent_sets
+                contracts
             WHERE
                 content_hash = ?
             LIMIT
@@ -15,7 +15,7 @@ VALUES
             SELECT
                 id
             FROM
-                intents
+               predicates 
             WHERE
                 content_hash = ?
             LIMIT

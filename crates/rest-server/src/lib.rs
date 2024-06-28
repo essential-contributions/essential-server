@@ -13,10 +13,11 @@ use axum::{
 use essential_server::{CheckSolutionOutput, Essential, SolutionOutcome, StateRead, Storage};
 use essential_server_types::{CheckSolution, QueryStateReads, QueryStateReadsOutput};
 use essential_types::{
+    contract::{Contract, SignedContract},
     convert::word_from_bytes,
-    intent::{self, Intent},
+    predicate::Predicate,
     solution::Solution,
-    Block, ContentAddress, IntentAddress, Word,
+    Block, ContentAddress, PredicateAddress, Word,
 };
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioExecutor, TokioIo};
@@ -87,17 +88,20 @@ where
     // Create all the endpoints.
     let app = Router::new()
         .route("/", get(health_check))
-        .route("/deploy-intent-set", post(deploy_intent_set))
-        .route("/get-intent-set/:address", get(get_intent_set))
-        .route("/get-intent/:set/:address", get(get_intent))
-        .route("/list-intent-sets", get(list_intent_sets))
+        .route("/deploy-contract", post(deploy_contract))
+        .route("/get-contract/:address", get(get_contract))
+        .route("/get-predicate/:contract/:address", get(get_predicate))
+        .route("/list-contracts", get(list_contracts))
         .route("/submit-solution", post(submit_solution))
         .route("/list-solutions-pool", get(list_solutions_pool))
         .route("/query-state/:address/:key", get(query_state))
         .route("/list-winning-blocks", get(list_winning_blocks))
         .route("/solution-outcome/:hash", get(solution_outcome))
         .route("/check-solution", post(check_solution))
-        .route("/check-solution-with-data", post(check_solution_with_data))
+        .route(
+            "/check-solution-with-contracts",
+            post(check_solution_with_contracts),
+        )
         .route("/query-state-reads", post(query_state_reads))
         .with_state(essential.clone());
 
@@ -126,7 +130,7 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
     let shut = shutdown(shutdown_rx);
     tokio::pin!(shut);
 
-    let mut conn_set = JoinSet::new();
+    let mut conn_contract = JoinSet::new();
     // Continuously accept new connections up to max connections.
     loop {
         // Accept a new connection or wait for a shutdown signal.
@@ -155,7 +159,7 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
         // Spawn a task to handle the connection. That way we can handle multiple connections
         // concurrently.
 
-        conn_set.spawn(async move {
+        conn_contract.spawn(async move {
             // Hyper has its own `AsyncRead` and `AsyncWrite` traits and doesn't use tokio.
             // `TokioIo` converts between them.
             let socket = TokioIo::new(socket);
@@ -180,14 +184,14 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
         });
 
         // Wait for existing connection to close or wait for a shutdown signal.
-        if conn_set.len() > MAX_CONNECTIONS {
+        if conn_contract.len() > MAX_CONNECTIONS {
             #[cfg(feature = "tracing")]
             tracing::info!("Max number of connections reached: {}", MAX_CONNECTIONS);
             tokio::select! {
                 _ = &mut shut => {
                     break;
                 }
-                _ = conn_set.join_next() => {},
+                _ = conn_contract.join_next() => {},
 
             }
         }
@@ -197,19 +201,19 @@ async fn serve(app: Router, listener: TcpListener, shutdown_rx: Option<oneshot::
 /// The return a health check response.
 async fn health_check() {}
 
-/// The deploy intent set post endpoint.
+/// The deploy contract post endpoint.
 ///
-/// Takes a signed vector of intents as a json payload.
-async fn deploy_intent_set<S>(
+/// Takes a signed vector of contract as a json payload.
+async fn deploy_contract<S>(
     State(essential): State<Essential<S>>,
-    Json(payload): Json<intent::SignedSet>,
+    Json(payload): Json<SignedContract>,
 ) -> Result<Json<ContentAddress>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let address = essential.deploy_intent_set(payload).await?;
+    let address = essential.deploy_contract(payload).await?;
     Ok(Json(address))
 }
 
@@ -229,13 +233,13 @@ where
     Ok(Json(hash))
 }
 
-/// The get intent set get endpoint.
+/// The get contract get endpoint.
 ///
 /// Takes a content address (encoded as hex) as a path parameter.
-async fn get_intent_set<S>(
+async fn get_contract<S>(
     State(essential): State<Essential<S>>,
     Path(address): Path<String>,
-) -> Result<Json<Option<intent::SignedSet>>, Error>
+) -> Result<Json<Option<SignedContract>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -243,42 +247,47 @@ where
 {
     let address: ContentAddress = address
         .parse()
-        .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
-    let set = essential.get_intent_set(&address).await?;
-    Ok(Json(set))
+        .map_err(|e| anyhow!("failed to parse contract content address: {e}"))?;
+    let contract = essential.get_contract(&address).await?;
+    Ok(Json(contract))
 }
 
-/// The get intent get endpoint.
+/// The get predicate get endpoint.
 ///
-/// Takes a set content address and an intent content address as path parameters.
+/// Takes a contract content address and a predicate content address as path parameters.
 /// Both are encoded as hex.
-async fn get_intent<S>(
+async fn get_predicate<S>(
     State(essential): State<Essential<S>>,
-    Path((set, address)): Path<(String, String)>,
-) -> Result<Json<Option<Intent>>, Error>
+    Path((contract, address)): Path<(String, String)>,
+) -> Result<Json<Option<Predicate>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    let set: ContentAddress = set
+    let contract: ContentAddress = contract
         .parse()
-        .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
-    let intent: ContentAddress = address
+        .map_err(|e| anyhow!("failed to parse contract content address: {e}"))?;
+    let predicate: ContentAddress = address
         .parse()
-        .map_err(|e| anyhow!("failed to parse intent content address: {e}"))?;
-    let intent = essential.get_intent(&IntentAddress { set, intent }).await?;
-    Ok(Json(intent))
+        .map_err(|e| anyhow!("failed to parse predicate content address: {e}"))?;
+    let predicate = essential
+        .get_predicate(&PredicateAddress {
+            contract,
+            predicate,
+        })
+        .await?;
+    Ok(Json(predicate))
 }
 
-/// The list intent sets get endpoint.
+/// The list contracts get endpoint.
 ///
 /// Takes optional time range and page as query parameters.
-async fn list_intent_sets<S>(
+async fn list_contracts<S>(
     State(essential): State<Essential<S>>,
     time_range: Option<Query<TimeRange>>,
     page: Option<Query<Page>>,
-) -> Result<Json<Vec<Vec<Intent>>>, Error>
+) -> Result<Json<Vec<Contract>>, Error>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
     <S as StateRead>::Future: Send,
@@ -287,10 +296,10 @@ where
     let time_range =
         time_range.map(|range| Duration::from_secs(range.start)..Duration::from_secs(range.end));
 
-    let sets = essential
-        .list_intent_sets(time_range, page.map(|p| p.page as usize))
+    let contracts = essential
+        .list_contracts(time_range, page.map(|p| p.page as usize))
         .await?;
-    Ok(Json(sets))
+    Ok(Json(contracts))
 }
 
 /// The list winning blocks get endpoint.
@@ -346,7 +355,7 @@ where
 {
     let address: ContentAddress = address
         .parse()
-        .map_err(|e| anyhow!("failed to parse intent set content address: {e}"))?;
+        .map_err(|e| anyhow!("failed to parse contract content address: {e}"))?;
     let key: Vec<u8> = hex::decode(key).map_err(|e| anyhow!("failed to decode key: {e}"))?;
 
     // Convert the key to words.
@@ -396,8 +405,8 @@ where
 
 /// The check solution with data post endpoint.
 ///
-/// Takes a signed solution and a list of intents as a json payload.
-async fn check_solution_with_data<S>(
+/// Takes a signed solution and a list of contract as a json payload.
+async fn check_solution_with_contracts<S>(
     State(essential): State<Essential<S>>,
     Json(payload): Json<CheckSolution>,
 ) -> Result<Json<CheckSolutionOutput>, Error>
@@ -407,7 +416,7 @@ where
     <S as StateRead>::Error: Send,
 {
     let outcome = essential
-        .check_solution_with_data(payload.solution, payload.intents)
+        .check_solution_with_contracts(payload.solution, payload.contracts)
         .await?;
     Ok(Json(outcome))
 }

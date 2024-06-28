@@ -1,17 +1,17 @@
 use super::*;
-use essential_types::intent::Intent;
+use essential_types::{contract::Contract, predicate::Predicate};
 use test_utils::empty::Empty;
 
 #[test]
-fn test_intent() {
-    let data = encode(&Intent::empty());
-    let r: Intent = decode(&data).unwrap();
-    assert_eq!(r, Intent::empty());
+fn test_predicate() {
+    let data = encode(&Predicate::empty());
+    let r: Predicate = decode(&data).unwrap();
+    assert_eq!(r, Predicate::empty());
 }
 
 #[test]
-fn test_intent_set() {
-    let data = encode(&vec![Intent::empty()]);
-    let r: Vec<Intent> = decode(&data).unwrap();
-    assert_eq!(r, vec![Intent::empty()]);
+fn test_contract() {
+    let data = encode(&Contract::without_salt(vec![Predicate::empty()]));
+    let r: Contract = decode(&data).unwrap();
+    assert_eq!(r, Contract::without_salt(vec![Predicate::empty()]));
 }

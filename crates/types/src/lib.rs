@@ -5,14 +5,15 @@
 use std::collections::BTreeMap;
 
 use essential_types::{
-    intent::Intent,
+    contract::Contract,
+    predicate::Predicate,
     solution::{Solution, SolutionData, SolutionDataIndex},
-    ContentAddress, IntentAddress, Key, StateReadBytecode, Value,
+    ContentAddress, Key, PredicateAddress, StateReadBytecode, Value,
 };
 
-const ZEROED_INTENT: IntentAddress = IntentAddress {
-    set: ContentAddress([0; 32]),
-    intent: ContentAddress([0; 32]),
+const ZEROED_PREDICATE: PredicateAddress = PredicateAddress {
+    contract: ContentAddress([0; 32]),
+    predicate: ContentAddress([0; 32]),
 };
 
 pub mod ser;
@@ -38,13 +39,13 @@ pub enum SolutionOutcome {
     Fail(String),
 }
 
-/// Solution with intents read from storage that will be used for checking.
+/// Solution with contract read from storage that will be used for checking.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CheckSolution {
     /// The solution to check.
     pub solution: Solution,
-    /// The intents this solution depends on.
-    pub intents: Vec<Intent>,
+    /// The contracts this solution depends on.
+    pub contracts: Vec<Contract>,
 }
 
 /// Query the results of running an ordered list of state read programs.
@@ -125,14 +126,14 @@ pub struct Slots {
 }
 
 impl QueryStateReads {
-    /// Create a query from a solution and an intent.
+    /// Create a query from a solution and a predicate.
     ///
-    /// It is assumed the provided intent is the intent that the solution data
+    /// It is assumed the provided predicate is the predicate that the solution data
     /// at the provided index is solving. This is not checked.
     pub fn from_solution(
         mut solution: Solution,
         index: SolutionDataIndex,
-        intent: &Intent,
+        predicate: &Predicate,
         request_type: StateReadRequestType,
     ) -> Self {
         for (i, d) in solution.data.iter_mut().enumerate() {
@@ -142,7 +143,7 @@ impl QueryStateReads {
             d.decision_variables = Default::default();
         }
         Self {
-            state_read: intent.state_read.clone(),
+            state_read: predicate.state_read.clone(),
             index,
             solution,
             request_type,
@@ -150,13 +151,13 @@ impl QueryStateReads {
     }
 
     /// Create a query that only reads external state.
-    /// The intent address is zeroed out.
+    /// The predicate address is zeroed out.
     pub fn inline_empty(
         state_read: Vec<StateReadBytecode>,
         request_type: StateReadRequestType,
     ) -> Self {
         let data = SolutionData {
-            intent_to_solve: ZEROED_INTENT,
+            predicate_to_solve: ZEROED_PREDICATE,
             decision_variables: Default::default(),
             transient_data: Default::default(),
             state_mutations: Default::default(),
