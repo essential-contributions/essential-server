@@ -105,7 +105,7 @@ fn create_readme_inputs() {
     p("check solution");
     ser(&solution);
 
-    p("check solution with data");
+    p("check solution with contracts");
     ser(CheckSolution {
         solution: solution.clone(),
         contracts: vec![signed.contract.clone()],

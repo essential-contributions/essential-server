@@ -28,7 +28,7 @@ Returns: `ContentAddress` as JSON
 **Example:**
 ```bash
 curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" \
-    -d '{"contract":{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"signature":"2B157D9FB985A8C35C502092AE953C651D20DED7BEC9021D39497F86BF33849A2DABEF86AD8D22F8C56C97B57CFF02C54457735E64F0D879EE6D31303CBE006E00"}' \
+    -d '{"contract":{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":"0000000000000000000000000000000000000000000000000000000000000000"},"signature":"D7B64C906BD6CA28DB9F02F21A295A96E134C13DB31F86E6A8A9BA5680A073D61ED8039FA47C26F24D5ED08808854332723BA274D9E0BDE5276D79DE82C25C9901"}' \
     http://localhost:59498/deploy-contract
 ```
 ### GET `/get-contract/:address`
@@ -155,7 +155,7 @@ pub struct CheckSolutionOutput {
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"solution":{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"contracts":[{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}]}' http://localhost:59498/check-solution-with-contracts
+curl --http2-prior-knowledge -X POST -H "Content-Type: application/json" -d '{"solution":{"data":[{"predicate_to_solve":{"contract":"EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236","predicate":"709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C"},"decision_variables":[],"transient_data":[],"state_mutations":[]}]},"contracts":[{"predicates":[{"state_read":[],"constraints":[],"directive":"Satisfy"}],"salt":"0000000000000000000000000000000000000000000000000000000000000000"}]}' http://localhost:59498/check-solution-with-contracts
 ```
 
 ### Post `/query-state-reads`
