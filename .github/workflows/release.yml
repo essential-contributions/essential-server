@@ -41,15 +41,20 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download Artifact
+      - name: Download Artifact Ubuntu
         uses: actions/download-artifact@v4
         with:
-            path: ${{ github.workspace }}/bin
-            merge-multiple: true
+            name: essential-rest-server-ubuntu-latest
+            path: ${{ github.workspace }}/bin/ubuntu-latest
+      - name: Download Artifact Macos
+        uses: actions/download-artifact@v4
+        with:
+            name: essential-rest-server-macos-latest
+            path: ${{ github.workspace }}/bin/macos-latest
       - run: find ${{ github.workspace }}/bin
       - name: Release 
         uses: softprops/action-gh-release@v2
         with:
             files: |
-                ${{ github.workspace }}/bin/essential-rest-server-ubuntu-latest/essential-rest-server-ubuntu-latest
-                ${{ github.workspace }}/bin/essential-rest-server-macos-latest/essential-rest-server-macos-latest
+                ${{ github.workspace }}/bin/ubuntu-latest/essential-rest-server
+                ${{ github.workspace }}/bin/macos-latest/essential-rest-server
