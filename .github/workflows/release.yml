@@ -1,10 +1,12 @@
 name: release 
 
 on:
-  workflow_dispatch:
+    push:
+      tags:
+        - "v*.*.*"
 
 jobs:
-  nix:
+  build:
     permissions:
       id-token: "write" # added for magic-nix-cache-action
       contents: "read"  # added for magic-nix-cache-action
@@ -12,9 +14,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        command: [
-            "build --print-build-logs --no-update-lock-file .#essential-rest-server",
-          ]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -29,9 +28,24 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v10
       - name: Cache Nix
         uses: DeterminateSystems/magic-nix-cache-action@v4
-      - run: nix ${{ matrix.command }}
+      - run: nix build --print-build-logs --no-update-lock-file .#essential-rest-server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: essential-rest-server-${{ matrix.os }}
+          path: ./result/bin/essential-rest-server
+    
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+            path: bin
+            merge-multiple: true
       - name: Release 
         uses: softprops/action-gh-release@v2
         with:
             files: |
-                ./result/bin/essential-rest-server
+                ./bin/essential-rest-server-ubuntu-latest
+                ./bin/essential-rest-server-macos-latest
