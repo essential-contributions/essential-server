@@ -46,6 +46,7 @@ jobs:
         with:
             path: ${{ github.workspace }}/bin
             merge-multiple: true
+      - run: find ${{ github.workspace }}/bin
       - name: Release 
         uses: softprops/action-gh-release@v2
         with:
