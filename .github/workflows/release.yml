@@ -1,0 +1,37 @@
+name: release 
+
+on:
+  workflow_dispatch:
+
+jobs:
+  nix:
+    permissions:
+      id-token: "write" # added for magic-nix-cache-action
+      contents: "read"  # added for magic-nix-cache-action
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        command: [
+            "build --print-build-logs --no-update-lock-file .#essential-rest-server",
+          ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: SSH 
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+              ${{ secrets.SSH_PRIVATE_KEY }}
+              ${{ secrets.SSH_PRIVATE_KEY_SELF }}
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v10
+      - name: Cache Nix
+        uses: DeterminateSystems/magic-nix-cache-action@v4
+      - run: nix ${{ matrix.command }}
+      - name: Release 
+        uses: softprops/action-gh-release@v2
+        with:
+            files: |
+                ./result/bin/essential-rest-server
