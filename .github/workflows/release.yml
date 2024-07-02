@@ -55,7 +55,7 @@ jobs:
           mv ${{ github.workspace }}/bin/macos-latest/essential-rest-server ${{ github.workspace }}/bin/macos-latest/essential-rest-server-macos-latest
           mv ${{ github.workspace }}/bin/ubuntu-latest/essential-rest-server ${{ github.workspace }}/bin/macos-latest/essential-rest-server-ubuntu-latest
           chmod 755 ${{ github.workspace }}/bin/macos-latest/essential-rest-server-macos-latest
-          chmod 755 ${{ github.workspace }}/bin/macos-latest/essential-rest-server-ubuntu-latest
+          chmod 755 ${{ github.workspace }}/bin/ubuntu-latest/essential-rest-server-ubuntu-latest
           find ${{ github.workspace }}/bin
       - name: Release 
         uses: softprops/action-gh-release@v2
