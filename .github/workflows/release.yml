@@ -42,11 +42,11 @@ jobs:
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
-            path: bin
+            path: /bin
             merge-multiple: true
       - name: Release 
         uses: softprops/action-gh-release@v2
         with:
             files: |
-                ./bin/essential-rest-server-ubuntu-latest
-                ./bin/essential-rest-server-macos-latest
+                /bin/essential-rest-server-ubuntu-latest
+                /bin/essential-rest-server-macos-latest
