@@ -2,6 +2,7 @@
 { openssl
 , pkg-config
 , rustPlatform
+, lib
 }:
 let
   src = builtins.path {
