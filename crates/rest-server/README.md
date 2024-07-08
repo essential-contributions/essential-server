@@ -1,5 +1,19 @@
 # Essential Rest Server
-This runs a basic HTTP REST server that can be used to interact with the essential application.
+[![Crates.io][crates-badge]][crates-url]
+[![Documentation][docs-badge]][docs-url]
+[![license][apache-badge]][apache-url]
+[![Build Status][actions-badge]][actions-url]
+
+[crates-badge]: https://img.shields.io/crates/v/essential-rest-server.svg
+[crates-url]: https://crates.io/crates/essential-rest-server
+[docs-badge]: https://docs.rs/essential-rest-server/badge.svg
+[docs-url]: https://docs.rs/essential-rest-server
+[apache-badge]: https://img.shields.io/badge/license-APACHE-blue.svg
+[apache-url]: LICENSE
+[actions-badge]: https://github.com/essential-contributions/essential-server/workflows/ci/badge.svg
+[actions-url]:https://github.com/essential-contributions/essential-server/actions
+
+A lightweight HTTP REST server designed to facilitate interaction with the Essential protocol. This server acts as an interface between clients and the Essential declarative protocol, allowing for easy integration and communication from the Essential ecosystem.
 ## Running the server
 ### Nix
 ### Memory DB
