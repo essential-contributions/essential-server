@@ -1,9 +1,4 @@
 # Essential Server
-
-A implementation of the Essential declarative protocol and constraint checking engine that builds blocks and runs as a centralized server.
-This repository is designed for application developers to be able to experience building and running declarative applications while the decentralized node is being built.
-
-# Essential Server
 [![Crates.io][crates-badge]][crates-url]
 [![Documentation][docs-badge]][docs-url]
 [![license][apache-badge]][apache-url]
