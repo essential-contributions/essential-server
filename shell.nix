@@ -8,6 +8,8 @@
 , rust-analyzer
 , rustfmt
 , curl
+, cargo
+, rustc
 }:
 mkShell {
   inputsFrom = [
@@ -21,5 +23,7 @@ mkShell {
     rqlite
     rust-analyzer
     rustfmt
+    cargo
+    rustc
   ];
 }
