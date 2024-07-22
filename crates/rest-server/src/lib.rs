@@ -29,6 +29,7 @@ use tokio::{
     task::JoinSet,
 };
 use tower::Service;
+use tower_http::cors::CorsLayer;
 
 const MAX_CONNECTIONS: usize = 2000;
 
@@ -85,6 +86,11 @@ where
         None
     };
 
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods([http::Method::GET, http::Method::POST, http::Method::OPTIONS])
+        .allow_headers([http::header::CONTENT_TYPE]);
+
     // Create all the endpoints.
     let app = Router::new()
         .route("/", get(health_check))
@@ -103,6 +109,7 @@ where
             post(check_solution_with_contracts),
         )
         .route("/query-state-reads", post(query_state_reads))
+        .layer(cors)
         .with_state(essential.clone());
 
     // Bind to the address.
