@@ -1,6 +1,6 @@
 use super::*;
 use essential_storage::failed_solution::SolutionFailReason;
-use essential_types::{contract::Contract, Batch};
+use essential_types::contract::Contract;
 use std::vec;
 use test_utils::{
     duration_secs, predicate_with_salt, sign_contract_with_random_keypair,
@@ -235,9 +235,7 @@ fn test_paging_blocks() {
                 essential_types::Block {
                     number: b.number,
                     timestamp: *d,
-                    batch: Batch {
-                        solutions: b.hashes.iter().map(|h| solutions[h].clone()).collect(),
-                    },
+                    solutions: b.hashes.iter().map(|h| solutions[h].clone()).collect(),
                 },
             )
         })

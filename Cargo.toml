@@ -16,13 +16,13 @@ anyhow = "1.0.80"
 axum = "0.7.5"
 clap = { version = "4.5.4", features = ["derive"] }
 criterion = "0.5"
-essential-check = "0.1.0"
-essential-constraint-vm = "0.1.0"
-essential-hash = "0.1.0"
+essential-check = "0.2.0"
+essential-constraint-vm = "0.2.0"
+essential-hash = "0.2.0"
 essential-lock = "0.1.0"
-essential-sign = "0.1.0"
-essential-state-read-vm = "0.1.0" 
-essential-types = "0.1.0"
+essential-sign = "0.2.0"
+essential-state-read-vm = "0.2.0" 
+essential-types = "0.2.0"
 futures = "0.3.30"
 hex = "0.4.3"
 http = "1.1.0"
@@ -46,11 +46,11 @@ tower-http = { version = "0.5.2", features = ["cors"] }
 tracing = {version = "0.1", features = ["attributes"]}
 tracing-subscriber = "0.3"
 
-essential-memory-storage = { path = "crates/memory-storage", version = "0.1.0" }
-essential-rqlite-storage = { path = "crates/rqlite-storage", version = "0.1.0" }
-essential-server = { path = "crates/server", version = "0.1.0" }
+essential-memory-storage = { path = "crates/memory-storage", version = "0.2.0" }
+essential-rqlite-storage = { path = "crates/rqlite-storage", version = "0.2.0" }
+essential-server = { path = "crates/server", version = "0.2.0" }
 essential-server-types = { path = "crates/types", version = "0.1.0" }
-essential-storage = { path = "crates/storage", version = "0.1.0" }
+essential-storage = { path = "crates/storage", version = "0.2.0" }
 essential-transaction-storage = { path = "crates/transaction-storage", version = "0.1.0" }
 test-dbs = { path = "crates/test_dbs" }
 test-utils = { path = "crates/test-utils" }

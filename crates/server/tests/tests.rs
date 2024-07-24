@@ -37,7 +37,7 @@ where
     server.submit_solution(solution.clone()).await.unwrap();
 
     let blocks = loop {
-        let blocks = server.list_winning_blocks(None, None).await.unwrap();
+        let blocks = server.list_blocks(None, None).await.unwrap();
         if !blocks.is_empty() {
             break blocks;
         }
@@ -47,15 +47,15 @@ where
     let outcome = server.solution_outcome(&solution_hash).await.unwrap();
 
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].batch.solutions.len(), 1);
-    assert!(&blocks[0].batch.solutions.contains(&solution));
+    assert_eq!(blocks[0].solutions.len(), 1);
+    assert!(&blocks[0].solutions.contains(&solution));
     assert_eq!(outcome.len(), 1);
     assert_eq!(outcome[0], SolutionOutcome::Success(0));
 
     server.submit_solution(solution.clone()).await.unwrap();
 
     let blocks = loop {
-        let blocks = server.list_winning_blocks(None, None).await.unwrap();
+        let blocks = server.list_blocks(None, None).await.unwrap();
         if blocks.len() > 1 {
             break blocks;
         }
@@ -65,8 +65,8 @@ where
     let outcome = server.solution_outcome(&solution_hash).await.unwrap();
 
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[1].batch.solutions.len(), 1);
-    assert!(&blocks[1].batch.solutions.contains(&solution));
+    assert_eq!(blocks[1].solutions.len(), 1);
+    assert!(&blocks[1].solutions.contains(&solution));
     assert_eq!(outcome.len(), 2, "{:?}", outcome);
     assert_eq!(outcome[1], SolutionOutcome::Success(1));
 

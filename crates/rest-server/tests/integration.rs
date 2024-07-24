@@ -264,13 +264,13 @@ async fn test_list_winning_blocks() {
         jh,
     } = setup_with_mem(mem).await;
 
-    let mut a = url.join("/list-winning-blocks").unwrap();
+    let mut a = url.join("/list-blocks").unwrap();
     a.query_pairs_mut().append_pair("page", "0");
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
     let blocks = response.json::<Vec<Block>>().await.unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(essential_hash::hash(&blocks[0].batch.solutions[0]), hash);
+    assert_eq!(essential_hash::hash(&blocks[0].solutions[0]), hash);
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();

@@ -101,7 +101,7 @@ where
         .route("/submit-solution", post(submit_solution))
         .route("/list-solutions-pool", get(list_solutions_pool))
         .route("/query-state/:address/:key", get(query_state))
-        .route("/list-winning-blocks", get(list_winning_blocks))
+        .route("/list-blocks", get(list_blocks))
         .route("/solution-outcome/:hash", get(solution_outcome))
         .route("/check-solution", post(check_solution))
         .route(
@@ -312,7 +312,7 @@ where
 /// The list winning blocks get endpoint.
 ///
 /// Takes optional time range and page as query parameters.
-async fn list_winning_blocks<S>(
+async fn list_blocks<S>(
     State(essential): State<Essential<S>>,
     time_range: Option<Query<TimeRange>>,
     page: Option<Query<Page>>,
@@ -326,7 +326,7 @@ where
         time_range.map(|range| Duration::from_secs(range.start)..Duration::from_secs(range.end));
 
     let blocks = essential
-        .list_winning_blocks(time_range, page.map(|p| p.page as usize))
+        .list_blocks(time_range, page.map(|p| p.page as usize))
         .await?;
     Ok(Json(blocks))
 }

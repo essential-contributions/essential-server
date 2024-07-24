@@ -187,12 +187,12 @@ where
         self.storage.list_solutions_pool(page).await
     }
 
-    pub async fn list_winning_blocks(
+    pub async fn list_blocks(
         &self,
         time_range: Option<Range<Duration>>,
         page: Option<usize>,
     ) -> anyhow::Result<Vec<Block>> {
-        self.storage.list_winning_blocks(time_range, page).await
+        self.storage.list_blocks(time_range, page).await
     }
 
     pub async fn query_state(

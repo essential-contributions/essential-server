@@ -512,7 +512,7 @@ impl Storage for RqliteStorage {
         values::list_failed_solutions(queries)
     }
 
-    async fn list_winning_blocks(
+    async fn list_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
         page: Option<usize>,
@@ -537,7 +537,7 @@ impl Storage for RqliteStorage {
                 self.query_values(sql).await?
             }
         };
-        values::list_winning_blocks(queries)
+        values::list_blocks(queries)
     }
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {

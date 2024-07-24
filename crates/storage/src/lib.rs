@@ -91,7 +91,7 @@ pub trait Storage: StateStorage {
     ) -> impl std::future::Future<Output = anyhow::Result<Vec<FailedSolution>>> + Send;
 
     /// List all blocks of solutions that have been solved.
-    fn list_winning_blocks(
+    fn list_blocks(
         &self,
         time_range: Option<Range<Duration>>,
         page: Option<usize>,
