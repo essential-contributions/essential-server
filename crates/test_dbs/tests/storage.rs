@@ -129,7 +129,7 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
 
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 10);
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 0);
 
     let hashes: Vec<_> = solutions.iter().map(essential_hash::hash).collect();
@@ -145,9 +145,9 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
     assert_eq!(&result[0..3], &solutions[0..3]);
     assert_eq!(&result[3..8], &solutions[5..10]);
 
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 1);
-    assert_eq!(&result[0].batch.solutions[..], &solutions[3..5]);
+    assert_eq!(&result[0].solutions[..], &solutions[3..5]);
 
     // Move missing hash is noop
     let hash = essential_hash::hash(&solution_with_all_inputs(11));
@@ -155,7 +155,7 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
 
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 8);
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 1);
 
     // Move some with missing hash
@@ -169,34 +169,34 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
     assert_eq!(&result[0..2], &solutions[0..2]);
     assert_eq!(&result[3..7], &solutions[5..9]);
 
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 2);
-    assert_eq!(&result[0].batch.solutions[..], &solutions[3..5]);
-    assert_eq!(&result[1].batch.solutions[..], &solutions[9..10]);
+    assert_eq!(&result[0].solutions[..], &solutions[3..5]);
+    assert_eq!(&result[1].solutions[..], &solutions[9..10]);
 
     // Move all
     storage.move_solutions_to_solved(&hashes).await.unwrap();
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 3);
-    assert_eq!(&result[0].batch.solutions[..], &solutions[3..5]);
-    assert_eq!(&result[1].batch.solutions[..], &solutions[9..10]);
-    assert_eq!(result[2].batch.solutions.len(), 7);
-    assert_eq!(&result[2].batch.solutions[0..3], &solutions[0..3]);
-    assert_eq!(&result[2].batch.solutions[3..7], &solutions[5..9]);
+    assert_eq!(&result[0].solutions[..], &solutions[3..5]);
+    assert_eq!(&result[1].solutions[..], &solutions[9..10]);
+    assert_eq!(result[2].solutions.len(), 7);
+    assert_eq!(&result[2].solutions[0..3], &solutions[0..3]);
+    assert_eq!(&result[2].solutions[3..7], &solutions[5..9]);
 
     // Move all again is noop
     storage.move_solutions_to_solved(&hashes).await.unwrap();
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 3);
-    assert_eq!(&result[0].batch.solutions[..], &solutions[3..5]);
-    assert_eq!(&result[1].batch.solutions[..], &solutions[9..10]);
-    assert_eq!(result[2].batch.solutions.len(), 7);
-    assert_eq!(&result[2].batch.solutions[0..3], &solutions[0..3]);
-    assert_eq!(&result[2].batch.solutions[3..7], &solutions[5..9]);
+    assert_eq!(&result[0].solutions[..], &solutions[3..5]);
+    assert_eq!(&result[1].solutions[..], &solutions[9..10]);
+    assert_eq!(result[2].solutions.len(), 7);
+    assert_eq!(&result[2].solutions[0..3], &solutions[0..3]);
+    assert_eq!(&result[2].solutions[3..7], &solutions[5..9]);
 
     assert_eq!(result[0].number, 0);
     assert_eq!(result[1].number, 1);
@@ -453,11 +453,11 @@ async fn list_failed_solutions_pool<S: Storage>(storage: S) {
     assert!(result.is_empty());
 }
 
-create_test!(list_winning_blocks);
+create_test!(list_blocks);
 
-async fn list_winning_blocks<S: Storage>(storage: S) {
+async fn list_blocks<S: Storage>(storage: S) {
     // Empty
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert!(result.is_empty());
 
     let solutions: Vec<_> = (0..102).map(solution_with_all_inputs).collect();
@@ -477,10 +477,10 @@ async fn list_winning_blocks<S: Storage>(storage: S) {
         .await
         .unwrap();
 
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].batch.solutions.len(), 1);
-    assert_eq!(result[0].batch.solutions[0], solutions[0]);
+    assert_eq!(result[0].solutions.len(), 1);
+    assert_eq!(result[0].solutions[0], solutions[0]);
     assert_eq!(result[0].number, 0);
 
     // Move rest
@@ -492,43 +492,43 @@ async fn list_winning_blocks<S: Storage>(storage: S) {
     }
 
     // List up to page size
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 100);
 
-    assert_eq!(result[0].batch.solutions.len(), 1);
-    assert_eq!(result[0].batch.solutions[0], solutions[0]);
+    assert_eq!(result[0].solutions.len(), 1);
+    assert_eq!(result[0].solutions[0], solutions[0]);
     assert_eq!(result[0].number, 0);
 
-    assert_eq!(result[99].batch.solutions.len(), 1);
-    assert_eq!(result[99].batch.solutions[0], solutions[99]);
+    assert_eq!(result[99].solutions.len(), 1);
+    assert_eq!(result[99].solutions[0], solutions[99]);
     assert_eq!(result[99].number, 99);
 
     // List first page
-    let result = storage.list_winning_blocks(None, Some(0)).await.unwrap();
+    let result = storage.list_blocks(None, Some(0)).await.unwrap();
     assert_eq!(result.len(), 100);
 
-    assert_eq!(result[0].batch.solutions.len(), 1);
-    assert_eq!(result[0].batch.solutions[0], solutions[0]);
+    assert_eq!(result[0].solutions.len(), 1);
+    assert_eq!(result[0].solutions[0], solutions[0]);
     assert_eq!(result[0].number, 0);
 
-    assert_eq!(result[99].batch.solutions.len(), 1);
-    assert_eq!(result[99].batch.solutions[0], solutions[99]);
+    assert_eq!(result[99].solutions.len(), 1);
+    assert_eq!(result[99].solutions[0], solutions[99]);
     assert_eq!(result[99].number, 99);
 
     // List second page
-    let result = storage.list_winning_blocks(None, Some(1)).await.unwrap();
+    let result = storage.list_blocks(None, Some(1)).await.unwrap();
     assert_eq!(result.len(), 2);
 
-    assert_eq!(result[0].batch.solutions.len(), 1);
-    assert_eq!(result[0].batch.solutions[0], solutions[100]);
+    assert_eq!(result[0].solutions.len(), 1);
+    assert_eq!(result[0].solutions[0], solutions[100]);
     assert_eq!(result[0].number, 100);
 
-    assert_eq!(result[1].batch.solutions.len(), 1);
-    assert_eq!(result[1].batch.solutions[0], solutions[101]);
+    assert_eq!(result[1].solutions.len(), 1);
+    assert_eq!(result[1].solutions[0], solutions[101]);
     assert_eq!(result[1].number, 101);
 
     // List empty third page
-    let result = storage.list_winning_blocks(None, Some(2)).await.unwrap();
+    let result = storage.list_blocks(None, Some(2)).await.unwrap();
     assert_eq!(result.len(), 0);
 
     // List within time
@@ -538,48 +538,42 @@ async fn list_winning_blocks<S: Storage>(storage: S) {
     let start = time - std::time::Duration::from_secs(100);
     let end = time + std::time::Duration::from_secs(100);
 
-    let result = storage
-        .list_winning_blocks(Some(start..end), None)
-        .await
-        .unwrap();
+    let result = storage.list_blocks(Some(start..end), None).await.unwrap();
     assert_eq!(result.len(), 100);
 
-    assert_eq!(result[0].batch.solutions.len(), 1);
-    assert_eq!(result[0].batch.solutions[0], solutions[0]);
+    assert_eq!(result[0].solutions.len(), 1);
+    assert_eq!(result[0].solutions[0], solutions[0]);
     assert_eq!(result[0].number, 0);
 
-    assert_eq!(result[99].batch.solutions.len(), 1);
-    assert_eq!(result[99].batch.solutions[0], solutions[99]);
+    assert_eq!(result[99].solutions.len(), 1);
+    assert_eq!(result[99].solutions[0], solutions[99]);
     assert_eq!(result[99].number, 99);
 
     // List within time and page
     let result = storage
-        .list_winning_blocks(Some(start..end), Some(1))
+        .list_blocks(Some(start..end), Some(1))
         .await
         .unwrap();
     assert_eq!(result.len(), 2);
 
-    assert_eq!(result[0].batch.solutions.len(), 1);
-    assert_eq!(result[0].batch.solutions[0], solutions[100]);
+    assert_eq!(result[0].solutions.len(), 1);
+    assert_eq!(result[0].solutions[0], solutions[100]);
     assert_eq!(result[0].number, 100);
 
-    assert_eq!(result[1].batch.solutions.len(), 1);
-    assert_eq!(result[1].batch.solutions[0], solutions[101]);
+    assert_eq!(result[1].solutions.len(), 1);
+    assert_eq!(result[1].solutions[0], solutions[101]);
     assert_eq!(result[1].number, 101);
 
     // List within time and empty page
     let result = storage
-        .list_winning_blocks(Some(start..end), Some(2))
+        .list_blocks(Some(start..end), Some(2))
         .await
         .unwrap();
     assert_eq!(result.len(), 0);
 
     // List outside time and empty page
     let end = time - std::time::Duration::from_secs(80);
-    let result = storage
-        .list_winning_blocks(Some(start..end), None)
-        .await
-        .unwrap();
+    let result = storage.list_blocks(Some(start..end), None).await.unwrap();
     assert_eq!(result.len(), 0);
 }
 
@@ -605,7 +599,7 @@ async fn get_solution<S: Storage>(storage: S) {
         .await
         .unwrap();
 
-    let r = storage.list_winning_blocks(None, None).await.unwrap();
+    let r = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(r.len(), 1);
 
     // Get existing solution in pool
@@ -650,7 +644,7 @@ async fn get_solution<S: Storage>(storage: S) {
         .move_solutions_to_failed(&[(hashes[1], SolutionFailReason::NotComposable)])
         .await
         .unwrap();
-    let r = storage.list_winning_blocks(None, None).await.unwrap();
+    let r = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(r.len(), 2);
 
     for solution in &solutions {
@@ -669,7 +663,7 @@ async fn get_solution<S: Storage>(storage: S) {
         .await
         .unwrap();
 
-    let r = storage.list_winning_blocks(None, None).await.unwrap();
+    let r = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(r.len(), 3);
 
     // Get existing solution in solved

@@ -321,7 +321,7 @@ impl Storage for MemoryStorage {
         }))
     }
 
-    async fn list_winning_blocks(
+    async fn list_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
         page: Option<usize>,

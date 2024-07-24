@@ -9,7 +9,7 @@ use essential_types::{
     contract::{Contract, SignedContract},
     predicate::Predicate,
     solution::Solution,
-    Batch, Block, Hash, Signature, Word,
+    Block, Hash, Signature, Word,
 };
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -305,7 +305,7 @@ pub fn list_failed_solutions(
         .collect()
 }
 
-pub fn list_winning_blocks(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Block>> {
+pub fn list_blocks(QueryValues { queries }: QueryValues) -> anyhow::Result<Vec<Block>> {
     // Only expecting a single query.
     let rows = match &queries[..] {
         [Some(Rows { rows })] => rows,
@@ -350,11 +350,8 @@ fn map_solution_to_block(
                         .or_insert_with(|| Block {
                             number,
                             timestamp: Duration::new(created_at_secs, created_at_nanos as u32),
-                            batch: Batch {
-                                solutions: Vec::with_capacity(1),
-                            },
+                            solutions: Vec::new(),
                         })
-                        .batch
                         .solutions
                         .push(solution);
                     Ok(map)

@@ -17,8 +17,8 @@ fn test_valid_query() {
     )
     .unwrap();
     assert_eq!(r.len(), 1);
-    assert_eq!(r[&1].batch.solutions.len(), 1);
-    assert_eq!(r[&1].batch.solutions[0], solution);
+    assert_eq!(r[&1].solutions.len(), 1);
+    assert_eq!(r[&1].solutions[0], solution);
     assert_eq!(r[&1].number, 0);
     assert_eq!(r[&1].timestamp, Duration::new(2, 3));
 
@@ -34,9 +34,9 @@ fn test_valid_query() {
     )
     .unwrap();
     assert_eq!(r.len(), 1);
-    assert_eq!(r[&1].batch.solutions.len(), 2);
-    assert_eq!(r[&1].batch.solutions[0], solution);
-    assert_eq!(r[&1].batch.solutions[1], solution);
+    assert_eq!(r[&1].solutions.len(), 2);
+    assert_eq!(r[&1].solutions[0], solution);
+    assert_eq!(r[&1].solutions[1], solution);
     assert_eq!(r[&1].number, 0);
     assert_eq!(r[&1].timestamp, Duration::new(2, 3));
 
@@ -52,10 +52,10 @@ fn test_valid_query() {
     )
     .unwrap();
     assert_eq!(r.len(), 2);
-    assert_eq!(r[&1].batch.solutions.len(), 2);
-    assert_eq!(r[&1].batch.solutions[0], solution);
-    assert_eq!(r[&1].batch.solutions[1], solution);
-    assert_eq!(r[&2].batch.solutions[0], solution);
+    assert_eq!(r[&1].solutions.len(), 2);
+    assert_eq!(r[&1].solutions[0], solution);
+    assert_eq!(r[&1].solutions[1], solution);
+    assert_eq!(r[&2].solutions[0], solution);
     assert_eq!(r[&1].number, 0);
     assert_eq!(r[&1].timestamp, Duration::new(2, 3));
     assert_eq!(r[&2].number, 1);

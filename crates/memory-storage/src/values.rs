@@ -5,7 +5,7 @@ use std::{
 };
 
 use essential_types::{
-    contract::Contract, predicate::Predicate, solution::Solution, Batch, ContentAddress,
+    contract::Contract, predicate::Predicate, solution::Solution, ContentAddress,
 };
 
 use crate::ContractWithAddresses;
@@ -106,7 +106,7 @@ pub fn page_winning_blocks(
                 Ok(essential_types::Block {
                     number: *number,
                     timestamp: *timestamp,
-                    batch: Batch { solutions },
+                    solutions,
                 })
             })
             .collect(),
@@ -129,7 +129,7 @@ pub fn page_winning_blocks(
                 Ok(essential_types::Block {
                     number: *number,
                     timestamp: *timestamp,
-                    batch: Batch { solutions },
+                    solutions,
                 })
             })
             .collect(),

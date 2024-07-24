@@ -1,6 +1,6 @@
 [package]
 name = "essential-memory-storage"
-version = "0.1.0"
+version = "0.2.0"
 description = "In memory storage for the Essential server"
 edition.workspace = true
 authors.workspace = true

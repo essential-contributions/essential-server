@@ -96,9 +96,9 @@ async fn solutions<S: Storage>(storage: S) {
     assert_eq!(result.len(), 1);
     assert!(result.contains(&solution2));
 
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].batch.solutions, vec![solution.clone()]);
+    assert_eq!(result[0].solutions, vec![solution.clone()]);
 
     storage
         .insert_solution_into_pool(solution3.clone())
@@ -139,11 +139,11 @@ async fn solutions<S: Storage>(storage: S) {
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
 
-    let result = storage.list_winning_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(result.len(), 2);
-    assert_eq!(result[0].batch.solutions, vec![solution.clone()]);
+    assert_eq!(result[0].solutions, vec![solution.clone()]);
     assert_eq!(
-        result[1].batch.solutions,
+        result[1].solutions,
         vec![solution2.clone(), solution3.clone()]
     );
 

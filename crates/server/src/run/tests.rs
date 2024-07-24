@@ -51,10 +51,10 @@ async fn test_run() {
         .unwrap();
     assert_eq!(post_state, vec![42]);
 
-    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].batch.solutions.len(), 1);
-    assert_eq!(blocks[0].batch.solutions[0], solution);
+    assert_eq!(blocks[0].solutions.len(), 1);
+    assert_eq!(blocks[0].solutions[0], solution);
 
     let solution2 = solution; // same as solution
     let (solution3, _) = test_solution(Some(storage.clone()), 2).await;
@@ -64,10 +64,10 @@ async fn test_run() {
 
     run(&storage).await.unwrap();
 
-    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[1].batch.solutions.len(), 1);
-    assert!(blocks[1].batch.solutions.iter().any(|s| s == &solution3));
+    assert_eq!(blocks[1].solutions.len(), 1);
+    assert!(blocks[1].solutions.iter().any(|s| s == &solution3));
 }
 
 #[tokio::test]
@@ -104,10 +104,10 @@ async fn test_counter() {
         .unwrap();
     assert_eq!(post_state, vec![2]);
 
-    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].batch.solutions.len(), 2);
-    let solutions = &blocks[0].batch.solutions;
+    assert_eq!(blocks[0].solutions.len(), 2);
+    let solutions = &blocks[0].solutions;
     assert!(solutions.contains(&solution));
     assert!(solutions.contains(&solution2));
 
@@ -122,10 +122,10 @@ async fn test_counter() {
         .unwrap();
     assert_eq!(post_state, vec![4]);
 
-    let blocks = storage.list_winning_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
-    assert_eq!(blocks[1].batch.solutions.len(), 2);
-    let solutions = &blocks[1].batch.solutions;
+    assert_eq!(blocks[1].solutions.len(), 2);
+    let solutions = &blocks[1].solutions;
     assert!(solutions.contains(&solution3));
     assert!(solutions.contains(&solution4));
 }
