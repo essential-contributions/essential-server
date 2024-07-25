@@ -474,10 +474,10 @@ fn test_batch_paging() {
     assert_eq!(
         result,
         vec![
-            (10, "solution18".to_string(), 9 * 100, 9 * 100),
-            (10, "solution19".to_string(), 9 * 100, 9 * 100,),
-            (11, "solution20".to_string(), 10 * 100, 10 * 100,),
+            (11, "solution20".to_string(), 10 * 100, 10 * 100),
             (11, "solution21".to_string(), 10 * 100, 10 * 100,),
+            (12, "solution22".to_string(), 11 * 100, 11 * 100,),
+            (12, "solution23".to_string(), 11 * 100, 11 * 100,),
         ]
     );
 
@@ -501,10 +501,10 @@ fn test_batch_paging() {
     assert_eq!(
         result,
         vec![
-            (12, "solution22".to_string(), 11 * 100, 11 * 100),
-            (12, "solution23".to_string(), 11 * 100, 11 * 100,),
-            (13, "solution24".to_string(), 12 * 100, 12 * 100,),
+            (13, "solution24".to_string(), 12 * 100, 12 * 100),
             (13, "solution25".to_string(), 12 * 100, 12 * 100,),
+            (14, "solution26".to_string(), 13 * 100, 13 * 100,),
+            (14, "solution27".to_string(), 13 * 100, 13 * 100,),
         ]
     );
 
@@ -561,8 +561,8 @@ fn test_batch_paging() {
     assert_eq!(
         result,
         vec![
-            (46, "solution90".to_string(), 45 * 100, 45 * 100),
-            (46, "solution91".to_string(), 45 * 100, 45 * 100,),
+            (47, "solution92".to_string(), 46 * 100, 46 * 100),
+            (47, "solution93".to_string(), 46 * 100, 46 * 100,),
         ]
     );
 
