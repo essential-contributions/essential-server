@@ -355,6 +355,7 @@ where
 async fn list_blocks<S>(
     State(essential): State<Essential<S>>,
     time_range: Option<Query<TimeRange>>,
+    block: Option<Query<BlockNumber>>,
     page: Option<Query<Page>>,
 ) -> Result<Json<Vec<Block>>, Error>
 where
@@ -366,7 +367,11 @@ where
         time_range.map(|range| Duration::from_secs(range.start)..Duration::from_secs(range.end));
 
     let blocks = essential
-        .list_blocks(time_range, page.map(|p| p.page as usize))
+        .list_blocks(
+            time_range,
+            block.map(|b| b.block),
+            page.map(|p| p.page as usize),
+        )
         .await?;
     Ok(Json(blocks))
 }

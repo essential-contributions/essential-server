@@ -200,9 +200,12 @@ where
     pub async fn list_blocks(
         &self,
         time_range: Option<Range<Duration>>,
+        block_number: Option<u64>,
         page: Option<usize>,
     ) -> anyhow::Result<Vec<Block>> {
-        self.storage.list_blocks(time_range, page).await
+        self.storage
+            .list_blocks(time_range, block_number, page)
+            .await
     }
 
     pub fn subscribe_blocks(

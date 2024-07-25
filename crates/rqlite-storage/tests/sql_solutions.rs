@@ -127,6 +127,7 @@ fn test_insert_solutions() {
         &conn,
         include_sql!("query", "list_winning_batches"),
         named_params! {
+            ":block_number": 0,
             ":page_size": 10,
             ":page_number": 0,
         },
@@ -376,6 +377,7 @@ fn test_batch_paging() {
         &conn,
         include_sql!("query", "list_winning_batches"),
         named_params! {
+            ":block_number": 0,
             ":page_size": 2,
             ":page_number": 0,
         },
@@ -402,6 +404,7 @@ fn test_batch_paging() {
         &conn,
         include_sql!("query", "list_winning_batches"),
         named_params! {
+            ":block_number": 0,
             ":page_size": 2,
             ":page_number": 1,
         },
@@ -428,6 +431,7 @@ fn test_batch_paging() {
         &conn,
         include_sql!("query", "list_winning_batches"),
         named_params! {
+            ":block_number": 0,
             ":page_size": 2,
             ":page_number": 20,
         },
@@ -452,8 +456,63 @@ fn test_batch_paging() {
 
     let result = query(
         &conn,
+        include_sql!("query", "list_winning_batches"),
+        named_params! {
+            ":block_number": 10,
+            ":page_size": 2,
+            ":page_number": 0,
+        },
+        |row| {
+            (
+                row.get::<_, usize>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
+                row.get::<_, usize>(3).unwrap(),
+            )
+        },
+    );
+    assert_eq!(
+        result,
+        vec![
+            (10, "solution18".to_string(), 9 * 100, 9 * 100),
+            (10, "solution19".to_string(), 9 * 100, 9 * 100,),
+            (11, "solution20".to_string(), 10 * 100, 10 * 100,),
+            (11, "solution21".to_string(), 10 * 100, 10 * 100,),
+        ]
+    );
+
+    let result = query(
+        &conn,
+        include_sql!("query", "list_winning_batches"),
+        named_params! {
+            ":block_number": 10,
+            ":page_size": 2,
+            ":page_number": 1,
+        },
+        |row| {
+            (
+                row.get::<_, usize>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
+                row.get::<_, usize>(3).unwrap(),
+            )
+        },
+    );
+    assert_eq!(
+        result,
+        vec![
+            (12, "solution22".to_string(), 11 * 100, 11 * 100),
+            (12, "solution23".to_string(), 11 * 100, 11 * 100,),
+            (13, "solution24".to_string(), 12 * 100, 12 * 100,),
+            (13, "solution25".to_string(), 12 * 100, 12 * 100,),
+        ]
+    );
+
+    let result = query(
+        &conn,
         include_sql!("query", "list_winning_batches_by_time"),
         named_params! {
+            ":block_number": 40,
             ":page_size": 1,
             ":page_number": 2,
             ":start_seconds": 40 * 100,
@@ -482,6 +541,36 @@ fn test_batch_paging() {
         &conn,
         include_sql!("query", "list_winning_batches_by_time"),
         named_params! {
+            ":block_number": 44,
+            ":page_size": 1,
+            ":page_number": 2,
+            ":start_seconds": 40 * 100,
+            ":start_nanos": 100,
+            ":end_seconds": 100 * 100,
+            ":end_nanos": 100 * 100,
+        },
+        |row| {
+            (
+                row.get::<_, usize>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
+                row.get::<_, usize>(3).unwrap(),
+            )
+        },
+    );
+    assert_eq!(
+        result,
+        vec![
+            (46, "solution90".to_string(), 45 * 100, 45 * 100),
+            (46, "solution91".to_string(), 45 * 100, 45 * 100,),
+        ]
+    );
+
+    let result = query(
+        &conn,
+        include_sql!("query", "list_winning_batches_by_time"),
+        named_params! {
+            ":block_number": 0,
             ":page_size": 1,
             ":page_number": 0,
             ":start_seconds": 41 * 100,

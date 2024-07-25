@@ -37,7 +37,7 @@ where
     server.submit_solution(solution.clone()).await.unwrap();
 
     let blocks = loop {
-        let blocks = server.list_blocks(None, None).await.unwrap();
+        let blocks = server.list_blocks(None, None, None).await.unwrap();
         if !blocks.is_empty() {
             break blocks;
         }
@@ -55,7 +55,7 @@ where
     server.submit_solution(solution.clone()).await.unwrap();
 
     let blocks = loop {
-        let blocks = server.list_blocks(None, None).await.unwrap();
+        let blocks = server.list_blocks(None, None, None).await.unwrap();
         if blocks.len() > 1 {
             break blocks;
         }

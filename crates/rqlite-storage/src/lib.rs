@@ -555,12 +555,15 @@ impl Storage for RqliteStorage {
     async fn list_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
+        block_number: Option<u64>,
         page: Option<usize>,
     ) -> anyhow::Result<Vec<Block>> {
         let page = page.unwrap_or(0);
+        let block_number = block_number.unwrap_or(0);
         let queries = match time_range {
             Some(range) => {
                 let sql = &[include_sql!(named "query/list_winning_batches_by_time.sql",
+                    "block_number" => block_number,
                     "page_size" => PAGE_SIZE,
                     "page_number" => page,
                     "start_seconds" => range.start.as_secs(),
@@ -572,7 +575,7 @@ impl Storage for RqliteStorage {
             }
             None => {
                 let sql = &[
-                    include_sql!(named "query/list_winning_batches.sql", "page_size" => PAGE_SIZE, "page_number" => page),
+                    include_sql!(named "query/list_winning_batches.sql", "block_number" => block_number, "page_size" => PAGE_SIZE, "page_number" => page),
                 ];
                 self.query_values(sql).await?
             }
@@ -598,7 +601,11 @@ impl Storage for RqliteStorage {
                     let storage = storage.clone();
                     async move {
                         storage
-                            .list_blocks(get.time.map(|s| s..Duration::MAX), Some(get.page))
+                            .list_blocks(
+                                get.time.map(|s| s..Duration::MAX),
+                                get.number,
+                                Some(get.page),
+                            )
                             .await
                     }
                 },

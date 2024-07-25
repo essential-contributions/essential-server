@@ -105,6 +105,7 @@ pub trait Storage: StateStorage {
     fn list_blocks(
         &self,
         time_range: Option<Range<Duration>>,
+        block_number: Option<u64>,
         page: Option<usize>,
     ) -> impl Future<Output = anyhow::Result<Vec<Block>>> + Send;
 

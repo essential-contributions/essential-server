@@ -137,7 +137,7 @@ async fn insert_solution_into_pool<S: Storage>(storage: S) {
         .unwrap();
     let solutions = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(solutions.len(), 0);
-    let batches = storage.list_blocks(None, None).await.unwrap();
+    let batches = storage.list_blocks(None, None, None).await.unwrap();
     assert_eq!(batches.len(), 1);
     assert_eq!(hash(&batches[0].solutions), hash(&vec![solution]));
 }

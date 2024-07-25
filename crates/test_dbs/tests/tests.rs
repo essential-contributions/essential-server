@@ -147,7 +147,7 @@ async fn solutions<S: Storage>(storage: S) {
     assert_eq!(result.len(), 1);
     assert!(result.contains(&solution2));
 
-    let result = storage.list_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None, None).await.unwrap();
     assert_eq!(result.len(), 1);
     assert_eq!(result[0].solutions, vec![solution.clone()]);
 
@@ -190,7 +190,7 @@ async fn solutions<S: Storage>(storage: S) {
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
 
-    let result = storage.list_blocks(None, None).await.unwrap();
+    let result = storage.list_blocks(None, None, None).await.unwrap();
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].solutions, vec![solution.clone()]);
     assert_eq!(

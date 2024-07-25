@@ -49,6 +49,7 @@ struct Inner {
     solutions: HashMap<Hash, Solution>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
+    block_number_index: HashMap<u64, Duration>,
     solution_block_time_index: HashMap<Hash, Vec<Duration>>,
     state: HashMap<ContentAddress, BTreeMap<Key, Vec<Word>>>,
 }
@@ -363,11 +364,20 @@ impl Storage for MemoryStorage {
     async fn list_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
+        block_number: Option<u64>,
         page: Option<usize>,
     ) -> anyhow::Result<Vec<essential_types::Block>> {
         let page = page.unwrap_or(0);
         self.inner.apply(|i| {
-            values::page_winning_blocks(&i.solved, &i.solutions, time_range, page, PAGE_SIZE)
+            values::page_blocks(
+                &i.solved,
+                &i.solutions,
+                &i.block_number_index,
+                time_range,
+                block_number,
+                page,
+                PAGE_SIZE,
+            )
         })
     }
 
@@ -389,7 +399,11 @@ impl Storage for MemoryStorage {
                     let storage = storage.clone();
                     async move {
                         storage
-                            .list_blocks(get.time.map(|s| s..Duration::MAX), Some(get.page))
+                            .list_blocks(
+                                get.time.map(|s| s..Duration::MAX),
+                                get.number,
+                                Some(get.page),
+                            )
                             .await
                     }
                 },
@@ -547,6 +561,7 @@ fn move_solutions_to_solved(
         hashes: solutions,
     };
     i.solved.insert(timestamp, block);
+    i.block_number_index.insert(number, timestamp);
     Ok(())
 }
 

@@ -697,7 +697,6 @@ dependencies = [
  "anyhow",
  "essential-hash",
  "essential-lock",
- "essential-server-types",
  "essential-state-read-vm",
  "essential-storage",
  "essential-types",
