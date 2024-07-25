@@ -697,6 +697,7 @@ dependencies = [
  "anyhow",
  "essential-hash",
  "essential-lock",
+ "essential-server-types",
  "essential-state-read-vm",
  "essential-storage",
  "essential-types",
@@ -836,7 +837,9 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "essential-types",
+ "futures",
  "serde",
+ "tokio",
 ]
 
 [[package]]
@@ -2281,6 +2284,7 @@ dependencies = [
  "essential-sign",
  "essential-storage",
  "essential-types",
+ "futures",
  "paste",
  "pretty_assertions",
  "tempfile",

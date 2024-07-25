@@ -183,6 +183,16 @@ where
         self.storage.list_contracts(time_range, page).await
     }
 
+    pub fn subscribe_contracts(
+        &self,
+        start_time: Option<Duration>,
+        start_page: Option<usize>,
+    ) -> impl futures::stream::Stream<Item = anyhow::Result<Contract>> + Send + 'static {
+        self.storage
+            .clone()
+            .subscribe_contracts(start_time, start_page)
+    }
+
     pub async fn list_solutions_pool(&self, page: Option<usize>) -> anyhow::Result<Vec<Solution>> {
         self.storage.list_solutions_pool(page).await
     }
@@ -193,6 +203,17 @@ where
         page: Option<usize>,
     ) -> anyhow::Result<Vec<Block>> {
         self.storage.list_blocks(time_range, page).await
+    }
+
+    pub fn subscribe_blocks(
+        &self,
+        start_time: Option<Duration>,
+        start_number: Option<u64>,
+        start_page: Option<usize>,
+    ) -> impl futures::stream::Stream<Item = anyhow::Result<Block>> + Send + 'static {
+        self.storage
+            .clone()
+            .subscribe_blocks(start_time, start_number, start_page)
     }
 
     pub async fn query_state(

@@ -1,9 +1,12 @@
+use std::time::Duration;
+
 use essential_hash::hash;
 use essential_storage::{
     failed_solution::{CheckOutcome, SolutionFailReason},
     Storage,
 };
 use essential_types::PredicateAddress;
+use futures::StreamExt;
 use test_dbs::create_test;
 use test_utils::{
     predicate_with_salt, sign_contract_with_random_keypair, solution_with_decision_variables,
@@ -55,6 +58,54 @@ async fn insert_contract<S: Storage>(storage: S) {
             assert_eq!(&result, predicate);
         }
     }
+}
+
+create_test!(subscribe_contracts);
+
+async fn subscribe_contracts<S: Storage + Clone + Send + Sync + 'static>(storage: S) {
+    let mut contracts = [
+        sign_contract_with_random_keypair(vec![
+            predicate_with_salt(0),
+            predicate_with_salt(1),
+            predicate_with_salt(2),
+        ]),
+        sign_contract_with_random_keypair(vec![
+            predicate_with_salt(2),
+            predicate_with_salt(3),
+            predicate_with_salt(4),
+        ]),
+    ];
+
+    // Order contract by their CA, as that's how `list_contracts` will return them.
+    for signed in &mut contracts {
+        signed.contract.sort_by_key(essential_hash::content_addr);
+    }
+
+    storage.insert_contract(contracts[0].clone()).await.unwrap();
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    let jh = tokio::spawn({
+        let storage = storage.clone();
+        let contracts = contracts.clone();
+        async move {
+            rx.await.unwrap();
+            storage.insert_contract(contracts[1].clone()).await.unwrap();
+        }
+    });
+
+    let stream = storage.subscribe_contracts(None, None);
+    futures::pin_mut!(stream);
+    let result = stream.next().await.unwrap().unwrap();
+    assert_eq!(result, contracts[0].contract);
+
+    let r = tokio::time::timeout(Duration::from_millis(50), stream.next()).await;
+    assert!(r.is_err());
+    tx.send(()).unwrap();
+
+    let result = stream.next().await.unwrap().unwrap();
+    assert_eq!(result, contracts[1].contract);
+    jh.await.unwrap();
 }
 
 create_test!(solutions);
@@ -159,6 +210,54 @@ async fn solutions<S: Storage>(storage: S) {
 
     let result = storage.list_failed_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
+}
+
+create_test!(subscribe_blocks);
+
+async fn subscribe_blocks<S: Storage + Clone + Send + Sync + 'static>(storage: S) {
+    let solution = solution_with_decision_variables(0);
+    let solution2 = solution_with_decision_variables(1);
+    storage
+        .insert_solution_into_pool(solution.clone())
+        .await
+        .unwrap();
+    storage
+        .insert_solution_into_pool(solution2.clone())
+        .await
+        .unwrap();
+
+    storage
+        .move_solutions_to_solved(&[hash(&solution)])
+        .await
+        .unwrap();
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    let jh = tokio::spawn({
+        let storage = storage.clone();
+        let solution2 = solution2.clone();
+        async move {
+            rx.await.unwrap();
+            storage
+                .move_solutions_to_solved(&[hash(&solution2)])
+                .await
+                .unwrap();
+        }
+    });
+
+    let stream = storage.subscribe_blocks(None, None, None);
+    futures::pin_mut!(stream);
+    let result = stream.next().await.unwrap().unwrap();
+    assert_eq!(result.solutions[0], solution);
+
+    let r = tokio::time::timeout(Duration::from_millis(50), stream.next()).await;
+    assert!(r.is_err());
+    tx.send(()).unwrap();
+
+    let result = stream.next().await.unwrap().unwrap();
+    assert_eq!(result.solutions[0], solution2);
+
+    jh.await.unwrap();
 }
 
 create_test!(update_and_query_state);

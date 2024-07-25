@@ -6,7 +6,7 @@
 use anyhow::anyhow;
 use axum::{
     extract::{Path, Query, State},
-    response::IntoResponse,
+    response::{sse::Event, IntoResponse, Sse},
     routing::{get, post},
     Json, Router,
 };
@@ -19,6 +19,7 @@ use essential_types::{
     solution::Solution,
     Block, ContentAddress, PredicateAddress, Word,
 };
+use futures::{Stream, StreamExt};
 use hyper::body::Incoming;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use serde::Deserialize;
@@ -54,10 +55,24 @@ struct TimeRange {
 }
 
 #[derive(Deserialize)]
+/// Type to deserialize a time query parameters.
+struct Time {
+    /// Time in seconds.
+    time: u64,
+}
+
+#[derive(Deserialize)]
 /// Type to deserialize a page query parameter.
 struct Page {
     /// The page number to start from.
     page: u64,
+}
+
+#[derive(Deserialize)]
+/// Type to deserialize a block number query parameter.
+struct BlockNumber {
+    /// The block number to start from.
+    block: u64,
 }
 
 /// Run the server.
@@ -98,10 +113,12 @@ where
         .route("/get-contract/:address", get(get_contract))
         .route("/get-predicate/:contract/:address", get(get_predicate))
         .route("/list-contracts", get(list_contracts))
+        .route("/subscribe-contracts", get(subscribe_contracts))
         .route("/submit-solution", post(submit_solution))
         .route("/list-solutions-pool", get(list_solutions_pool))
         .route("/query-state/:address/:key", get(query_state))
         .route("/list-blocks", get(list_blocks))
+        .route("/subscribe-blocks", get(subscribe_blocks))
         .route("/solution-outcome/:hash", get(solution_outcome))
         .route("/check-solution", post(check_solution))
         .route(
@@ -309,7 +326,30 @@ where
     Ok(Json(contracts))
 }
 
-/// The list winning blocks get endpoint.
+/// The subscribe contracts get endpoint.
+///
+/// Takes optional time and page as query parameters.
+async fn subscribe_contracts<S>(
+    State(essential): State<Essential<S>>,
+    time: Option<Query<Time>>,
+    page: Option<Query<Page>>,
+) -> Sse<impl Stream<Item = Result<Event, StdError>>>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let time = time.map(|t| Duration::from_secs(t.time));
+
+    let contracts = essential.subscribe_contracts(time, page.map(|p| p.page as usize));
+    Sse::new(
+        contracts
+            .map::<Result<_, Error>, _>(|contract| Ok(Event::default().json_data(contract?)?))
+            .map(|r| r.map_err(StdError)),
+    )
+}
+
+/// The list blocks get endpoint.
 ///
 /// Takes optional time range and page as query parameters.
 async fn list_blocks<S>(
@@ -329,6 +369,31 @@ where
         .list_blocks(time_range, page.map(|p| p.page as usize))
         .await?;
     Ok(Json(blocks))
+}
+
+/// The subscribe blocks get endpoint.
+///
+/// Takes optional time and page as query parameters.
+async fn subscribe_blocks<S>(
+    State(essential): State<Essential<S>>,
+    time: Option<Query<Time>>,
+    block: Option<Query<BlockNumber>>,
+    page: Option<Query<Page>>,
+) -> Sse<impl Stream<Item = Result<Event, StdError>>>
+where
+    S: Storage + StateRead + Clone + Send + Sync + 'static,
+    <S as StateRead>::Future: Send,
+    <S as StateRead>::Error: Send,
+{
+    let time = time.map(|time| Duration::from_secs(time.time));
+
+    let blocks =
+        essential.subscribe_blocks(time, block.map(|b| b.block), page.map(|p| p.page as usize));
+    Sse::new(
+        blocks
+            .map::<Result<_, Error>, _>(|block| Ok(Event::default().json_data(block?)?))
+            .map(|r| r.map_err(StdError)),
+    )
 }
 
 /// The list solutions pool get endpoint.
@@ -470,7 +535,11 @@ async fn shutdown(rx: Option<oneshot::Receiver<()>>) {
     }
 }
 
+#[derive(Debug)]
 struct Error(anyhow::Error);
+
+#[derive(Debug)]
+struct StdError(Error);
 
 impl IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
@@ -489,6 +558,26 @@ where
 {
     fn from(err: E) -> Self {
         Self(err.into())
+    }
+}
+
+impl From<Error> for StdError {
+    fn from(err: Error) -> Self {
+        Self(err)
+    }
+}
+
+impl std::error::Error for StdError {}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::fmt::Display for StdError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
