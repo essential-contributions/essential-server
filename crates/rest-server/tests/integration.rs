@@ -13,8 +13,16 @@ use essential_types::{
     solution::{Solution, SolutionData},
     Block, ContentAddress, PredicateAddress, Word,
 };
+use futures::{StreamExt, TryStreamExt};
 use test_utils::{
-    empty::Empty, sign_contract_with_random_keypair, solution_with_decision_variables,
+    empty::Empty, sign_contract_with_random_keypair, solution_with_all_inputs_fixed_size,
+    solution_with_decision_variables,
+};
+use tokio_util::bytes::Buf;
+use tokio_util::{
+    bytes,
+    codec::{Decoder, FramedRead},
+    io::StreamReader,
 };
 use utils::{setup, setup_with_mem, TestServer};
 
@@ -402,4 +410,142 @@ async fn test_check_solution_with_data() {
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn test_subscribe_blocks() {
+    let solutions: Vec<_> = (0..200)
+        .map(|i| solution_with_all_inputs_fixed_size(i, 4))
+        .collect();
+    let hashes: Vec<_> = solutions.iter().map(essential_hash::hash).collect();
+
+    let mem = MemoryStorage::new();
+    for solution in &solutions {
+        mem.insert_solution_into_pool(solution.clone())
+            .await
+            .unwrap();
+    }
+    mem.move_solutions_to_solved(&hashes[0..1]).await.unwrap();
+
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup_with_mem(mem.clone()).await;
+
+    let a = url.join("/subscribe-blocks").unwrap();
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let mut s = make_stream(response);
+
+    let block = s.try_next().await.unwrap().unwrap();
+    assert_eq!(block.number, 0);
+    assert_eq!(block.solutions.len(), 1);
+    assert_eq!(essential_hash::hash(&block.solutions[0]), hashes[0]);
+
+    let r = tokio::time::timeout(Duration::from_millis(50), s.try_next()).await;
+    assert!(r.is_err());
+
+    mem.move_solutions_to_solved(&hashes[1..3]).await.unwrap();
+
+    let block = s.try_next().await.unwrap().unwrap();
+    assert_eq!(block.number, 1);
+    assert_eq!(block.solutions.len(), 2);
+    assert_eq!(essential_hash::hash(&block.solutions[0]), hashes[1]);
+    assert_eq!(essential_hash::hash(&block.solutions[1]), hashes[2]);
+    drop(s);
+
+    let mut a = url.join("/subscribe-blocks").unwrap();
+    a.query_pairs_mut().append_pair("page", "0");
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let result: Vec<_> = make_stream(response).take(2).try_collect().await.unwrap();
+    assert_eq!(result.len(), 2);
+    assert_eq!(result[0].number, 0);
+    assert_eq!(result[1].number, 1);
+
+    let mut a = url.join("/subscribe-blocks").unwrap();
+    a.query_pairs_mut().append_pair("page", "1");
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let mut s = make_stream(response);
+
+    let r = tokio::time::timeout(Duration::from_millis(50), s.try_next()).await;
+    assert!(r.is_err());
+
+    for hash in &hashes[3..] {
+        mem.move_solutions_to_solved(&[*hash]).await.unwrap();
+    }
+
+    let block = s.try_next().await.unwrap().unwrap();
+    assert_eq!(block.number, 100);
+
+    let blocks: Vec<_> = s.take(98).try_collect().await.unwrap();
+    assert_eq!(blocks.len(), 98);
+    assert_eq!(blocks[97].number, 198);
+
+    let mut a = url.join("/subscribe-blocks").unwrap();
+    a.query_pairs_mut().append_pair("block", "190");
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let s = make_stream(response);
+
+    let blocks: Vec<_> = s.take(9).try_collect().await.unwrap();
+    assert_eq!(blocks.len(), 9);
+    assert_eq!(blocks[8].number, 198);
+
+    let mut a = url.join("/subscribe-blocks").unwrap();
+    a.query_pairs_mut()
+        .append_pair("block", "90")
+        .append_pair("page", "1");
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+
+    let s = make_stream(response);
+
+    let blocks: Vec<_> = s.take(9).try_collect().await.unwrap();
+    assert_eq!(blocks.len(), 9);
+    assert_eq!(blocks[8].number, 198);
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+struct BlockDecoder {}
+
+impl Decoder for BlockDecoder {
+    type Item = Block;
+    type Error = anyhow::Error;
+
+    fn decode(&mut self, buf: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let end = buf
+            .iter()
+            .zip(buf.iter().skip(1))
+            .position(|(&a, &b)| a == b'\n' && b == b'\n');
+
+        match end {
+            Some(end) => {
+                let s = std::str::from_utf8(&buf[..end])?;
+                let s = s.trim_start_matches("data: ").trim();
+                let block = serde_json::from_str::<Block>(s)?;
+                buf.advance(end + 2);
+                Ok(Some(block))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+fn make_stream(response: reqwest::Response) -> impl futures::Stream<Item = anyhow::Result<Block>> {
+    let stream = StreamReader::new(
+        response
+            .bytes_stream()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))),
+    );
+    FramedRead::new(stream, BlockDecoder {})
 }

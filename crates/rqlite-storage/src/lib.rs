@@ -650,6 +650,8 @@ impl Storage for RqliteStorage {
             Ok(Vec::new())
         };
 
+        let new_block = !solved.is_empty();
+
         let r = r.and_then(|mut sql| {
             let r = if !solved.is_empty() {
                 move_solutions_to_solved(solved)
@@ -676,8 +678,10 @@ impl Storage for RqliteStorage {
             let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| v.as_slice()).collect();
             let r = self.execute(&sql[..]).await;
 
-            // Notify the streams of the new blocks.
-            self.streams.notify_new_blocks();
+            if new_block {
+                // Notify the streams of the new blocks.
+                self.streams.notify_new_blocks();
+            }
 
             r
         }

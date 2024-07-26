@@ -210,13 +210,16 @@ impl Storage for MemoryStorage {
     }
 
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
+        let new_block = !solutions.is_empty();
         let hashes: HashSet<_> = solutions.iter().collect();
         let r = self
             .inner
             .apply(|i| move_solutions_to_solved(i, solutions, hashes));
 
-        // There is a new block.
-        self.streams.notify_new_blocks();
+        if new_block {
+            // There is a new block.
+            self.streams.notify_new_blocks();
+        }
         r
     }
 
@@ -474,15 +477,21 @@ impl Storage for MemoryStorage {
         let hashes: HashSet<_> = failed.iter().map(|(h, _)| h).collect();
         let solved_hashes: HashSet<_> = solved.iter().collect();
         let r = self.inner.apply(|i| {
+            let new_block = !solved_hashes.is_empty();
             move_solutions_to_failed(i, failed, hashes)?;
             move_solutions_to_solved(i, solved, solved_hashes)?;
             update_state_batch(i, state_updates);
-            Ok(())
+            Ok(new_block)
         });
 
-        // There is a new block.
-        self.streams.notify_new_blocks();
-        async { r }
+        if let Ok(r) = &r {
+            if *r {
+                // There is a new block.
+                self.streams.notify_new_blocks();
+            }
+        }
+
+        async { r.map(|_| ()) }
     }
 }
 

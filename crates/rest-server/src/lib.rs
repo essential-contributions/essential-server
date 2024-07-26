@@ -6,7 +6,10 @@
 use anyhow::anyhow;
 use axum::{
     extract::{Path, Query, State},
-    response::{sse::Event, IntoResponse, Sse},
+    response::{
+        sse::{Event, KeepAlive},
+        IntoResponse, Sse,
+    },
     routing::{get, post},
     Json, Router,
 };
@@ -347,6 +350,7 @@ where
             .map::<Result<_, Error>, _>(|contract| Ok(Event::default().json_data(contract?)?))
             .map(|r| r.map_err(StdError)),
     )
+    .keep_alive(KeepAlive::default())
 }
 
 /// The list blocks get endpoint.
@@ -399,6 +403,7 @@ where
             .map::<Result<_, Error>, _>(|block| Ok(Event::default().json_data(block?)?))
             .map(|r| r.map_err(StdError)),
     )
+    .keep_alive(KeepAlive::default())
 }
 
 /// The list solutions pool get endpoint.
