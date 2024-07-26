@@ -310,6 +310,63 @@ fn test_paging_blocks() {
     )
     .unwrap();
     assert_eq!(r, vec![]);
+
+    let r = page_blocks(&blocks, &solutions, &block_time_index, None, Some(5), 0, 1).unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(5)).unwrap().clone()]);
+
+    let r = page_blocks(&blocks, &solutions, &block_time_index, None, Some(5), 2, 1).unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(7)).unwrap().clone()]);
+
+    let r = page_blocks(&blocks, &solutions, &block_time_index, None, Some(10), 0, 1).unwrap();
+    assert_eq!(r, vec![]);
+
+    let r = page_blocks(
+        &blocks,
+        &solutions,
+        &block_time_index,
+        Some(duration_secs(3)..duration_secs(5)),
+        Some(1),
+        0,
+        1,
+    )
+    .unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(3)).unwrap().clone()]);
+
+    let r = page_blocks(
+        &blocks,
+        &solutions,
+        &block_time_index,
+        Some(duration_secs(3)..duration_secs(5)),
+        Some(4),
+        0,
+        1,
+    )
+    .unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(4)).unwrap().clone()]);
+
+    let r = page_blocks(
+        &blocks,
+        &solutions,
+        &block_time_index,
+        Some(duration_secs(3)..duration_secs(5)),
+        Some(4),
+        0,
+        10,
+    )
+    .unwrap();
+    assert_eq!(r, vec![expected.get(&duration_secs(4)).unwrap().clone()]);
+
+    let r = page_blocks(
+        &blocks,
+        &solutions,
+        &block_time_index,
+        Some(duration_secs(3)..duration_secs(5)),
+        Some(6),
+        0,
+        10,
+    )
+    .unwrap();
+    assert_eq!(r, vec![]);
 }
 
 #[test]
