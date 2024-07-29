@@ -66,6 +66,7 @@ Returns: `Option<Predicate>` as JSON
 ```bash
 curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/get-predicate/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236/709E80C88487A2411E1EE4DFB9F22A861492D20C4765150C0C794ABD70F8147C
 ```
+
 ### GET `/list-contracts`
 Query parameters: 
 - *Optional* `{ start: u64, end: u64 }`. This is the time range to list contract within. It is inclusive of the start and exclusive of the end.
@@ -77,6 +78,21 @@ Returns: `Vec<Contract>` as JSON
 ```bash
 curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-contracts?start=0&end=1&page=0"
 ```
+
+### GET `/subscribe-contracts`
+This api is a server sent event api.\
+This allows you to subscribe to new contracts as they are deployed.
+Query parameters: 
+- *Optional* `{ start: u64 }`. This is the time to start returning contracts from.
+- *Optional* `{ page: u64 }`. This is the page number to return contracts from. The default is 0.
+
+Returns: `Stream<Item = Result<Contract>>` where the result and contract are json.
+
+**Example:**
+```bash
+curl --http2-prior-knowledge -N -X GET -H "Content-Type: application/json" "http://localhost:59498/subscribe-blocks?start=0&end=1&page=0&block=0"
+```
+
 ### POST `/submit-solution`
 Body: `Solution` as JSON \
 Returns: `Hash` as JSON
@@ -106,17 +122,35 @@ Returns: `Option<Word>` as JSON
 ```bash
 curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" http://localhost:59498/query-state/EE3F28F3E0396EEE29613AF73E65D2BA52AE606E5FFD14D5EBD02A0FB5B88236/00
 ```
+
 ### GET `/list-blocks`
 Query parameters: 
-- *Optional* `{ start: u64, end: u64 }`. This is the time range to list contract within. It is inclusive of the start and exclusive of the end.
-- *Optional* `{ page: u64 }`. This is the page number to list contracts from. The default is 0.
+- *Optional* `{ start: u64, end: u64 }`. This is the time range to list blocks within. It is inclusive of the start and exclusive of the end.
+- *Optional* `{ page: u64 }`. This is the page number to list blocks from. The default is 0.
+- *Optional* `{ block: u64 }`. This is the block number to list blocks from.
 
 Returns: `Vec<Block>` as JSON
 
 **Example:**
 ```bash
-curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-blocks?start=0&end=1&page=0"
+curl --http2-prior-knowledge -X GET -H "Content-Type: application/json" "http://localhost:59498/list-blocks?start=0&end=1&page=0&block=0"
 ```
+
+### GET `/subscribe-blocks`
+This api is a server sent event api.\
+This allows you to subscribe to new blocks as they are added to the chain.
+Query parameters: 
+- *Optional* `{ start: u64 }`. This is the time to start returning blocks from.
+- *Optional* `{ page: u64 }`. This is the page number to return blocks from. The default is 0.
+- *Optional* `{ block: u64 }`. This is the block number to return blocks from.
+
+Returns: `Stream<Item = Result<Block>>` where the result and block are json.
+
+**Example:**
+```bash
+curl --http2-prior-knowledge -N -X GET -H "Content-Type: application/json" "http://localhost:59498/subscribe-blocks?start=0&end=1&page=0&block=0"
+```
+
 ### GET `/solution-outcome/:hash`
 Parameters: 
 - `:hash` = `[u8; 32]` as hex string. This is the hash of the solution.
