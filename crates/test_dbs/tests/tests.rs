@@ -6,10 +6,11 @@ use essential_storage::{
     Storage,
 };
 use essential_types::PredicateAddress;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use test_dbs::create_test;
 use test_utils::{
-    predicate_with_salt, sign_contract_with_random_keypair, solution_with_decision_variables,
+    predicate_with_salt, sign_contract_with_random_keypair, solution_with_all_inputs_fixed_size,
+    solution_with_decision_variables,
 };
 
 create_test!(insert_contract);
@@ -215,47 +216,172 @@ async fn solutions<S: Storage>(storage: S) {
 create_test!(subscribe_blocks);
 
 async fn subscribe_blocks<S: Storage + Clone + Send + Sync + 'static>(storage: S) {
-    let solution = solution_with_decision_variables(0);
-    let solution2 = solution_with_decision_variables(1);
-    storage
-        .insert_solution_into_pool(solution.clone())
-        .await
-        .unwrap();
-    storage
-        .insert_solution_into_pool(solution2.clone())
-        .await
-        .unwrap();
+    let solutions: Vec<_> = (0..102)
+        .map(|i| solution_with_all_inputs_fixed_size(i, 1))
+        .collect();
 
-    storage
-        .move_solutions_to_solved(&[hash(&solution)])
-        .await
-        .unwrap();
+    let hashes: Vec<_> = solutions.iter().map(essential_hash::hash).collect();
 
-    let (tx, rx) = tokio::sync::oneshot::channel();
+    for solution in &solutions {
+        storage
+            .insert_solution_into_pool(solution.clone())
+            .await
+            .unwrap();
+    }
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<_>>(10);
 
     let jh = tokio::spawn({
         let storage = storage.clone();
-        let solution2 = solution2.clone();
         async move {
-            rx.await.unwrap();
-            storage
-                .move_solutions_to_solved(&[hash(&solution2)])
-                .await
-                .unwrap();
+            while let Some(hashes) = rx.recv().await {
+                storage.move_solutions_to_solved(&hashes).await.unwrap();
+            }
         }
     });
 
-    let stream = storage.subscribe_blocks(None, None, None);
+    tx.send(hashes[0..1].to_vec()).await.unwrap();
+
+    let stream = storage.clone().subscribe_blocks(None, None, None);
     futures::pin_mut!(stream);
     let result = stream.next().await.unwrap().unwrap();
-    assert_eq!(result.solutions[0], solution);
+    assert_eq!(result.solutions[0], solutions[0]);
 
     let r = tokio::time::timeout(Duration::from_millis(50), stream.next()).await;
     assert!(r.is_err());
-    tx.send(()).unwrap();
+    tx.send(hashes[1..2].to_vec()).await.unwrap();
 
     let result = stream.next().await.unwrap().unwrap();
-    assert_eq!(result.solutions[0], solution2);
+    assert_eq!(result.solutions[0], solutions[1]);
+
+    // Move remaining solutions to solved in individual blocks
+    for i in 2..102 {
+        tx.send(hashes[i..i + 1].to_vec()).await.unwrap();
+        let result = stream.next().await.unwrap().unwrap();
+        assert_eq!(result.solutions[0], solutions[i]);
+    }
+
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(None, None, Some(1))
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].solutions[0], solutions[100]);
+    assert_eq!(results[1].solutions[0], solutions[101]);
+
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(None, Some(99), Some(0))
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].solutions[0], solutions[99]);
+    assert_eq!(results[1].solutions[0], solutions[100]);
+    assert_eq!(results[2].solutions[0], solutions[101]);
+
+    // List block num 1 and page 1
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(None, Some(1), Some(1))
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].solutions[0], solutions[101]);
+
+    // List block num 101
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(None, Some(101), Some(0))
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].solutions[0], solutions[101]);
+
+    // List empty block num
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(None, Some(200), None)
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert!(results.is_empty());
+
+    // List empty page
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(None, None, Some(2))
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert!(results.is_empty());
+
+    let time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+    let start = time - std::time::Duration::from_secs(100);
+
+    // List within start time
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(Some(start), None, None)
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(results.len(), 102);
+    for (i, result) in results.iter().enumerate() {
+        assert_eq!(result.solutions[0], solutions[i]);
+    }
+
+    // List within time and block num
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(Some(start), Some(2), None)
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(results.len(), 100);
+    for (i, result) in results.iter().enumerate() {
+        assert_eq!(result.solutions[0], solutions[i + 2]);
+    }
+
+    // List within time, block, page
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(Some(start), Some(1), Some(1))
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].solutions[0], solutions[101]);
+
+    // List outside time
+    let start = start + std::time::Duration::from_secs(200);
+    let results: Vec<_> = storage
+        .clone()
+        .subscribe_blocks(Some(start), None, None)
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert!(results.is_empty());
+
+    drop(tx);
 
     jh.await.unwrap();
 }
