@@ -461,7 +461,11 @@ async fn test_subscribe_blocks() {
 
     let response = client.get(a).send().await.unwrap();
     assert_eq!(response.status(), 200);
-    let result: Vec<_> = make_stream(response).take(2).try_collect().await.unwrap();
+    let result: Vec<_> = make_stream(response)
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].number, 0);
     assert_eq!(result[1].number, 1);
@@ -483,7 +487,11 @@ async fn test_subscribe_blocks() {
     let block = s.try_next().await.unwrap().unwrap();
     assert_eq!(block.number, 100);
 
-    let blocks: Vec<_> = s.take(98).try_collect().await.unwrap();
+    let blocks: Vec<_> = s
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
     assert_eq!(blocks.len(), 98);
     assert_eq!(blocks[97].number, 198);
 
@@ -494,7 +502,11 @@ async fn test_subscribe_blocks() {
     assert_eq!(response.status(), 200);
     let s = make_stream(response);
 
-    let blocks: Vec<_> = s.take(9).try_collect().await.unwrap();
+    let blocks: Vec<_> = s
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
     assert_eq!(blocks.len(), 9);
     assert_eq!(blocks[8].number, 198);
 
@@ -508,7 +520,11 @@ async fn test_subscribe_blocks() {
 
     let s = make_stream(response);
 
-    let blocks: Vec<_> = s.take(9).try_collect().await.unwrap();
+    let blocks: Vec<_> = s
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
     assert_eq!(blocks.len(), 9);
     assert_eq!(blocks[8].number, 198);
 
@@ -548,4 +564,183 @@ fn make_stream(response: reqwest::Response) -> impl futures::Stream<Item = anyho
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))),
     );
     FramedRead::new(stream, BlockDecoder {})
+}
+
+fn contract_with_salt(salt: Word) -> Contract {
+    let mut s = [0; 32];
+    s[0..8].copy_from_slice(&bytes_from_word(salt));
+    Contract {
+        predicates: vec![],
+        salt: s,
+    }
+}
+
+#[tokio::test]
+async fn test_subscribe_contracts() {
+    let contracts: Vec<_> = (0..200)
+        .map(contract_with_salt)
+        .map(|mut c| {
+            c.predicates.push(Predicate::empty());
+            c
+        })
+        .map(sign_contract_with_random_keypair)
+        .collect();
+
+    let mem = MemoryStorage::new();
+    mem.insert_contract(contracts[0].clone()).await.unwrap();
+
+    let TestServer {
+        client,
+        url,
+        shutdown,
+        jh,
+    } = setup_with_mem(mem.clone()).await;
+
+    let a = url.join("/subscribe-contracts").unwrap();
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let mut s = make_contract_stream(response);
+
+    let contract = s.try_next().await.unwrap().unwrap();
+    assert_eq!(contract, contracts[0].contract);
+
+    let r = tokio::time::timeout(Duration::from_millis(50), s.try_next()).await;
+    assert!(r.is_err());
+
+    for contract in &contracts[1..3] {
+        mem.insert_contract(contract.clone()).await.unwrap();
+    }
+
+    let result: Vec<_> = s
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+
+    for (contract, result) in contracts[1..3].iter().zip(result) {
+        assert_eq!(contract.contract, result);
+    }
+
+    let mut a = url.join("/subscribe-contracts").unwrap();
+    a.query_pairs_mut().append_pair("page", "0");
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let result: Vec<_> = make_contract_stream(response)
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+
+    assert_eq!(result.len(), 3);
+    for (contract, result) in contracts[0..3].iter().zip(result) {
+        assert_eq!(contract.contract, result);
+    }
+
+    let mut a = url.join("/subscribe-contracts").unwrap();
+    a.query_pairs_mut().append_pair("page", "1");
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let mut s = make_contract_stream(response);
+
+    let r = tokio::time::timeout(Duration::from_millis(50), s.try_next()).await;
+    assert!(r.is_err());
+
+    for contract in &contracts[3..] {
+        mem.insert_contract(contract.clone()).await.unwrap();
+    }
+
+    let contract = s.try_next().await.unwrap().unwrap();
+    assert_eq!(contract, contracts[100].contract);
+
+    let results: Vec<_> = s
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 99);
+    assert_eq!(results[98], contracts[199].contract);
+
+    let time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+    let start = time - std::time::Duration::from_secs(100);
+    let mut a = url.join("/subscribe-contracts").unwrap();
+    a.query_pairs_mut()
+        .append_pair("start", start.as_secs().to_string().as_str());
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+    let s = make_contract_stream(response);
+
+    let results: Vec<_> = s
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 200);
+    assert_eq!(results[199], contracts[199].contract);
+
+    let mut a = url.join("/subscribe-contracts").unwrap();
+    a.query_pairs_mut()
+        .append_pair("start", start.as_secs().to_string().as_str())
+        .append_pair("page", "1");
+
+    let response = client.get(a).send().await.unwrap();
+    assert_eq!(response.status(), 200);
+
+    let s = make_contract_stream(response);
+
+    let results: Vec<_> = s
+        .take_until(tokio::time::sleep(Duration::from_millis(50)))
+        .try_collect()
+        .await
+        .unwrap();
+    assert_eq!(results.len(), 100);
+    for (contract, result) in contracts[100..].iter().zip(results) {
+        assert_eq!(contract.contract, result);
+    }
+
+    shutdown.send(()).unwrap();
+    jh.await.unwrap().unwrap();
+}
+
+struct ContractDecoder {}
+
+impl Decoder for ContractDecoder {
+    type Item = Contract;
+    type Error = anyhow::Error;
+
+    fn decode(&mut self, buf: &mut bytes::BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let end = buf
+            .iter()
+            .zip(buf.iter().skip(1))
+            .position(|(&a, &b)| a == b'\n' && b == b'\n');
+
+        match end {
+            Some(end) => {
+                let s = std::str::from_utf8(&buf[..end])?;
+                let s = s.trim_start_matches("data: ").trim();
+                let contract = serde_json::from_str::<Contract>(s);
+                buf.advance(end + 2);
+                let Ok(contract) = contract else {
+                    return Ok(None);
+                };
+                Ok(Some(contract))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+fn make_contract_stream(
+    response: reqwest::Response,
+) -> impl futures::Stream<Item = anyhow::Result<Contract>> {
+    let stream = StreamReader::new(
+        response
+            .bytes_stream()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", e))),
+    );
+    FramedRead::new(stream, ContractDecoder {})
 }
