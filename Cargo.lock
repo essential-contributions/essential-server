@@ -789,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "essential-server-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "essential-types",
  "serde",
@@ -844,7 +844,7 @@ dependencies = [
 
 [[package]]
 name = "essential-transaction-storage"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "essential-hash",
