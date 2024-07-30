@@ -14,7 +14,8 @@ WHERE
         FROM
             batch
         WHERE
-            (
+            id > :block_number
+            AND (
                 created_at_seconds > :start_seconds
                 OR (
                     created_at_seconds = :start_seconds

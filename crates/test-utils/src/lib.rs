@@ -120,14 +120,14 @@ pub fn solution_with_all_inputs_fixed_size(i: usize, size: usize) -> Solution {
                     key: input.clone(),
                     value: input.clone()
                 };
-                i
+                size
             ],
             transient_data: vec![
                 Mutation {
                     key: input.clone(),
                     value: input.clone()
                 };
-                i
+                size
             ],
         }],
     }

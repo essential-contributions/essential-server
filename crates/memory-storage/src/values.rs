@@ -78,40 +78,53 @@ where
         .collect()
 }
 
-pub fn page_winning_blocks(
+pub fn page_blocks(
     blocks: &BTreeMap<Duration, super::Block>,
     solutions: &HashMap<essential_types::Hash, Solution>,
+    block_number_index: &HashMap<u64, Duration>,
     range: Option<Range<Duration>>,
+    block_number: Option<u64>,
     page: usize,
     page_size: usize,
 ) -> anyhow::Result<Vec<essential_types::Block>> {
     let start = page * page_size;
+    let block_number = block_number.unwrap_or(0);
+    let Some(block_number_time) = block_number_index.get(&block_number).copied() else {
+        return Ok(Vec::new());
+    };
+
     match range {
-        Some(range) => blocks
-            .range(range)
-            .skip(start)
-            .take(page_size)
-            .map(|(_, v)| v)
-            .map(|block| {
-                let super::Block {
-                    number,
-                    timestamp,
-                    hashes,
-                } = block;
-                let solutions = hashes
-                    .iter()
-                    .map(|h| solutions.get(h).cloned())
-                    .collect::<Option<Vec<_>>>()
-                    .ok_or_else(|| anyhow::anyhow!("Missing solution"))?;
-                Ok(essential_types::Block {
-                    number: *number,
-                    timestamp: *timestamp,
-                    solutions,
+        Some(range) => {
+            let range = range.start.max(block_number_time)..range.end;
+            if range.is_empty() {
+                return Ok(Vec::new());
+            }
+            blocks
+                .range(range)
+                .skip(start)
+                .take(page_size)
+                .map(|(_, v)| v)
+                .map(|block| {
+                    let super::Block {
+                        number,
+                        timestamp,
+                        hashes,
+                    } = block;
+                    let solutions = hashes
+                        .iter()
+                        .map(|h| solutions.get(h).cloned())
+                        .collect::<Option<Vec<_>>>()
+                        .ok_or_else(|| anyhow::anyhow!("Missing solution"))?;
+                    Ok(essential_types::Block {
+                        number: *number,
+                        timestamp: *timestamp,
+                        solutions,
+                    })
                 })
-            })
-            .collect(),
+                .collect()
+        }
         None => blocks
-            .iter()
+            .range(block_number_time..)
             .skip(start)
             .take(page_size)
             .map(|(_, v)| v)

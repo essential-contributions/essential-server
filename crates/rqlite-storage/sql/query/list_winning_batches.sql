@@ -13,6 +13,8 @@ WHERE
             id
         FROM
             batch
+        WHERE
+            id > :block_number
         ORDER BY
             id ASC
         LIMIT

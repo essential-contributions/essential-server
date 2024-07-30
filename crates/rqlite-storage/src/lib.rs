@@ -15,7 +15,7 @@ use essential_types::{
     contract::{Contract, SignedContract},
     Block, ContentAddress, Hash, Key, Word,
 };
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use std::{pin::Pin, sync::Arc, time::Duration};
 use thiserror::Error;
 
@@ -44,6 +44,7 @@ const MAX_DB_CONNECTIONS: usize = 400;
 pub struct RqliteStorage {
     http: Db,
     server: reqwest::Url,
+    streams: essential_storage::streams::Notify,
 }
 
 #[derive(Clone)]
@@ -112,6 +113,7 @@ impl RqliteStorage {
                 http: reqwest::Client::new(),
             },
             server: reqwest::Url::parse(server)?,
+            streams: essential_storage::streams::Notify::new(),
         };
         while let Err(err) = s.create_tables().await {
             #[cfg(feature = "tracing")]
@@ -363,7 +365,12 @@ impl Storage for RqliteStorage {
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
         let inserts: Vec<&[serde_json::Value]> = inserts.iter().map(|v| v.as_slice()).collect();
-        self.execute(&inserts[..]).await
+        let r = self.execute(&inserts[..]).await;
+
+        // Notify the streams of the new contract.
+        self.streams.notify_new_contracts();
+
+        r
     }
 
     async fn insert_solution_into_pool(
@@ -393,7 +400,12 @@ impl Storage for RqliteStorage {
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
         let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| v.as_slice()).collect();
-        self.execute(&sql[..]).await
+        let r = self.execute(&sql[..]).await;
+
+        // Notify the streams of the new blocks.
+        self.streams.notify_new_blocks();
+
+        r
     }
 
     async fn move_solutions_to_failed(
@@ -488,6 +500,34 @@ impl Storage for RqliteStorage {
         values::list_contracts(queries)
     }
 
+    fn subscribe_contracts(
+        self,
+        start_time: Option<Duration>,
+        start_page: Option<usize>,
+    ) -> impl futures::Stream<Item = anyhow::Result<Contract>> + Send + 'static {
+        let new_contracts = self.streams.subscribe_contracts();
+        let init = essential_storage::streams::StreamState::new(start_page, start_time, None);
+        futures::stream::unfold(init, move |state| {
+            let storage = self.clone();
+            essential_storage::streams::next_data(
+                new_contracts.clone(),
+                state,
+                PAGE_SIZE,
+                // List contracts expects a Range not a RangeFrom so we give it a range from
+                // start till the end of time.
+                move |get| {
+                    let storage = storage.clone();
+                    async move {
+                        storage
+                            .list_contracts(get.time.map(|s| s..Duration::MAX), Some(get.page))
+                            .await
+                    }
+                },
+            )
+        })
+        .flat_map(futures::stream::iter)
+    }
+
     async fn list_solutions_pool(
         &self,
         page: Option<usize>,
@@ -515,12 +555,15 @@ impl Storage for RqliteStorage {
     async fn list_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
+        block_number: Option<u64>,
         page: Option<usize>,
     ) -> anyhow::Result<Vec<Block>> {
         let page = page.unwrap_or(0);
+        let block_number = block_number.unwrap_or(0);
         let queries = match time_range {
             Some(range) => {
                 let sql = &[include_sql!(named "query/list_winning_batches_by_time.sql",
+                    "block_number" => block_number,
                     "page_size" => PAGE_SIZE,
                     "page_number" => page,
                     "start_seconds" => range.start.as_secs(),
@@ -532,12 +575,46 @@ impl Storage for RqliteStorage {
             }
             None => {
                 let sql = &[
-                    include_sql!(named "query/list_winning_batches.sql", "page_size" => PAGE_SIZE, "page_number" => page),
+                    include_sql!(named "query/list_winning_batches.sql", "block_number" => block_number, "page_size" => PAGE_SIZE, "page_number" => page),
                 ];
                 self.query_values(sql).await?
             }
         };
         values::list_blocks(queries)
+    }
+
+    fn subscribe_blocks(
+        self,
+        start_time: Option<Duration>,
+        block_number: Option<u64>,
+        start_page: Option<usize>,
+    ) -> impl futures::Stream<Item = anyhow::Result<Block>> + Send {
+        let new_blocks = self.streams.subscribe_blocks();
+        let init =
+            essential_storage::streams::StreamState::new(start_page, start_time, block_number);
+        futures::stream::unfold(init, move |state| {
+            let storage = self.clone();
+            essential_storage::streams::next_data(
+                new_blocks.clone(),
+                state,
+                PAGE_SIZE,
+                // List blocks expects a Range not a RangeFrom so we give it a range from
+                // start till the end of time.
+                move |get| {
+                    let storage = storage.clone();
+                    async move {
+                        storage
+                            .list_blocks(
+                                get.time.map(|s| s..Duration::MAX),
+                                get.number,
+                                Some(get.page),
+                            )
+                            .await
+                    }
+                },
+            )
+        })
+        .flat_map(futures::stream::iter)
     }
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {
@@ -573,6 +650,8 @@ impl Storage for RqliteStorage {
             Ok(Vec::new())
         };
 
+        let new_block = !solved.is_empty();
+
         let r = r.and_then(|mut sql| {
             let r = if !solved.is_empty() {
                 move_solutions_to_solved(solved)
@@ -597,7 +676,14 @@ impl Storage for RqliteStorage {
             // TODO: Is there a way to avoid this?
             // Maybe create an owned version of execute.
             let sql: Vec<&[serde_json::Value]> = sql.iter().map(|v| v.as_slice()).collect();
-            self.execute(&sql[..]).await
+            let r = self.execute(&sql[..]).await;
+
+            if new_block {
+                // Notify the streams of the new blocks.
+                self.streams.notify_new_blocks();
+            }
+
+            r
         }
     }
 }

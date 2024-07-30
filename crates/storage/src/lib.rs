@@ -15,6 +15,8 @@ use failed_solution::{FailedSolution, SolutionFailReason, SolutionOutcomes};
 
 /// Module for failed solution struct.
 pub mod failed_solution;
+/// Module for streams.
+pub mod streams;
 
 /// Data to commit after a block has been built.
 /// This data should all be committed atomically.
@@ -78,6 +80,15 @@ pub trait Storage: StateStorage {
         page: Option<usize>,
     ) -> impl Future<Output = anyhow::Result<Vec<Contract>>> + Send;
 
+    /// Subscribe to new contracts from a given start page or start time.
+    /// This will return all the contracts from that point then continue to stream
+    /// as new contracts are added.
+    fn subscribe_contracts(
+        self,
+        start_time: Option<Duration>,
+        start_page: Option<usize>,
+    ) -> impl futures::Stream<Item = anyhow::Result<Contract>> + Send + 'static;
+
     /// List all solutions in the pool.
     fn list_solutions_pool(
         &self,
@@ -94,8 +105,19 @@ pub trait Storage: StateStorage {
     fn list_blocks(
         &self,
         time_range: Option<Range<Duration>>,
+        block_number: Option<u64>,
         page: Option<usize>,
     ) -> impl Future<Output = anyhow::Result<Vec<Block>>> + Send;
+
+    /// Subscribe to new blocks from a given block number or start page or start time.
+    /// This will return all the blocks from that point then continue to stream
+    /// as new blocks are added.
+    fn subscribe_blocks(
+        self,
+        start_time: Option<Duration>,
+        block_number: Option<u64>,
+        start_page: Option<usize>,
+    ) -> impl futures::Stream<Item = anyhow::Result<Block>> + Send + 'static;
 
     /// Get failed solution and its failing reason.
     fn get_solution(

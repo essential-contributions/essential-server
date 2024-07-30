@@ -51,7 +51,7 @@ async fn test_run() {
         .unwrap();
     assert_eq!(post_state, vec![42]);
 
-    let blocks = storage.list_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].solutions.len(), 1);
     assert_eq!(blocks[0].solutions[0], solution);
@@ -64,7 +64,7 @@ async fn test_run() {
 
     run(&storage).await.unwrap();
 
-    let blocks = storage.list_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[1].solutions.len(), 1);
     assert!(blocks[1].solutions.iter().any(|s| s == &solution3));
@@ -104,7 +104,7 @@ async fn test_counter() {
         .unwrap();
     assert_eq!(post_state, vec![2]);
 
-    let blocks = storage.list_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None, None).await.unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].solutions.len(), 2);
     let solutions = &blocks[0].solutions;
@@ -122,7 +122,7 @@ async fn test_counter() {
         .unwrap();
     assert_eq!(post_state, vec![4]);
 
-    let blocks = storage.list_blocks(None, None).await.unwrap();
+    let blocks = storage.list_blocks(None, None, None).await.unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[1].solutions.len(), 2);
     let solutions = &blocks[1].solutions;

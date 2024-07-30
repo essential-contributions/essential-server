@@ -53,8 +53,15 @@ async fn test_readme_curl() {
 
     for c in &commands {
         let mut command = Command::new("curl");
+        let mut stream = false;
         for arg in c.iter().skip(1) {
+            if arg == "-N" {
+                stream = true;
+            }
             command.arg(arg);
+        }
+        if stream {
+            continue;
         }
         let output = command.output().await.unwrap();
         let s = String::from_utf8_lossy(&output.stdout);

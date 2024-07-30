@@ -11,7 +11,7 @@ use essential_types::{
     solution::Solution,
     ContentAddress, Hash, Key, PredicateAddress, Signature, Word,
 };
-use futures::future::FutureExt;
+use futures::{future::FutureExt, StreamExt};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     pin::Pin,
@@ -28,6 +28,7 @@ const PAGE_SIZE: usize = 100;
 #[derive(Clone)]
 pub struct MemoryStorage {
     inner: Arc<StdLock<Inner>>,
+    streams: essential_storage::streams::Notify,
 }
 
 impl Default for MemoryStorage {
@@ -48,6 +49,7 @@ struct Inner {
     solutions: HashMap<Hash, Solution>,
     /// Solved batches ordered by the time they were solved.
     solved: BTreeMap<Duration, Block>,
+    block_number_index: HashMap<u64, Duration>,
     solution_block_time_index: HashMap<Hash, Vec<Duration>>,
     state: HashMap<ContentAddress, BTreeMap<Key, Vec<Word>>>,
 }
@@ -102,6 +104,7 @@ impl MemoryStorage {
     pub fn new() -> Self {
         Self {
             inner: Arc::new(StdLock::new(Inner::default())),
+            streams: essential_storage::streams::Notify::new(),
         }
     }
 }
@@ -171,7 +174,7 @@ impl Storage for MemoryStorage {
             signature,
         };
         let time = SystemTime::now().duration_since(UNIX_EPOCH)?;
-        self.inner.apply(|i| {
+        let r = self.inner.apply(|i| {
             i.predicates.extend(data);
             let contains = i
                 .contracts
@@ -184,7 +187,11 @@ impl Storage for MemoryStorage {
             }
             i.state.entry(contract_addr).or_default();
             Ok(())
-        })
+        });
+
+        // There is a new contract.
+        self.streams.notify_new_contracts();
+        r
     }
 
     async fn insert_solution_into_pool(&self, solution: Solution) -> anyhow::Result<()> {
@@ -203,9 +210,17 @@ impl Storage for MemoryStorage {
     }
 
     async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
+        let new_block = !solutions.is_empty();
         let hashes: HashSet<_> = solutions.iter().collect();
-        self.inner
-            .apply(|i| move_solutions_to_solved(i, solutions, hashes))
+        let r = self
+            .inner
+            .apply(|i| move_solutions_to_solved(i, solutions, hashes));
+
+        if new_block {
+            // There is a new block.
+            self.streams.notify_new_blocks();
+        }
+        r
     }
 
     async fn move_solutions_to_failed(
@@ -276,6 +291,34 @@ impl Storage for MemoryStorage {
         }
     }
 
+    fn subscribe_contracts(
+        self,
+        start_time: Option<Duration>,
+        start_page: Option<usize>,
+    ) -> impl futures::Stream<Item = anyhow::Result<Contract>> + Send + 'static {
+        let new_contracts = self.streams.subscribe_contracts();
+        let init = essential_storage::streams::StreamState::new(start_page, start_time, None);
+        futures::stream::unfold(init, move |state| {
+            let storage = self.clone();
+            essential_storage::streams::next_data(
+                new_contracts.clone(),
+                state,
+                PAGE_SIZE,
+                // List contracts expects a Range not a RangeFrom so we give it a range from
+                // start till the end of time.
+                move |get| {
+                    let storage = storage.clone();
+                    async move {
+                        storage
+                            .list_contracts(get.time.map(|s| s..Duration::MAX), Some(get.page))
+                            .await
+                    }
+                },
+            )
+        })
+        .flat_map(futures::stream::iter)
+    }
+
     async fn list_solutions_pool(&self, page: Option<usize>) -> anyhow::Result<Vec<Solution>> {
         Ok(self.inner.apply(|i| {
             let iter = i
@@ -324,12 +367,55 @@ impl Storage for MemoryStorage {
     async fn list_blocks(
         &self,
         time_range: Option<std::ops::Range<std::time::Duration>>,
+        block_number: Option<u64>,
         page: Option<usize>,
     ) -> anyhow::Result<Vec<essential_types::Block>> {
         let page = page.unwrap_or(0);
         self.inner.apply(|i| {
-            values::page_winning_blocks(&i.solved, &i.solutions, time_range, page, PAGE_SIZE)
+            values::page_blocks(
+                &i.solved,
+                &i.solutions,
+                &i.block_number_index,
+                time_range,
+                block_number,
+                page,
+                PAGE_SIZE,
+            )
         })
+    }
+
+    fn subscribe_blocks(
+        self,
+        start_time: Option<Duration>,
+        block_number: Option<u64>,
+        start_page: Option<usize>,
+    ) -> impl futures::Stream<Item = anyhow::Result<essential_types::Block>> + Send + 'static {
+        let new_blocks = self.streams.subscribe_blocks();
+        let init =
+            essential_storage::streams::StreamState::new(start_page, start_time, block_number);
+        futures::stream::unfold(init, move |state| {
+            let storage = self.clone();
+            essential_storage::streams::next_data(
+                new_blocks.clone(),
+                state,
+                PAGE_SIZE,
+                // List blocks expects a Range not a RangeFrom so we give it a range from
+                // start till the end of time.
+                move |get| {
+                    let storage = storage.clone();
+                    async move {
+                        storage
+                            .list_blocks(
+                                get.time.map(|s| s..Duration::MAX),
+                                get.number,
+                                Some(get.page),
+                            )
+                            .await
+                    }
+                },
+            )
+        })
+        .flat_map(futures::stream::iter)
     }
 
     async fn get_solution(&self, solution_hash: Hash) -> anyhow::Result<Option<SolutionOutcomes>> {
@@ -391,12 +477,21 @@ impl Storage for MemoryStorage {
         let hashes: HashSet<_> = failed.iter().map(|(h, _)| h).collect();
         let solved_hashes: HashSet<_> = solved.iter().collect();
         let r = self.inner.apply(|i| {
+            let new_block = !solved_hashes.is_empty();
             move_solutions_to_failed(i, failed, hashes)?;
             move_solutions_to_solved(i, solved, solved_hashes)?;
             update_state_batch(i, state_updates);
-            Ok(())
+            Ok(new_block)
         });
-        async { r }
+
+        if let Ok(r) = &r {
+            if *r {
+                // There is a new block.
+                self.streams.notify_new_blocks();
+            }
+        }
+
+        async { r.map(|_| ()) }
     }
 }
 
@@ -469,12 +564,13 @@ fn move_solutions_to_solved(
         .cloned()
         .collect();
     let number = i.solved.len() as u64;
-    let batch = Block {
+    let block = Block {
         number,
         timestamp,
         hashes: solutions,
     };
-    i.solved.insert(timestamp, batch);
+    i.solved.insert(timestamp, block);
+    i.block_number_index.insert(number, timestamp);
     Ok(())
 }
 

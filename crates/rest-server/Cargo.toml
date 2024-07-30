@@ -35,9 +35,10 @@ tracing-subscriber = { workspace = true, optional = true, features = [
 essential-hash = { workspace = true }
 essential-state-read-vm = { workspace = true }
 essential-storage = { workspace = true }
-reqwest = { workspace = true, features = ["json"] }
+reqwest = { workspace = true, features = ["json", "stream"] }
 serde_json = { workspace = true }
 test-utils = { workspace = true }
+tokio-util.workspace = true
 
 [features]
 default = ["tracing"]

@@ -11,4 +11,6 @@ repository.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 essential-types = { workspace = true }
+futures.workspace = true
 serde = { workspace = true }
+tokio.workspace = true
