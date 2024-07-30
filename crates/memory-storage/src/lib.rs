@@ -301,6 +301,9 @@ impl Storage for MemoryStorage {
         futures::stream::unfold(init, move |state| {
             let storage = self.clone();
             essential_storage::streams::next_data(
+                new_contracts.clone(),
+                state,
+                PAGE_SIZE,
                 // List contracts expects a Range not a RangeFrom so we give it a range from
                 // start till the end of time.
                 move |get| {
@@ -311,9 +314,6 @@ impl Storage for MemoryStorage {
                             .await
                     }
                 },
-                new_contracts.clone(),
-                state,
-                PAGE_SIZE,
             )
         })
         .flat_map(futures::stream::iter)
@@ -396,6 +396,9 @@ impl Storage for MemoryStorage {
         futures::stream::unfold(init, move |state| {
             let storage = self.clone();
             essential_storage::streams::next_data(
+                new_blocks.clone(),
+                state,
+                PAGE_SIZE,
                 // List blocks expects a Range not a RangeFrom so we give it a range from
                 // start till the end of time.
                 move |get| {
@@ -410,9 +413,6 @@ impl Storage for MemoryStorage {
                             .await
                     }
                 },
-                new_blocks.clone(),
-                state,
-                PAGE_SIZE,
             )
         })
         .flat_map(futures::stream::iter)

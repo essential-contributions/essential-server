@@ -52,10 +52,10 @@ struct Start {
 
 /// Get the next data in the stream.
 pub async fn next_data<F, Fut, D>(
-    get_data: F,
     mut new_data: NewData,
     state: StreamState,
     page_size: usize,
+    get_data: F,
 ) -> Option<(Vec<anyhow::Result<D>>, StreamState)>
 where
     F: Fn(GetData) -> Fut,

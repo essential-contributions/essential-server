@@ -9,29 +9,24 @@ use super::*;
 async fn test_err() {
     let notify = Notify::new();
     let rx = notify.subscribe_contracts();
-    let (result, state) = next_data::<_, _, ()>(
-        |_| async { Err(anyhow::anyhow!("error")) },
-        rx.clone(),
-        StreamState::default(),
-        100,
-    )
-    .await
-    .unwrap();
+    let (result, state) =
+        next_data::<_, _, ()>(rx.clone(), StreamState::default(), 100, |_| async {
+            Err(anyhow::anyhow!("error"))
+        })
+        .await
+        .unwrap();
 
     assert_eq!(result.len(), 1);
     assert!(result[0].is_err());
 
-    let result = next_data::<_, _, ()>(
-        |_| async { Err(anyhow::anyhow!("error")) },
-        rx.clone(),
-        state.clone(),
-        100,
-    )
+    let result = next_data::<_, _, ()>(rx.clone(), state.clone(), 100, |_| async {
+        Err(anyhow::anyhow!("error"))
+    })
     .await;
     assert!(result.is_none());
 
     let result =
-        next_data::<_, _, ()>(|_| async { Ok(vec![()]) }, rx.clone(), state.clone(), 100).await;
+        next_data::<_, _, ()>(rx.clone(), state.clone(), 100, |_| async { Ok(vec![()]) }).await;
     assert!(result.is_none());
 }
 
@@ -41,20 +36,16 @@ async fn no_data() {
     let rx = notify.subscribe_contracts();
     let num = Arc::new(AtomicUsize::new(0));
     notify.notify_new_contracts();
-    let (result, state) = next_data::<_, _, ()>(
-        |_| async {
+    let (result, state) =
+        next_data::<_, _, ()>(rx.clone(), StreamState::default(), 100, |_| async {
             if num.fetch_add(1, Ordering::SeqCst) == 0 {
                 Ok(vec![])
             } else {
                 Ok(vec![()])
             }
-        },
-        rx.clone(),
-        StreamState::default(),
-        100,
-    )
-    .await
-    .unwrap();
+        })
+        .await
+        .unwrap();
 
     assert_eq!(result.len(), 1);
     assert!(result[0].is_ok());
@@ -72,12 +63,9 @@ async fn no_data() {
 async fn page_calc() {
     let notify = Notify::new();
     let rx = notify.subscribe_contracts();
-    let (result, state) = next_data::<_, _, ()>(
-        |_| async { Ok(vec![()]) },
-        rx.clone(),
-        StreamState::default(),
-        3,
-    )
+    let (result, state) = next_data::<_, _, ()>(rx.clone(), StreamState::default(), 3, |_| async {
+        Ok(vec![()])
+    })
     .await
     .unwrap();
 
@@ -92,7 +80,7 @@ async fn page_calc() {
     );
 
     let (result, state) =
-        next_data::<_, _, ()>(|_| async { Ok(vec![(); 3]) }, rx.clone(), state, 3)
+        next_data::<_, _, ()>(rx.clone(), state, 3, |_| async { Ok(vec![(); 3]) })
             .await
             .unwrap();
 
@@ -107,7 +95,7 @@ async fn page_calc() {
     );
 
     let (result, state) =
-        next_data::<_, _, ()>(|_| async { Ok(vec![(); 3]) }, rx.clone(), state, 3)
+        next_data::<_, _, ()>(rx.clone(), state, 3, |_| async { Ok(vec![(); 3]) })
             .await
             .unwrap();
 
@@ -121,28 +109,23 @@ async fn page_calc() {
         }
     );
 
-    let (_, state) = next_data::<_, _, ()>(|_| async { Ok(vec![(); 2]) }, rx.clone(), state, 3)
+    let (_, state) = next_data::<_, _, ()>(rx.clone(), state, 3, |_| async { Ok(vec![(); 2]) })
         .await
         .unwrap();
 
     let num = Arc::new(AtomicUsize::new(0));
     notify.notify_new_contracts();
-    let (result, state) = next_data::<_, _, ()>(
-        |get| {
-            let num = num.clone();
-            async move {
-                assert_eq!(get.page, 2);
-                if num.fetch_add(1, Ordering::SeqCst) == 0 {
-                    Ok(vec![(); 2])
-                } else {
-                    Ok(vec![(); 3])
-                }
+    let (result, state) = next_data::<_, _, ()>(rx.clone(), state, 3, |get| {
+        let num = num.clone();
+        async move {
+            assert_eq!(get.page, 2);
+            if num.fetch_add(1, Ordering::SeqCst) == 0 {
+                Ok(vec![(); 2])
+            } else {
+                Ok(vec![(); 3])
             }
-        },
-        rx.clone(),
-        state,
-        3,
-    )
+        }
+    })
     .await
     .unwrap();
 
@@ -156,28 +139,23 @@ async fn page_calc() {
         }
     );
 
-    let (_, state) = next_data::<_, _, ()>(|_| async { Ok(vec![(); 1]) }, rx.clone(), state, 3)
+    let (_, state) = next_data::<_, _, ()>(rx.clone(), state, 3, |_| async { Ok(vec![(); 1]) })
         .await
         .unwrap();
 
     let num = Arc::new(AtomicUsize::new(0));
     notify.notify_new_contracts();
-    let (result, state) = next_data::<_, _, ()>(
-        |get| {
-            let num = num.clone();
-            async move {
-                assert_eq!(get.page, 3);
-                if num.fetch_add(1, Ordering::SeqCst) == 0 {
-                    Ok(vec![(); 1])
-                } else {
-                    Ok(vec![(); 2])
-                }
+    let (result, state) = next_data::<_, _, ()>(rx.clone(), state, 3, |get| {
+        let num = num.clone();
+        async move {
+            assert_eq!(get.page, 3);
+            if num.fetch_add(1, Ordering::SeqCst) == 0 {
+                Ok(vec![(); 1])
+            } else {
+                Ok(vec![(); 2])
             }
-        },
-        rx.clone(),
-        state,
-        3,
-    )
+        }
+    })
     .await
     .unwrap();
 
@@ -197,19 +175,16 @@ async fn ordering() {
     let notify = Notify::new();
     let rx = notify.subscribe_contracts();
 
-    let (result, state) = next_data::<_, _, _>(
-        |_| async { Ok(vec![1]) },
-        rx.clone(),
-        StreamState::default(),
-        3,
-    )
+    let (result, state) = next_data::<_, _, _>(rx.clone(), StreamState::default(), 3, |_| async {
+        Ok(vec![1])
+    })
     .await
     .unwrap();
 
     assert_eq!(result.len(), 1);
     assert_eq!(*result[0].as_ref().unwrap(), 1);
 
-    let (result, _) = next_data::<_, _, _>(|_| async { Ok(vec![1, 2, 3]) }, rx.clone(), state, 3)
+    let (result, _) = next_data::<_, _, _>(rx.clone(), state, 3, |_| async { Ok(vec![1, 2, 3]) })
         .await
         .unwrap();
 
