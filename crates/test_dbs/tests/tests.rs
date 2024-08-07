@@ -140,7 +140,7 @@ async fn solutions<S: Storage>(storage: S) {
     assert!(result.contains(&solution2));
 
     storage
-        .move_solutions_to_solved(&[hash(&solution)])
+        .move_solutions_to_solved(0, Duration::from_secs(0), &[hash(&solution)])
         .await
         .unwrap();
 
@@ -163,7 +163,7 @@ async fn solutions<S: Storage>(storage: S) {
         .unwrap();
 
     storage
-        .move_solutions_to_solved(&[hash(&solution2), hash(&solution3)])
+        .move_solutions_to_solved(1, Duration::from_secs(1), &[hash(&solution2), hash(&solution3)])
         .await
         .unwrap();
 
@@ -216,6 +216,9 @@ async fn solutions<S: Storage>(storage: S) {
 create_test!(subscribe_blocks);
 
 async fn subscribe_blocks<S: Storage + Clone + Send + Sync + 'static>(storage: S) {
+    let time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
     let solutions: Vec<_> = (0..102)
         .map(|i| solution_with_all_inputs_fixed_size(i, 1))
         .collect();
@@ -234,8 +237,10 @@ async fn subscribe_blocks<S: Storage + Clone + Send + Sync + 'static>(storage: S
     let jh = tokio::spawn({
         let storage = storage.clone();
         async move {
+            let mut i = 0;
             while let Some(hashes) = rx.recv().await {
-                storage.move_solutions_to_solved(&hashes).await.unwrap();
+                storage.move_solutions_to_solved(i, time + Duration::from_secs(i), &hashes).await.unwrap();
+                i += 1;
             }
         }
     });
@@ -326,9 +331,6 @@ async fn subscribe_blocks<S: Storage + Clone + Send + Sync + 'static>(storage: S
         .unwrap();
     assert!(results.is_empty());
 
-    let time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap();
     let start = time - std::time::Duration::from_secs(100);
 
     // List within start time
@@ -449,7 +451,7 @@ async fn double_get_solution_bug<S: Storage>(storage: S) {
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 1);
 
-    storage.move_solutions_to_solved(&[hash]).await.unwrap();
+    storage.move_solutions_to_solved(0, Duration::from_secs(1), &[hash]).await.unwrap();
 
     let result = storage.get_solution(hash).await.unwrap().unwrap();
     assert_eq!(result.outcome, vec![CheckOutcome::Success(0)]);
@@ -473,7 +475,7 @@ async fn double_get_solution_bug<S: Storage>(storage: S) {
     let result = storage.get_solution(hash).await.unwrap().unwrap();
     assert_eq!(result.outcome, vec![CheckOutcome::Success(0)]);
 
-    storage.move_solutions_to_solved(&[hash]).await.unwrap();
+    storage.move_solutions_to_solved(1, Duration::from_secs(2), &[hash]).await.unwrap();
 
     let result = storage.get_solution(hash).await.unwrap().unwrap();
     assert_eq!(
@@ -504,7 +506,7 @@ async fn list_solutions_pool_order<S: Storage>(storage: S) {
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result, solutions);
 
-    storage.move_solutions_to_solved(&hashes).await.unwrap();
+    storage.move_solutions_to_solved(0, Duration::from_secs(1), &hashes).await.unwrap();
 
     for solution in solutions.iter().rev() {
         storage
