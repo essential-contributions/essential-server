@@ -209,12 +209,17 @@ impl Storage for MemoryStorage {
         Ok(())
     }
 
-    async fn move_solutions_to_solved(&self, solutions: &[Hash]) -> anyhow::Result<()> {
+    async fn move_solutions_to_solved(
+        &self,
+        block_number: u64,
+        block_timestamp: Duration,
+        solutions: &[Hash],
+    ) -> anyhow::Result<()> {
         let new_block = !solutions.is_empty();
         let hashes: HashSet<_> = solutions.iter().collect();
-        let r = self
-            .inner
-            .apply(|i| move_solutions_to_solved(i, solutions, hashes));
+        let r = self.inner.apply(|i| {
+            move_solutions_to_solved(i, block_number, block_timestamp, solutions, hashes)
+        });
 
         if new_block {
             // There is a new block.
@@ -473,13 +478,15 @@ impl Storage for MemoryStorage {
             failed,
             solved,
             state_updates,
+            block_number,
+            block_timestamp,
         } = data;
         let hashes: HashSet<_> = failed.iter().map(|(h, _)| h).collect();
         let solved_hashes: HashSet<_> = solved.iter().collect();
         let r = self.inner.apply(|i| {
             let new_block = !solved_hashes.is_empty();
             move_solutions_to_failed(i, failed, hashes)?;
-            move_solutions_to_solved(i, solved, solved_hashes)?;
+            move_solutions_to_solved(i, block_number, block_timestamp, solved, solved_hashes)?;
             update_state_batch(i, state_updates);
             Ok(new_block)
         });
@@ -492,6 +499,25 @@ impl Storage for MemoryStorage {
         }
 
         async { r.map(|_| ()) }
+    }
+
+    async fn get_latest_block(&self) -> anyhow::Result<Option<essential_types::Block>> {
+        let r = self.inner.apply(|i| match i.solved.last_key_value() {
+            Some((_, block)) => {
+                let solutions = block
+                    .hashes
+                    .iter()
+                    .map(|h| i.solutions.get(h).cloned())
+                    .collect::<Option<Vec<_>>>()?;
+                Some(essential_types::Block {
+                    number: block.number,
+                    timestamp: block.timestamp,
+                    solutions,
+                })
+            }
+            None => None,
+        });
+        Ok(r)
     }
 }
 
@@ -530,6 +556,8 @@ fn move_solutions_to_failed(
 
 fn move_solutions_to_solved(
     i: &mut Inner,
+    block_number: u64,
+    block_timestamp: Duration,
     solutions: &[Hash],
     hashes: HashSet<&Hash>,
 ) -> Result<(), anyhow::Error> {
@@ -541,9 +569,7 @@ fn move_solutions_to_solved(
         return Ok(());
     }
 
-    let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
-
-    if i.solved.contains_key(&timestamp) {
+    if i.solved.contains_key(&block_timestamp) {
         bail!("Two blocks created at the same time");
     }
 
@@ -556,21 +582,21 @@ fn move_solutions_to_solved(
         i.solution_block_time_index
             .entry(*hash)
             .or_default()
-            .push(timestamp);
+            .push(block_timestamp);
     }
     let solutions = solutions
         .iter()
         .filter(|h| i.solution_pool.remove(*h))
         .cloned()
         .collect();
-    let number = i.solved.len() as u64;
+
     let block = Block {
-        number,
-        timestamp,
+        number: block_number,
+        timestamp: block_timestamp,
         hashes: solutions,
     };
-    i.solved.insert(timestamp, block);
-    i.block_number_index.insert(number, timestamp);
+    i.solved.insert(block_timestamp, block);
+    i.block_number_index.insert(block_number, block_timestamp);
     Ok(())
 }
 

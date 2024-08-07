@@ -132,7 +132,7 @@ async fn insert_solution_into_pool<S: Storage>(storage: S) {
     assert_eq!(solutions.len(), 1);
     assert_eq!(hash(&solutions[0].data), hash(&Solution::empty()));
     storage
-        .move_solutions_to_solved(&[hash(&Solution::empty())])
+        .move_solutions_to_solved(0, Default::default(), &[hash(&Solution::empty())])
         .await
         .unwrap();
     let solutions = storage.list_solutions_pool(None).await.unwrap();

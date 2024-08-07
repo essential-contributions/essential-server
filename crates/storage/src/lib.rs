@@ -21,6 +21,10 @@ pub mod streams;
 /// Data to commit after a block has been built.
 /// This data should all be committed atomically.
 pub struct CommitData<'a> {
+    /// Block number
+    pub block_number: u64,
+    /// Block timestamp
+    pub block_timestamp: Duration,
     /// Failed solutions
     pub failed: &'a [(Hash, SolutionFailReason)],
     /// Solved solutions
@@ -48,6 +52,8 @@ pub trait Storage: StateStorage {
     /// Move these solutions from the pool to the solved state.
     fn move_solutions_to_solved(
         &self,
+        block_number: u64,
+        block_timestamp: Duration,
         solutions: &[Hash],
     ) -> impl Future<Output = anyhow::Result<()>> + Send;
 
@@ -124,6 +130,11 @@ pub trait Storage: StateStorage {
         &self,
         solution_hash: Hash,
     ) -> impl std::future::Future<Output = anyhow::Result<Option<SolutionOutcomes>>> + Send;
+
+    /// Get latest block.
+    fn get_latest_block(
+        &self,
+    ) -> impl std::future::Future<Output = anyhow::Result<Option<Block>>> + Send;
 
     /// Prune failed solutions that failed before the provided duration.
     fn prune_failed_solutions(

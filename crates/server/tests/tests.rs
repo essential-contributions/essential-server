@@ -21,7 +21,7 @@ where
         predicate: predicate_address,
     };
 
-    let server = essential_server::Essential::new(s, Default::default());
+    let server = essential_server::Essential::new(s, Default::default(), Default::default());
     let config = essential_server::Config {
         run_loop_interval: Duration::from_millis(100),
     };

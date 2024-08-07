@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use essential_storage::{
     failed_solution::{CheckOutcome, FailedSolution, SolutionFailReason},
     CommitData, Storage,
@@ -124,7 +126,10 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
     }
 
     // Move none
-    storage.move_solutions_to_solved(&[]).await.unwrap();
+    storage
+        .move_solutions_to_solved(0, Duration::from_secs(1), &[])
+        .await
+        .unwrap();
 
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 10);
@@ -135,7 +140,7 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
 
     // Move some
     storage
-        .move_solutions_to_solved(&hashes[3..5])
+        .move_solutions_to_solved(0, Duration::from_secs(1), &hashes[3..5])
         .await
         .unwrap();
 
@@ -150,7 +155,10 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
 
     // Move missing hash is noop
     let hash = essential_hash::hash(&solution_with_all_inputs(11));
-    storage.move_solutions_to_solved(&[hash]).await.unwrap();
+    storage
+        .move_solutions_to_solved(10, Duration::from_secs(10), &[hash])
+        .await
+        .unwrap();
 
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert_eq!(result.len(), 8);
@@ -159,7 +167,7 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
 
     // Move some with missing hash
     storage
-        .move_solutions_to_solved(&[hashes[9], hash])
+        .move_solutions_to_solved(1, Duration::from_secs(2), &[hashes[9], hash])
         .await
         .unwrap();
 
@@ -174,7 +182,10 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
     assert_eq!(&result[1].solutions[..], &solutions[9..10]);
 
     // Move all
-    storage.move_solutions_to_solved(&hashes).await.unwrap();
+    storage
+        .move_solutions_to_solved(2, Duration::from_secs(3), &hashes)
+        .await
+        .unwrap();
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
     let result = storage.list_blocks(None, None, None).await.unwrap();
@@ -186,7 +197,10 @@ async fn move_solutions_to_solved<S: Storage>(storage: S) {
     assert_eq!(&result[2].solutions[3..7], &solutions[5..9]);
 
     // Move all again is noop
-    storage.move_solutions_to_solved(&hashes).await.unwrap();
+    storage
+        .move_solutions_to_solved(3, Duration::from_secs(4), &hashes)
+        .await
+        .unwrap();
     let result = storage.list_solutions_pool(None).await.unwrap();
     assert!(result.is_empty());
     let result = storage.list_blocks(None, None, None).await.unwrap();
@@ -470,9 +484,13 @@ async fn list_blocks<S: Storage>(storage: S) {
             .unwrap();
     }
 
+    let time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap();
+
     // Move one
     storage
-        .move_solutions_to_solved(&hashes[0..1])
+        .move_solutions_to_solved(0, time, &hashes[0..1])
         .await
         .unwrap();
 
@@ -485,7 +503,11 @@ async fn list_blocks<S: Storage>(storage: S) {
     // Move rest
     for i in 1..102 {
         storage
-            .move_solutions_to_solved(&hashes[i..i + 1])
+            .move_solutions_to_solved(
+                i as u64,
+                time + Duration::from_secs(i as u64 + 1),
+                &hashes[i..i + 1],
+            )
             .await
             .unwrap();
     }
@@ -567,11 +589,8 @@ async fn list_blocks<S: Storage>(storage: S) {
     assert_eq!(result.len(), 0);
 
     // List within time
-    let time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap();
-    let start = time - std::time::Duration::from_secs(100);
-    let end = time + std::time::Duration::from_secs(100);
+    let start = time - std::time::Duration::from_secs(200);
+    let end = time + std::time::Duration::from_secs(200);
 
     let result = storage
         .list_blocks(Some(start..end), None, None)
@@ -654,7 +673,7 @@ async fn get_solution<S: Storage>(storage: S) {
     }
 
     storage
-        .move_solutions_to_solved(&hashes[1..2])
+        .move_solutions_to_solved(0, Duration::from_secs(1), &hashes[1..2])
         .await
         .unwrap();
     storage
@@ -700,7 +719,7 @@ async fn get_solution<S: Storage>(storage: S) {
     }
 
     storage
-        .move_solutions_to_solved(&hashes[2..3])
+        .move_solutions_to_solved(1, Duration::from_secs(2), &hashes[2..3])
         .await
         .unwrap();
     storage
@@ -718,7 +737,7 @@ async fn get_solution<S: Storage>(storage: S) {
     }
 
     storage
-        .move_solutions_to_solved(&hashes[1..2])
+        .move_solutions_to_solved(2, Duration::from_secs(3), &hashes[1..2])
         .await
         .unwrap();
     storage
@@ -731,24 +750,25 @@ async fn get_solution<S: Storage>(storage: S) {
 
     // Get existing solution in solved
     let result = storage.get_solution(hashes[1]).await.unwrap().unwrap();
+    eprintln!("{:?}", result);
     assert_eq!(result.solution, solutions[1]);
     assert_eq!(result.outcome.len(), 3);
     assert_eq!(result.outcome[0], CheckOutcome::Success(0));
+    assert_eq!(result.outcome[1], CheckOutcome::Success(2));
     assert_eq!(
-        result.outcome[1],
+        result.outcome[2],
         CheckOutcome::Fail(SolutionFailReason::NotComposable)
     );
-    assert_eq!(result.outcome[2], CheckOutcome::Success(2));
 
     // Get existing solution in failed
     let result = storage.get_solution(hashes[2]).await.unwrap().unwrap();
     assert_eq!(result.solution, solutions[2]);
     assert_eq!(result.outcome.len(), 3);
+    assert_eq!(result.outcome[0], CheckOutcome::Success(1));
     assert_eq!(
-        result.outcome[0],
+        result.outcome[1],
         CheckOutcome::Fail(SolutionFailReason::NotComposable)
     );
-    assert_eq!(result.outcome[1], CheckOutcome::Success(1));
     assert_eq!(
         result.outcome[2],
         CheckOutcome::Fail(SolutionFailReason::NotComposable)
@@ -821,6 +841,8 @@ async fn commit_block<S: Storage>(storage: S) {
         failed: &failed,
         solved: &solved,
         state_updates: Box::new(state_updates),
+        block_number: 0,
+        block_timestamp: Duration::from_secs(1),
     };
     storage.commit_block(data).await.unwrap();
 

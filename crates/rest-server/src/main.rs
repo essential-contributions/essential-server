@@ -1,9 +1,10 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use clap::{Parser, ValueEnum};
 use essential_memory_storage::MemoryStorage;
 use essential_rest_server::Config;
 use essential_rqlite_storage::RqliteStorage;
+use essential_server::TimeConfig;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -25,12 +26,21 @@ struct Cli {
     rqlite_address: String,
 
     #[arg(long)]
-    /// Enable tracing.
+    /// Disable tracing.
     disable_tracing: bool,
 
     #[arg(long, short)]
     /// Frequency at which to run the main loop in seconds.
     loop_freq: Option<u64>,
+
+    #[arg(long)]
+    /// Disable time being included in state for each block.
+    disable_time: bool,
+
+    #[arg(long)]
+    /// Allow anyone to submit time solutions which update the time state.
+    /// By default the server will block any solutions that try to update the time state.
+    allow_time_submission: bool,
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -48,8 +58,14 @@ async fn main() {
         rqlite_address,
         disable_tracing,
         loop_freq,
+        disable_time,
+        allow_time_submission,
     } = Cli::parse();
     let (local_addr, local_addr_rx) = tokio::sync::oneshot::channel();
+    let time_config = Arc::new(TimeConfig {
+        enable_time: !disable_time,
+        allow_time_submissions: allow_time_submission,
+    });
     let check_config = Default::default();
     if !disable_tracing {
         #[cfg(feature = "tracing")]
@@ -74,14 +90,16 @@ async fn main() {
         match db {
             Db::Memory => {
                 let storage = MemoryStorage::new();
-                let essential = essential_server::Essential::new(storage, check_config);
+                let essential =
+                    essential_server::Essential::new(storage, check_config, time_config);
                 essential_rest_server::run(essential, address, local_addr, None, config).await
             }
             Db::Rqlite => {
                 let storage = RqliteStorage::new(&rqlite_address)
                     .await
                     .expect("Failed to connect to rqlite");
-                let essential = essential_server::Essential::new(storage, check_config);
+                let essential =
+                    essential_server::Essential::new(storage, check_config, time_config);
                 essential_rest_server::run(essential, address, local_addr, None, config).await
             }
         }

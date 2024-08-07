@@ -263,7 +263,9 @@ async fn test_list_winning_blocks() {
 
     let mem = MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
-    mem.move_solutions_to_solved(&[hash]).await.unwrap();
+    mem.move_solutions_to_solved(0, Duration::from_secs(1), &[hash])
+        .await
+        .unwrap();
 
     let TestServer {
         client,
@@ -291,7 +293,9 @@ async fn test_solution_outcome() {
 
     let mem = MemoryStorage::new();
     mem.insert_solution_into_pool(solution).await.unwrap();
-    mem.move_solutions_to_solved(&[ca.0]).await.unwrap();
+    mem.move_solutions_to_solved(0, Duration::from_secs(1), &[ca.0])
+        .await
+        .unwrap();
 
     let TestServer {
         client,
@@ -425,7 +429,9 @@ async fn test_subscribe_blocks() {
             .await
             .unwrap();
     }
-    mem.move_solutions_to_solved(&hashes[0..1]).await.unwrap();
+    mem.move_solutions_to_solved(0, Duration::from_secs(1), &hashes[0..1])
+        .await
+        .unwrap();
 
     let TestServer {
         client,
@@ -447,7 +453,9 @@ async fn test_subscribe_blocks() {
     let r = tokio::time::timeout(Duration::from_millis(50), s.try_next()).await;
     assert!(r.is_err());
 
-    mem.move_solutions_to_solved(&hashes[1..3]).await.unwrap();
+    mem.move_solutions_to_solved(1, Duration::from_secs(2), &hashes[1..3])
+        .await
+        .unwrap();
 
     let block = s.try_next().await.unwrap().unwrap();
     assert_eq!(block.number, 1);
@@ -480,8 +488,10 @@ async fn test_subscribe_blocks() {
     let r = tokio::time::timeout(Duration::from_millis(50), s.try_next()).await;
     assert!(r.is_err());
 
-    for hash in &hashes[3..] {
-        mem.move_solutions_to_solved(&[*hash]).await.unwrap();
+    for (i, hash) in hashes[3..].iter().enumerate() {
+        mem.move_solutions_to_solved(i as u64 + 2, Duration::from_secs(i as u64 + 3), &[*hash])
+            .await
+            .unwrap();
     }
 
     let block = s.try_next().await.unwrap().unwrap();

@@ -493,3 +493,25 @@ pub fn assert_row_changed(
     );
     Ok(())
 }
+
+pub fn get_latest_block(QueryValues { queries }: QueryValues) -> anyhow::Result<Option<Block>> {
+    // Only expecting a single query.
+    let rows = match &queries[..] {
+        [Some(Rows { rows })] => rows,
+        [None] => return Ok(None),
+        _ => bail!("expected a single query {:?}", queries),
+    };
+
+    // If the query isn't empty there should be at least one row.
+    if rows.is_empty() {
+        bail!("expected at least one row")
+    }
+
+    // Map the rows to blocks.
+    let r = rows
+        .iter()
+        .try_fold(BTreeMap::new(), |map, Columns { columns }| {
+            map_solution_to_block(map, columns)
+        });
+    Ok(r?.into_values().next())
+}
