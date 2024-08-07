@@ -24,6 +24,7 @@ use solution::read::read_contract_from_storage;
 use std::{collections::HashMap, ops::Range, sync::Arc, time::Duration};
 
 mod deploy;
+mod protocol;
 mod query_state_reads;
 mod run;
 mod solution;
@@ -39,6 +40,7 @@ where
     // Currently only check-related config, though we may want to add a
     // top-level `Config` type for other kinds of configuration (e.g. gas costs).
     config: Arc<CheckPredicateConfig>,
+    time_config: Arc<TimeConfig>,
 }
 
 #[derive(Debug, Clone)]
@@ -48,10 +50,26 @@ pub struct Config {
     pub run_loop_interval: Duration,
 }
 
+#[derive(Debug, Clone)]
+/// Time configuration.
+pub struct TimeConfig {
+    pub enable_time: bool,
+    pub allow_time_submissions: bool,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             run_loop_interval: run::RUN_LOOP_FREQUENCY,
+        }
+    }
+}
+
+impl Default for TimeConfig {
+    fn default() -> Self {
+        Self {
+            enable_time: true,
+            allow_time_submissions: false,
         }
     }
 }
@@ -64,8 +82,16 @@ where
     <S as StateRead>::Future: Send,
     <S as StateRead>::Error: Send,
 {
-    pub fn new(storage: S, config: Arc<CheckPredicateConfig>) -> Self {
-        Self { storage, config }
+    pub fn new(
+        storage: S,
+        config: Arc<CheckPredicateConfig>,
+        time_config: Arc<TimeConfig>,
+    ) -> Self {
+        Self {
+            storage,
+            config,
+            time_config,
+        }
     }
 
     pub fn spawn(self, config: Config) -> anyhow::Result<Handle>
@@ -79,7 +105,13 @@ where
     }
 
     pub async fn run(&self, shutdown: Shutdown, run_loop_interval: Duration) -> anyhow::Result<()> {
-        run::run(&self.storage, shutdown, run_loop_interval).await
+        run::run(
+            &self.storage,
+            shutdown,
+            run_loop_interval,
+            &self.time_config,
+        )
+        .await
     }
 
     pub async fn deploy_contract(
@@ -135,6 +167,7 @@ where
     }
 
     pub async fn submit_solution(&self, solution: Solution) -> anyhow::Result<ContentAddress> {
+        solution::filter_solution(&self.time_config, &solution)?;
         solution::submit_solution(&self.storage, solution).await
     }
 

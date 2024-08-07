@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
+use std::sync::Arc;
+
 use essential_memory_storage::MemoryStorage;
 use essential_rest_server::run;
+use essential_server::TimeConfig;
 use reqwest::{Client, ClientBuilder};
 
 static SERVER: &str = "localhost:0";
@@ -23,7 +26,14 @@ pub async fn setup_with_mem(mem: MemoryStorage) -> TestServer {
     let (tx, rx) = tokio::sync::oneshot::channel();
     let (shutdown, shutdown_rx) = tokio::sync::oneshot::channel();
     let jh = tokio::task::spawn(async {
-        let essential = essential_server::Essential::new(mem, config);
+        let essential = essential_server::Essential::new(
+            mem,
+            config,
+            Arc::new(TimeConfig {
+                enable_time: false,
+                ..Default::default()
+            }),
+        );
         run(essential, SERVER, tx, Some(shutdown_rx), Default::default()).await
     });
     let client = ClientBuilder::new()

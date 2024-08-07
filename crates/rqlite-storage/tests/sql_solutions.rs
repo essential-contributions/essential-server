@@ -594,6 +594,27 @@ fn test_batch_paging() {
             (43, "solution85".to_string(), 42 * 100, 42 * 100,),
         ]
     );
+
+    let result = query(
+        &conn,
+        include_sql!("query", "get_latest_block"),
+        [],
+        |row| {
+            (
+                row.get::<_, usize>(0).unwrap(),
+                row.get::<_, String>(1).unwrap(),
+                row.get::<_, usize>(2).unwrap(),
+                row.get::<_, usize>(3).unwrap(),
+            )
+        },
+    );
+    assert_eq!(
+        result,
+        vec![
+            (1000, "solution1998".to_string(), 99900, 99900),
+            (1000, "solution1999".to_string(), 99900, 99900),
+        ]
+    );
 }
 
 #[test]
