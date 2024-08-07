@@ -33,7 +33,7 @@ where
 pub(crate) fn apply_mutations<S>(
     storage: &mut TransactionStorage<S>,
     solution: &Solution,
-) -> anyhow::Result<()>
+)
 where
     S: StateStorage,
 {
@@ -46,7 +46,6 @@ where
             );
         }
     }
-    Ok(())
 }
 
 /// Given the pre_state and a solution, produce the post_state with all proposed
@@ -60,7 +59,7 @@ where
     S: Clone + StateStorage,
 {
     let mut post_state = pre_state.clone();
-    apply_mutations(&mut post_state, solution)?;
+    apply_mutations(&mut post_state, solution);
     Ok(post_state)
 }
 

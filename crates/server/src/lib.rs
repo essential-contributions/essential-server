@@ -29,6 +29,7 @@ mod run;
 mod solution;
 #[cfg(test)]
 mod test_utils;
+mod protocol;
 
 #[derive(Clone)]
 pub struct Essential<S>

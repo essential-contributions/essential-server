@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use essential_server::{SolutionOutcome, StateRead, Storage};
-use essential_types::{predicate::Predicate, PredicateAddress};
+use essential_types::{predicate::Predicate, ContentAddress, PredicateAddress};
 use test_dbs::create_test;
 use test_utils::{empty::Empty, sign_contract_with_random_keypair, solution_with_predicate};
 
@@ -69,6 +69,15 @@ where
     assert!(&blocks[1].solutions.contains(&solution));
     assert_eq!(outcome.len(), 2, "{:?}", outcome);
     assert_eq!(outcome[1], SolutionOutcome::Success(1));
+
+    let block_state = ContentAddress([
+        138, 134, 113, 142, 32, 7, 99, 223, 137, 73, 161, 77, 9, 238, 223, 211, 39, 160, 246, 55,
+        113, 92, 110, 195, 111, 175, 12, 255, 83, 70, 187, 242,
+    ]);
+
+    let number = server.query_state(&block_state, &vec![0]).await.unwrap();
+    let time = server.query_state(&block_state, &vec![1]).await.unwrap();
+    dbg!(number, time);
 
     handle.shutdown().await.unwrap();
 }

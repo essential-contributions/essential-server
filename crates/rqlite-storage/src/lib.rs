@@ -389,13 +389,15 @@ impl Storage for RqliteStorage {
 
     async fn move_solutions_to_solved(
         &self,
+        block_number: u64,
+        block_timestamp: Duration,
         solutions: &[essential_types::Hash],
     ) -> anyhow::Result<()> {
         if solutions.is_empty() {
             return Ok(());
         }
 
-        let sql = move_solutions_to_solved(solutions)?;
+        let sql = move_solutions_to_solved(block_number, block_timestamp, solutions)?;
 
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
@@ -643,6 +645,8 @@ impl Storage for RqliteStorage {
             failed,
             solved,
             state_updates,
+            block_number,
+            block_timestamp,
         } = data;
         let r = if !failed.is_empty() {
             move_solutions_to_failed(failed)
@@ -654,7 +658,7 @@ impl Storage for RqliteStorage {
 
         let r = r.and_then(|mut sql| {
             let r = if !solved.is_empty() {
-                move_solutions_to_solved(solved)
+                move_solutions_to_solved(block_number, block_timestamp, solved)
             } else {
                 Ok(Vec::new())
             };
@@ -686,6 +690,12 @@ impl Storage for RqliteStorage {
             r
         }
     }
+    
+    async fn get_latest_block(
+        &self,
+    ) -> anyhow::Result<Option<Block>> {
+        todo!()
+    }
 }
 
 fn move_solutions_to_failed(
@@ -711,12 +721,16 @@ fn move_solutions_to_failed(
         .collect())
 }
 
-fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
+fn move_solutions_to_solved(
+    block_number: u64,
+    block_timestamp: Duration,
+    solutions: &[Hash],
+) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
     if solutions.is_empty() {
         return Ok(Vec::new());
     }
-    let created_at = std::time::SystemTime::now();
-    let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
+    // let created_at = std::time::SystemTime::now();
+    // let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
     let inserts = solutions.iter().flat_map(|hash| {
         let hash = encode(hash);
         [
@@ -726,8 +740,8 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
     });
     let mut sql = vec![include_sql!(
         owned "insert/batch.sql",
-        unix_time.as_secs(),
-        unix_time.subsec_nanos()
+        block_timestamp.as_secs(),
+        block_timestamp.subsec_nanos()
     )];
     sql.extend(inserts);
     sql.push(include_sql!(owned "update/delete_empty_batch.sql"));
