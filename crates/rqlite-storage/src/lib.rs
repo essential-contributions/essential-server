@@ -721,8 +721,17 @@ fn move_solutions_to_failed(
         .collect())
 }
 
+/// Note that block_number is not actually used.
+/// It's not atomic to read the previous block number then increment it
+/// and use it in the next database write.
+///
+/// We could make the insert take the block number but it would introduce a lot
+/// of complexity and have potential to break if two servers are writing to the same database.
+/// We don't have a use case where multiple servers produces blocks so
+/// it could be ok to use the value that's passed in but this is probably better
+/// addressed in the block builder.
 fn move_solutions_to_solved(
-    block_number: u64,
+    _block_number: u64,
     block_timestamp: Duration,
     solutions: &[Hash],
 ) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
