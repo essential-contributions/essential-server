@@ -389,13 +389,15 @@ impl Storage for RqliteStorage {
 
     async fn move_solutions_to_solved(
         &self,
+        block_number: u64,
+        block_timestamp: Duration,
         solutions: &[essential_types::Hash],
     ) -> anyhow::Result<()> {
         if solutions.is_empty() {
             return Ok(());
         }
 
-        let sql = move_solutions_to_solved(solutions)?;
+        let sql = move_solutions_to_solved(block_number, block_timestamp, solutions)?;
 
         // TODO: Is there a way to avoid this?
         // Maybe create an owned version of execute.
@@ -643,6 +645,8 @@ impl Storage for RqliteStorage {
             failed,
             solved,
             state_updates,
+            block_number,
+            block_timestamp,
         } = data;
         let r = if !failed.is_empty() {
             move_solutions_to_failed(failed)
@@ -654,7 +658,7 @@ impl Storage for RqliteStorage {
 
         let r = r.and_then(|mut sql| {
             let r = if !solved.is_empty() {
-                move_solutions_to_solved(solved)
+                move_solutions_to_solved(block_number, block_timestamp, solved)
             } else {
                 Ok(Vec::new())
             };
@@ -686,6 +690,12 @@ impl Storage for RqliteStorage {
             r
         }
     }
+
+    async fn get_latest_block(&self) -> anyhow::Result<Option<Block>> {
+        let sql = &[include_sql!("query/get_latest_block.sql")];
+        let queries = self.query_values(sql).await?;
+        values::get_latest_block(queries)
+    }
 }
 
 fn move_solutions_to_failed(
@@ -711,12 +721,23 @@ fn move_solutions_to_failed(
         .collect())
 }
 
-fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
+/// Note that block_number is not actually used.
+/// It's not atomic to read the previous block number then increment it
+/// and use it in the next database write.
+///
+/// We could make the insert take the block number but it would introduce a lot
+/// of complexity and have potential to break if two servers are writing to the same database.
+/// We don't have a use case where multiple servers produces blocks so
+/// it could be ok to use the value that's passed in but this is probably better
+/// addressed in the block builder.
+fn move_solutions_to_solved(
+    _block_number: u64,
+    block_timestamp: Duration,
+    solutions: &[Hash],
+) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
     if solutions.is_empty() {
         return Ok(Vec::new());
     }
-    let created_at = std::time::SystemTime::now();
-    let unix_time = created_at.duration_since(std::time::UNIX_EPOCH)?;
     let inserts = solutions.iter().flat_map(|hash| {
         let hash = encode(hash);
         [
@@ -726,8 +747,8 @@ fn move_solutions_to_solved(solutions: &[Hash]) -> anyhow::Result<Vec<Vec<serde_
     });
     let mut sql = vec![include_sql!(
         owned "insert/batch.sql",
-        unix_time.as_secs(),
-        unix_time.subsec_nanos()
+        block_timestamp.as_secs(),
+        block_timestamp.subsec_nanos()
     )];
     sql.extend(inserts);
     sql.push(include_sql!(owned "update/delete_empty_batch.sql"));

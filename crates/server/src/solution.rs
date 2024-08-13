@@ -4,6 +4,8 @@ use essential_transaction_storage::TransactionStorage;
 use essential_types::{predicate::Predicate, solution::Solution, ContentAddress, PredicateAddress};
 use std::{collections::HashMap, sync::Arc};
 
+use crate::TimeConfig;
+
 pub(crate) mod read;
 #[cfg(test)]
 mod tests;
@@ -30,10 +32,7 @@ where
 }
 
 /// Apply mutations proposed by the given `solution` to the given `storage`.
-pub(crate) fn apply_mutations<S>(
-    storage: &mut TransactionStorage<S>,
-    solution: &Solution,
-) -> anyhow::Result<()>
+pub(crate) fn apply_mutations<S>(storage: &mut TransactionStorage<S>, solution: &Solution)
 where
     S: StateStorage,
 {
@@ -46,7 +45,6 @@ where
             );
         }
     }
-    Ok(())
 }
 
 /// Given the pre_state and a solution, produce the post_state with all proposed
@@ -60,7 +58,7 @@ where
     S: Clone + StateStorage,
 {
     let mut post_state = pre_state.clone();
-    apply_mutations(&mut post_state, solution)?;
+    apply_mutations(&mut post_state, solution);
     Ok(post_state)
 }
 
@@ -87,5 +85,19 @@ pub fn contains_all_contract(
             .all(|data| predicates.contains_key(&data.predicate_to_solve)),
         "All predicates must be in the contracts"
     );
+    Ok(())
+}
+
+pub(crate) fn filter_solution(time_config: &TimeConfig, solution: &Solution) -> anyhow::Result<()> {
+    if time_config.enable_time && !time_config.allow_time_submissions {
+        let block_state_address = crate::protocol::block_state_contract_address();
+        if solution
+            .data
+            .iter()
+            .any(|data| data.predicate_to_solve.contract == block_state_address)
+        {
+            anyhow::bail!("Block state solutions are blocked");
+        }
+    }
     Ok(())
 }

@@ -21,7 +21,9 @@ where
     let (tx, rx) = tokio::sync::oneshot::channel();
     let shutdown = super::Shutdown(rx);
     let s = storage.clone();
-    let jh = tokio::spawn(async move { super::run(&s, shutdown, RUN_LOOP_FREQUENCY).await });
+    let jh = tokio::spawn(async move {
+        super::run(&s, shutdown, RUN_LOOP_FREQUENCY, &Default::default()).await
+    });
     tokio::time::sleep(Duration::from_millis(100)).await;
     tx.send(()).unwrap();
     jh.await?
