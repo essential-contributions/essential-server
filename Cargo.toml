@@ -51,7 +51,7 @@ essential-memory-storage = { path = "crates/memory-storage", version = "0.3.0" }
 essential-rqlite-storage = { path = "crates/rqlite-storage", version = "0.3.0" }
 essential-server = { path = "crates/server", version = "0.3.0" }
 essential-server-types = { path = "crates/types", version = "0.2.0" }
-essential-storage = { path = "crates/storage", version = "0.2.0" }
+essential-storage = { path = "crates/storage", version = "0.3.0" }
 essential-transaction-storage = { path = "crates/transaction-storage", version = "0.3.0" }
 test-dbs = { path = "crates/test_dbs" }
 test-utils = { path = "crates/test-utils" }
