@@ -14,3 +14,22 @@
 [actions-url]:https://github.com/essential-contributions/essential-server/actions
 
 A centralized server implementation of the Essential declarative protocol. This crate is responsible for building blocks and managing the core functionality of the Essential application, serving as the backbone for the entire system.
+
+## Block State Contract
+The server uses a special contract to store state about the blocks. Currently this includes time and block number.
+If you want to query this state you can do the following:
+```pint
+interface BlockState {
+    storage {
+        number: int,
+        time: int,
+    }
+}
+
+predicate MyPredicate {
+    interface Block = BlockState(0x920257E92B09C8A818BC03966E8EB5971E250D6EED4C0DF550E8928DD048E859);
+
+    state time = Block::time;
+    state number = Block::number;
+}
+```
