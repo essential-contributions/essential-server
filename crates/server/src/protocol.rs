@@ -56,12 +56,22 @@ pub(crate) fn block_state_solution(l1_block_number: u64, l1_block_timestamp: u64
 }
 
 #[test]
-#[ignore]
 fn print_time_address() {
     let block_state_address = block_state_contract_address();
     let words = essential_types::convert::word_4_from_u8_32(block_state_address.0);
 
+    let readme = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"));
+
     println!("{:?}", block_state_address);
     println!("{}", block_state_address);
     println!("{:?}", words);
+
+    let readme_addr = readme
+        .split("BlockState(")
+        .nth(1)
+        .unwrap()
+        .split(')')
+        .next()
+        .unwrap();
+    assert_eq!(readme_addr, format!("0x{}", block_state_address));
 }

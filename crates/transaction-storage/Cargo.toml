@@ -1,6 +1,6 @@
 [package]
 name = "essential-transaction-storage"
-version = "0.2.0"
+version = "0.3.0"
 description = "A transaction storage abstraction for the Essential server"
 edition.workspace = true
 authors.workspace = true
