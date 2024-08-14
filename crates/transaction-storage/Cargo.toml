@@ -19,6 +19,6 @@ imbl = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-essential-memory-storage = { workspace = true }
+essential-memory-storage = { path = "../memory-storage" }
 test-utils = { workspace = true }
 tokio = { workspace = true }
