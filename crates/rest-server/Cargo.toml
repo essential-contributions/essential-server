@@ -1,6 +1,6 @@
 [package]
 name = "essential-rest-server"
-version = "0.3.0"
+version = "0.4.0"
 description = "A REST server that wraps Essential server and exposes it's functionality"
 edition.workspace = true
 authors.workspace = true

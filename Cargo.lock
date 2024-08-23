@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "essential-rest-server"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -763,7 +763,7 @@ dependencies = [
 
 [[package]]
 name = "essential-server"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "essential-check",

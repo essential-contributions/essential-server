@@ -23,7 +23,7 @@ pub(crate) fn block_state_contract() -> Contract {
 
 pub(crate) fn block_state_contract_address() -> ContentAddress {
     let contract = block_state_contract();
-    essential_hash::content_addr(&contract)
+    essential_hash::contract_addr::from_contract(&contract)
 }
 
 pub(crate) fn block_state_solution(l1_block_number: u64, l1_block_timestamp: u64) -> Solution {
