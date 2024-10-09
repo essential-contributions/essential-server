@@ -21,8 +21,6 @@ pub mod ser;
 /// Utility and gas used as a result of checking a solution's state transitions.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct CheckSolutionOutput {
-    /// The utility of the solution.
-    pub utility: f64,
     /// The gas used by the solution.
     pub gas: u64,
 }
@@ -30,6 +28,7 @@ pub struct CheckSolutionOutput {
 /// The outcome of a solution, that is:
 /// - Utility if the solution was included in a block.
 /// - Failure reason if solution failed constraint checking or was not composable with other solutions.
+///
 /// This may be a stringified `SolutionFailReason`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub enum SolutionOutcome {

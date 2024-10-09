@@ -4,7 +4,7 @@ use essential_types::{
     contract::Contract,
     predicate::Predicate,
     solution::{Mutation, Solution, SolutionData},
-    ContentAddress, PredicateAddress, Word,
+    PredicateAddress, Word,
 };
 use test_utils::{empty::Empty, sign_contract_with_random_keypair, solution_with_predicate};
 
@@ -40,7 +40,7 @@ pub async fn deploy_predicate_to_storage(
     storage: MemoryStorage,
     predicate: Predicate,
 ) -> (PredicateAddress, MemoryStorage) {
-    let predicate_hash = ContentAddress(essential_hash::hash(&predicate));
+    let predicate_hash = essential_hash::content_addr(&predicate);
     let predicate = sign_contract_with_random_keypair(vec![predicate]);
     let result = deploy(&storage, predicate).await.unwrap();
     (
@@ -75,7 +75,7 @@ pub fn test_predicate(salt: Word) -> Predicate {
     // Program to read state slot 0.
     predicate.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
         essential_state_read_vm::asm::Stack::Push(1).into(),
-        essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+        essential_state_read_vm::asm::StateMemory::AllocSlots.into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
@@ -87,22 +87,25 @@ pub fn test_predicate(salt: Word) -> Predicate {
         essential_state_read_vm::asm::TotalControlFlow::Halt.into(),
     ])
     .collect()];
+    use essential_constraint_vm::asm::short::*;
     // Program to check pre-mutation value is None and
     // post-mutation value is 42 at slot 0.
     predicate.constraints = vec![essential_constraint_vm::asm::to_bytes(vec![
-        essential_constraint_vm::asm::Stack::Push(salt).into(), // Salt
-        essential_constraint_vm::asm::Stack::Pop.into(),
-        essential_constraint_vm::asm::Stack::Push(0).into(), // slot
-        essential_constraint_vm::asm::Stack::Push(0).into(), // pre
-        essential_constraint_vm::asm::Access::StateLen.into(),
-        essential_constraint_vm::asm::Stack::Push(0).into(),
-        essential_constraint_vm::asm::Pred::Eq.into(),
-        essential_constraint_vm::asm::Stack::Push(0).into(), // slot
-        essential_constraint_vm::asm::Stack::Push(1).into(), // post
-        essential_constraint_vm::asm::Access::State.into(),
-        essential_constraint_vm::asm::Stack::Push(42).into(),
-        essential_constraint_vm::asm::Pred::Eq.into(),
-        essential_constraint_vm::asm::Pred::And.into(),
+        PUSH(salt),
+        POP,
+        PUSH(0), // slot
+        PUSH(0), // pre
+        SLEN,
+        PUSH(0),
+        EQ,
+        PUSH(0), // slot
+        PUSH(0), // value_ix
+        PUSH(1), // len
+        PUSH(1), // post
+        STATE,
+        PUSH(42),
+        EQ,
+        AND,
     ])
     .collect()];
     predicate
@@ -133,7 +136,7 @@ pub fn counter_predicate(salt: Word) -> Predicate {
     let mut predicate = Predicate::empty();
     predicate.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
         essential_state_read_vm::asm::Stack::Push(1).into(),
-        essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+        essential_state_read_vm::asm::StateMemory::AllocSlots.into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
@@ -165,17 +168,27 @@ pub fn counter_predicate(salt: Word) -> Predicate {
         // If state is empty then it won't push anything on the stack.
         essential_constraint_vm::asm::Stack::Push(0).into(),
         essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Access::StateLen.into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
         essential_constraint_vm::asm::Access::State.into(),
         essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Alu::Add.into(),
         essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Access::State.into(),
         essential_constraint_vm::asm::Pred::Eq.into(),
         // Check the final value matches the dec var
         essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Access::DecisionVar.into(),
         essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(0).into(),
+        essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Stack::Push(1).into(),
         essential_constraint_vm::asm::Access::State.into(),
         essential_constraint_vm::asm::Pred::Eq.into(),

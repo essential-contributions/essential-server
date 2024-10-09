@@ -14,7 +14,6 @@ pub(crate) fn block_state_contract() -> Contract {
     let predicates = vec![Predicate {
         state_read: vec![],
         constraints: vec![],
-        directive: essential_types::predicate::Directive::Satisfy,
     }];
 
     let salt = essential_hash::hash(&"block-state-contract");

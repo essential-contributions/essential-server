@@ -6,7 +6,7 @@ use crate::{
 use essential_memory_storage::MemoryStorage;
 use essential_state_read_vm::StateRead;
 use essential_storage::{QueryState, Storage};
-use essential_types::{predicate::Predicate, ContentAddress, PredicateAddress, Word};
+use essential_types::{predicate::Predicate, PredicateAddress, Word};
 use std::time::Duration;
 use test_utils::{empty::Empty, sign_contract_with_random_keypair};
 
@@ -136,7 +136,7 @@ fn state_read_error_predicate(salt: Word) -> Predicate {
     let mut predicate = Predicate::empty();
     predicate.state_read = vec![essential_state_read_vm::asm::to_bytes(vec![
         essential_state_read_vm::asm::Stack::Push(1).into(),
-        essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+        essential_state_read_vm::asm::StateMemory::AllocSlots.into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
         essential_state_read_vm::asm::Stack::Push(0).into(),
@@ -187,7 +187,7 @@ async fn test_tracing() {
     let predicate: Predicate = state_read_error_predicate(1);
 
     let storage = MemoryStorage::default();
-    let predicate_hash = ContentAddress(essential_hash::hash(&predicate));
+    let predicate_hash = essential_hash::content_addr(&predicate);
     let contract = sign_contract_with_random_keypair(vec![predicate]);
     let result = deploy(&storage, contract).await.unwrap();
     let predicate_address = PredicateAddress {

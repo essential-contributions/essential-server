@@ -198,7 +198,7 @@ async fn test_query_state_reads() {
 
     let read_key: Vec<u8> = essential_state_read_vm::asm::to_bytes(vec![
         essential_state_read_vm::asm::Stack::Push(1).into(),
-        essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+        essential_state_read_vm::asm::StateMemory::AllocSlots.into(),
         essential_state_read_vm::asm::Stack::Push(addr_words[0]).into(),
         essential_state_read_vm::asm::Stack::Push(addr_words[1]).into(),
         essential_state_read_vm::asm::Stack::Push(addr_words[2]).into(),
@@ -353,13 +353,7 @@ async fn test_check_solution() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(
-        value,
-        CheckSolutionOutput {
-            utility: 1.0,
-            gas: 0
-        }
-    );
+    assert_eq!(value, CheckSolutionOutput { gas: 0 });
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();
@@ -404,13 +398,7 @@ async fn test_check_solution_with_data() {
         .unwrap()
         .unwrap();
 
-    assert_eq!(
-        value,
-        CheckSolutionOutput {
-            utility: 1.0,
-            gas: 0
-        }
-    );
+    assert_eq!(value, CheckSolutionOutput { gas: 0 });
 
     shutdown.send(()).unwrap();
     jh.await.unwrap().unwrap();

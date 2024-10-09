@@ -510,7 +510,7 @@ impl Storage for MemoryStorage {
                     .map(|h| i.solutions.get(h).cloned())
                     .collect::<Option<Vec<_>>>()?;
                 Some(essential_types::Block {
-                    number: block.number,
+                    number: block.number as Word,
                     timestamp: block.timestamp,
                     solutions,
                 })

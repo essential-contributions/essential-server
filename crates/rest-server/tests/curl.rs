@@ -65,7 +65,7 @@ async fn test_readme_curl() {
         }
         let output = command.output().await.unwrap();
         let s = String::from_utf8_lossy(&output.stdout);
-        assert!(!s.contains("failed") && !s.contains("Failed"));
+        assert!(!s.contains("failed") && !s.contains("Failed") && !s.contains("null"));
         assert!(output.status.success());
     }
 

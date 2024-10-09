@@ -5,7 +5,7 @@ use std::{
 };
 
 use essential_types::{
-    contract::Contract, predicate::Predicate, solution::Solution, ContentAddress,
+    contract::Contract, predicate::Predicate, solution::Solution, ContentAddress, Word,
 };
 
 use crate::ContractWithAddresses;
@@ -116,7 +116,7 @@ pub fn page_blocks(
                         .collect::<Option<Vec<_>>>()
                         .ok_or_else(|| anyhow::anyhow!("Missing solution"))?;
                     Ok(essential_types::Block {
-                        number: *number,
+                        number: *number as Word,
                         timestamp: *timestamp,
                         solutions,
                     })
@@ -140,7 +140,7 @@ pub fn page_blocks(
                     .collect::<Option<Vec<_>>>()
                     .ok_or_else(|| anyhow::anyhow!("Missing solution"))?;
                 Ok(essential_types::Block {
-                    number: *number,
+                    number: *number as Word,
                     timestamp: *timestamp,
                     solutions,
                 })

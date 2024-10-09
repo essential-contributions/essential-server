@@ -233,7 +233,7 @@ fn test_paging_blocks() {
             (
                 *d,
                 essential_types::Block {
-                    number: b.number,
+                    number: b.number as Word,
                     timestamp: *d,
                     solutions: b.hashes.iter().map(|h| solutions[h].clone()).collect(),
                 },

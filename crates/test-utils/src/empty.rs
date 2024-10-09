@@ -1,5 +1,5 @@
 use essential_types::{
-    predicate::{Directive, Predicate},
+    predicate::Predicate,
     solution::{Solution, SolutionData},
     ContentAddress, PredicateAddress,
 };
@@ -15,7 +15,6 @@ impl Empty for Predicate {
         Self {
             state_read: Default::default(),
             constraints: Default::default(),
-            directive: Directive::Satisfy,
         }
     }
 }

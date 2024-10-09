@@ -35,7 +35,7 @@ impl TestRqlite {
             .arg("-raft-log-level")
             .arg("TRACE")
             .arg("-fk")
-            .arg(&format!("{}", temp_dir.path().display()))
+            .arg(format!("{}", temp_dir.path().display()))
             .kill_on_drop(true)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

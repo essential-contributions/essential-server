@@ -27,7 +27,7 @@ interface BlockState {
 }
 
 predicate MyPredicate {
-    interface Block = BlockState(0xF745D1D91B68080CF398556DDD611B620964D2B1974C0283F03AC7C142B394DF);
+    interface Block = BlockState(0x25DC61C2401BB814A31F0DCAAC310368CCC804B83042377B1DD709E436B3081E);
 
     state time = Block::time;
     state number = Block::number;

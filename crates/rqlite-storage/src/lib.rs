@@ -333,7 +333,7 @@ impl Storage for RqliteStorage {
 
         // For each predicate, insert the predicate and the contract pairing.
         let contract = contract.contract.iter().flat_map(|predicate| {
-            let hash = encode(&essential_hash::content_addr(&predicate));
+            let hash = encode(&essential_hash::content_addr(predicate));
             let predicate = encode(&predicate);
             [
                 include_sql!(

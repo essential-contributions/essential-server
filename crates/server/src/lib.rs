@@ -4,10 +4,7 @@
 //! For an executable implementation of the Essential server, see the
 //! `essential-rest-server` crate.
 
-use essential_check::{
-    self as check,
-    solution::{CheckPredicateConfig, Utility},
-};
+use essential_check::{self as check, solution::CheckPredicateConfig};
 pub use essential_server_types::{CheckSolutionOutput, SolutionOutcome};
 pub use essential_state_read_vm::{Gas, StateRead};
 use essential_storage::failed_solution::CheckOutcome;
@@ -127,9 +124,9 @@ where
         let transaction = self.storage.clone().transaction();
         let solution = Arc::new(solution);
         let config = self.config.clone();
-        let (_post_state, utility, gas) =
+        let (_post_state, gas) =
             checked_state_transition(&transaction, solution, &contract, config).await?;
-        Ok(CheckSolutionOutput { utility, gas })
+        Ok(CheckSolutionOutput { gas })
     }
 
     pub async fn check_solution_with_contracts(
@@ -161,9 +158,9 @@ where
         let transaction = self.storage.clone().transaction();
         let config = self.config.clone();
         let solution = Arc::new(solution);
-        let (_post_state, utility, gas) =
+        let (_post_state, gas) =
             checked_state_transition(&transaction, solution, &predicates, config).await?;
-        Ok(CheckSolutionOutput { utility, gas })
+        Ok(CheckSolutionOutput { gas })
     }
 
     pub async fn submit_solution(&self, solution: Solution) -> anyhow::Result<ContentAddress> {
@@ -281,7 +278,7 @@ pub(crate) async fn checked_state_transition<S>(
     solution: Arc<Solution>,
     contract: &HashMap<PredicateAddress, Arc<Predicate>>,
     config: Arc<check::solution::CheckPredicateConfig>,
-) -> anyhow::Result<(TransactionStorage<S>, Utility, Gas)>
+) -> anyhow::Result<(TransactionStorage<S>, Gas)>
 where
     S: Storage + StateRead + Clone + Send + Sync + 'static,
 {
@@ -295,9 +292,9 @@ where
     // We only need read-only access to pre and post state during validation.
     let pre = pre_state.view();
     let post = post_state.view();
-    let (util, gas) =
+    let gas =
         check::solution::check_predicates(&pre, &post, solution.clone(), get_predicate, config)
             .await?;
 
-    Ok((post_state, util, gas))
+    Ok((post_state, gas))
 }

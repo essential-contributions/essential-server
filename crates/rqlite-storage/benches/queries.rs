@@ -406,7 +406,7 @@ fn insert_predicate(conn: &Connection, contract: SignedContract) -> ContentAddre
     .unwrap();
 
     for predicate in &contract.contract.predicates {
-        let hash = encode(&essential_hash::content_addr(&predicate));
+        let hash = encode(&essential_hash::content_addr(predicate));
         conn.execute(
             include_sql!("insert", "predicates"),
             [encode(predicate), hash.clone()],

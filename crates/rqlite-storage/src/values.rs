@@ -348,7 +348,7 @@ fn map_solution_to_block(
                     };
                     map.entry(batch_id)
                         .or_insert_with(|| Block {
-                            number,
+                            number: number as Word,
                             timestamp: Duration::new(created_at_secs, created_at_nanos as u32),
                             solutions: Vec::new(),
                         })

@@ -3,7 +3,7 @@ pub mod empty;
 use empty::Empty;
 use essential_types::{
     contract::{Contract, SignedContract},
-    predicate::{Directive, Predicate},
+    predicate::Predicate,
     solution::{Mutation, Solution, SolutionData},
     PredicateAddress, Word,
 };
@@ -48,7 +48,6 @@ pub fn predicate_with_salt(salt: Word) -> Predicate {
             essential_constraint_vm::asm::Stack::Pop.into(),
         ])
         .collect()],
-        directive: Directive::Satisfy,
     }
 }
 
@@ -56,7 +55,7 @@ pub fn predicate_with_salt_and_state(salt: Word, key: Word) -> Predicate {
     Predicate {
         state_read: vec![essential_state_read_vm::asm::to_bytes(vec![
             essential_state_read_vm::asm::Stack::Push(1).into(),
-            essential_state_read_vm::asm::StateSlots::AllocSlots.into(),
+            essential_state_read_vm::asm::StateMemory::AllocSlots.into(),
             essential_state_read_vm::asm::Stack::Push(key).into(),
             essential_state_read_vm::asm::Stack::Push(1).into(),
             essential_state_read_vm::asm::Stack::Push(1).into(),
@@ -70,7 +69,6 @@ pub fn predicate_with_salt_and_state(salt: Word, key: Word) -> Predicate {
             essential_constraint_vm::asm::Stack::Pop.into(),
         ])
         .collect()],
-        directive: Directive::Satisfy,
     }
 }
 

@@ -23,7 +23,7 @@ pub struct Handle {
 pub struct Shutdown(oneshot::Receiver<()>);
 
 struct Solutions {
-    valid_solutions: Vec<(Arc<Solution>, f64)>,
+    valid_solutions: Vec<Arc<Solution>>,
     failed_solutions: Vec<(Arc<Solution>, SolutionFailReason)>,
 }
 
@@ -101,7 +101,7 @@ where
     let solved_solutions: Vec<Hash> = solutions
         .valid_solutions
         .iter()
-        .map(|s| hash(s.0.as_ref()))
+        .map(|s| hash(s.as_ref()))
         .collect();
 
     let data = CommitData {
@@ -168,7 +168,7 @@ where
     let solutions = if time_config.enable_time {
         // Add the block state solution at the begging of the block.
         let block_state_solution =
-            crate::protocol::block_state_solution(number, timestamp.as_secs());
+            crate::protocol::block_state_solution(number as u64, timestamp.as_secs());
         let mut s = vec![block_state_solution];
         s.extend(solutions);
         s
@@ -191,13 +191,13 @@ where
         match crate::checked_state_transition(&transaction, solution.clone(), &contract, config)
             .await
         {
-            Ok((post_state, util, _gas)) => {
+            Ok((post_state, _gas)) => {
                 // Update the transaction to the post state.
                 transaction = post_state;
                 // Collect the valid solution.
-                valid_solutions.push((solution, util));
+                valid_solutions.push(solution);
                 #[cfg(feature = "tracing")]
-                tracing::debug!(valid_solution = %solution_hash, utility = util);
+                tracing::debug!(valid_solution = %solution_hash);
             }
             Err(err) => {
                 // Collect the failed solution with the reason.
@@ -218,7 +218,7 @@ where
     }
 
     Ok((
-        number,
+        number as u64,
         timestamp,
         Solutions {
             valid_solutions,
