@@ -2,11 +2,11 @@
   "nodes": {
     "nixpkgs": {
       "locked": {
-        "lastModified": 1711333969,
-        "narHash": "sha256-5PiWGn10DQjMZee5NXzeA6ccsv60iLu+Xtw+mfvkUAs=",
+        "lastModified": 1728492678,
+        "narHash": "sha256-9UTxR8eukdg+XZeHgxW5hQA9fIKHsKCdOIUycTryeVw=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "57e6b3a9e4ebec5aa121188301f04a6b8c354c9b",
+        "rev": "5633bcff0c6162b9e4b5f1264264611e950c8ec7",
         "type": "github"
       },
       "original": {
@@ -14,44 +14,6 @@
         "ref": "nixos-unstable",
         "repo": "nixpkgs",
         "type": "github"
-      }
-    },
-    "pint": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "pint-src": "pint-src",
-        "systems": "systems"
-      },
-      "locked": {
-        "lastModified": 1715232066,
-        "narHash": "sha256-tdN++N0Ru7UoSEAv7t9AnNrsMujZntwImzN4X1YDxxk=",
-        "ref": "refs/heads/main",
-        "rev": "a14a6eebfcdcb053c090cf86ea830e3fba2c652b",
-        "revCount": 36,
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/pint.nix"
-      },
-      "original": {
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/pint.nix"
-      }
-    },
-    "pint-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1714483645,
-        "narHash": "sha256-o7vREHins92Rrp+FV//Es8LEWRBD1nOM6hjOZBed8mE=",
-        "ref": "refs/heads/master",
-        "rev": "b6b018155224eb3a33d25edd22b1d8249ac60f62",
-        "revCount": 1162,
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/pint"
-      },
-      "original": {
-        "type": "git",
-        "url": "ssh://git@github.com/essential-contributions/pint"
       }
     },
     "root": {
