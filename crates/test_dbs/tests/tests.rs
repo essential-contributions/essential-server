@@ -403,7 +403,7 @@ async fn update_and_query_state<S: Storage>(storage: S) {
     let key = vec![0; 4];
     let word = vec![42];
 
-    // Test updating the state without an contract
+    // Test updating the state without a contract
     storage
         .update_state(&address, &key, word.clone())
         .await
